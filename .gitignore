@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Datasets
+*.zip
+datasets/
+data/
+
+# Large ML files
+*.h5
+*.keras
+*.pt
+*.pth
+
+# Environment files
+.env
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+
+# Build
+dist/
+build/
