@@ -18,8 +18,8 @@ const StatusItem = ({ icon: Icon, label }) => (
 
 const SystemStatus = () => {
   return (
-    <div className="glass-panel p-5">
-      <h3 className="text-sm font-semibold text-slate-300 mb-4 uppercase tracking-wider">System Status</h3>
+    <div className="glass-panel p-4 sm:p-5">
+      <h3 className="text-xs sm:text-sm font-semibold text-slate-300 mb-3 sm:mb-4 uppercase tracking-wider">System Status</h3>
       
       <div className="space-y-1">
         <StatusItem icon={Cpu} label="AI Model" />
