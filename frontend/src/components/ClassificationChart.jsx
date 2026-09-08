@@ -12,10 +12,10 @@ const categories = [
 
 const ClassificationChart = () => {
   return (
-    <div className="glass-panel p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <BarChart3 size={20} className="text-cyan-400" />
-        <h2 className="text-lg font-semibold text-slate-200">Cyclone Classification</h2>
+    <div className="glass-panel p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-4 sm:mb-6">
+        <BarChart3 size={20} className="text-cyan-400 shrink-0" />
+        <h2 className="text-base sm:text-lg font-semibold text-slate-200">Cyclone Classification</h2>
       </div>
 
       <div className="space-y-4">

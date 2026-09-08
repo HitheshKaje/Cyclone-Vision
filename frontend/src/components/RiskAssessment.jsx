@@ -3,10 +3,10 @@ import { AlertTriangle, MapPin, Shield } from 'lucide-react';
 
 const RiskAssessment = () => {
   return (
-    <div className="glass-panel p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <AlertTriangle size={20} className="text-orange-400" />
-        <h2 className="text-lg font-semibold text-slate-200">Coastal Risk Assessment</h2>
+    <div className="glass-panel p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-4 sm:mb-6">
+        <AlertTriangle size={20} className="text-orange-400 shrink-0" />
+        <h2 className="text-base sm:text-lg font-semibold text-slate-200">Coastal Risk Assessment</h2>
       </div>
 
       <div className="bg-navy-900/50 border border-slate-700/50 rounded-xl p-5 mb-4 text-center">

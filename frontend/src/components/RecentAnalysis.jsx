@@ -9,8 +9,9 @@ const RecentAnalysis = () => {
         <h2 className="text-lg font-semibold text-slate-200">Recent Analyses</h2>
       </div>
 
-      <div className="overflow-x-auto flex-1">
-        <table className="w-full text-left text-sm text-slate-400">
+      <div className="overflow-x-auto w-full flex-1 -mx-4 sm:mx-0 px-4 sm:px-0">
+        <div className="inline-block min-w-full align-middle">
+          <table className="min-w-full text-left text-sm text-slate-400">
           <thead className="text-xs text-slate-500 uppercase bg-navy-800/50 border-b border-slate-700/50">
             <tr>
               <th className="px-4 py-3 font-medium">Date & Time</th>
@@ -29,6 +30,7 @@ const RecentAnalysis = () => {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
