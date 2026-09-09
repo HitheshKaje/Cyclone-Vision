@@ -44,12 +44,6 @@ def main():
     print(f"Recall:    {rec:.4f} (Crucial for Cyclone Detection)")
     print(f"F1-Score:  {f1:.4f}")
     
-    # Classification report
-    print("\nClassification Report:")
-    report = classification_report(y_test, y_pred, target_names=classes, output_dict=True)
-    print(classification_report(y_test, y_pred, target_names=classes))
-    
-    # Confusion Matrix
     cm = confusion_matrix(y_test, y_pred)
     tn, fp, fn, tp = cm.ravel()
     print("\nConfusion Matrix Details:")
@@ -58,7 +52,6 @@ def main():
     print(f"False Negatives (Cyclone MISSED): {fn}")
     print(f"True Positives (Cyclone correctly identified): {tp}")
     
-    # Save metrics
     metrics = {
         "accuracy": float(acc),
         "precision": float(prec),
@@ -66,16 +59,12 @@ def main():
         "f1_score": float(f1),
         "confusion_matrix": {
             "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)
-        },
-        "classification_report": report
+        }
     }
     
     os.makedirs('../outputs/metrics', exist_ok=True)
-    with open('../outputs/metrics/training_metrics.json', 'w') as f:
+    with open('../outputs/metrics/results.json', 'w') as f:
         json.dump(metrics, f, indent=4)
-        
-    with open('../outputs/metrics/classification_report.json', 'w') as f:
-        json.dump(report, f, indent=4)
         
     # Plot Confusion Matrix
     plt.figure(figsize=(8, 6))
