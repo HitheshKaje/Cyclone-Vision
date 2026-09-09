@@ -11,7 +11,7 @@ const IntensityCard = () => {
 
       <div className="space-y-4">
         <div className="p-4 rounded-lg border border-slate-700/50 bg-navy-900/50 flex items-center justify-center py-6 sm:py-8">
-          <p className="text-slate-500 font-medium text-base sm:text-lg text-center">Waiting for model output</p>
+          <p className="text-slate-500 font-medium text-sm sm:text-base text-center">Not available yet — Intensity module pending</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -20,7 +20,7 @@ const IntensityCard = () => {
               <Wind size={14} className="text-slate-500" />
               <p className="text-xs text-slate-400">Est. Wind Speed</p>
             </div>
-            <p className="text-xl font-bold text-slate-600">-- <span className="text-sm font-normal text-slate-600">knots</span></p>
+            <p className="text-lg font-medium text-slate-500">Not available</p>
           </div>
           
           <div className="p-3 rounded-lg border border-slate-700/50 bg-navy-900/50">
@@ -28,7 +28,7 @@ const IntensityCard = () => {
               <Zap size={14} className="text-slate-500" />
               <p className="text-xs text-slate-400">Confidence</p>
             </div>
-            <p className="text-xl font-bold text-slate-600">--%</p>
+            <p className="text-lg font-medium text-slate-500">Not available</p>
           </div>
         </div>
       </div>

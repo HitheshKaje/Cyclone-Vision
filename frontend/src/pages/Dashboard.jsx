@@ -1,5 +1,5 @@
-import React from 'react';
-import { Target, Activity, BarChart3, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Target, Activity, BarChart3, AlertTriangle, Info } from 'lucide-react';
 import OverviewCard from '../components/OverviewCard';
 import SatelliteUpload from '../components/SatelliteUpload';
 import DetectionResult from '../components/DetectionResult';
@@ -12,6 +12,14 @@ import RecentAnalysis from '../components/RecentAnalysis';
 import SystemStatus from '../components/SystemStatus';
 
 const Dashboard = () => {
+  const [analysisStatus, setAnalysisStatus] = useState("Pending"); // Pending, Analyzing, Completed, Error
+  const [predictionResult, setPredictionResult] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+
+  const handleAnalysisComplete = (data) => {
+    setPredictionResult(data);
+  };
+
   return (
     <div className="space-y-6 pb-10">
       {/* Overview Cards */}
@@ -19,26 +27,27 @@ const Dashboard = () => {
         <OverviewCard 
           title="Detection Status" 
           icon={Target} 
-          value="Pending" 
-          subtitle="Waiting for image upload" 
+          value={analysisStatus === 'Analyzing' ? 'Analyzing' : analysisStatus === 'Completed' ? (predictionResult?.is_cyclone ? 'Cyclone Detected' : 'No Cyclone') : analysisStatus} 
+          subtitle={analysisStatus === 'Completed' ? `Confidence: ${predictionResult?.confidence_percent}%` : "Waiting for image upload"} 
+          iconColor={analysisStatus === 'Completed' && predictionResult?.is_cyclone ? 'text-red-400' : 'text-cyan-400'}
         />
         <OverviewCard 
           title="Current Intensity" 
           icon={Activity} 
-          value="--" 
-          subtitle="No data available" 
+          value="Pending" 
+          subtitle="Not available yet — Intensity module pending" 
         />
         <OverviewCard 
           title="Cyclone Category" 
           icon={BarChart3} 
           value="Unknown" 
-          subtitle="Awaiting classification" 
+          subtitle="Not available yet — Intensity module pending" 
         />
         <OverviewCard 
           title="Risk Level" 
           icon={AlertTriangle} 
           value="None" 
-          subtitle="No active threat detected" 
+          subtitle="Not available yet — Intensity module pending" 
         />
       </div>
 
@@ -48,11 +57,17 @@ const Dashboard = () => {
         {/* Left Column - Image & Detection */}
         <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           <div className="min-h-[300px] md:min-h-[400px] flex flex-col">
-            <SatelliteUpload />
+            <SatelliteUpload 
+              onAnalysisComplete={handleAnalysisComplete}
+              analysisStatus={analysisStatus}
+              setAnalysisStatus={setAnalysisStatus}
+              imagePreview={imagePreview}
+              setImagePreview={setImagePreview}
+            />
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-            <DetectionResult />
+            <DetectionResult predictionResult={predictionResult} analysisStatus={analysisStatus} />
             <IntensityCard />
           </div>
           
