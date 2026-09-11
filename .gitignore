@@ -31,3 +31,9 @@ node_modules/
 # Build
 dist/
 build/
+# Objective 2 - TCIR large dataset files
+backend/ml/intensity/dataset/*.h5
+backend/ml/intensity/dataset/*.hdf5
+backend/ml/intensity/dataset/*.tar
+backend/ml/intensity/dataset/*.tar.gz
+backend/ml/intensity/dataset/*.npz
