@@ -45,6 +45,15 @@ def preprocess_single_image_file(image_path, target_size=TARGET_IMG_SIZE):
     """
     Preprocess an arbitrary image file (e.g. uploaded via API or CLI)
     into the format expected by the intensity regression model.
+    
+    Scientific Note & Domain Limitation:
+    Standard visual/grayscale satellite imagery (JPG/PNG) has opposite polarity
+    to meteorological Infrared (IR1) brightness temperature data:
+      - In visual imagery: bright/dense cloud tops have high pixel values (~255 -> 1.0).
+      - In physical IR1 data: cold convective cloud tops have low Kelvin temperatures (~180K -> 0.0).
+    Applying polarity inversion (1.0 - norm_gray) maps visual cloud brightness
+    to the low-value representation learned by the TCIR IR1-trained model.
+    However, 8-bit visible JPGs lack true physical radiometric calibration (Kelvin).
     """
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image not found at: {image_path}")
@@ -59,11 +68,12 @@ def preprocess_single_image_file(image_path, target_size=TARGET_IMG_SIZE):
     else:
         gray = img
         
-    # Normalize pixel values [0, 255] -> [0, 1]
-    norm_gray = gray.astype(np.float32) / 255.0
+    # Normalize pixel values [0, 255] -> [0, 1] with polarity inversion:
+    # High visual brightness (clouds) -> Low normalized value (cold convective cloud top in TCIR IR1)
+    norm_inverted = 1.0 - (gray.astype(np.float32) / 255.0)
     
     # Resize and convert to 3 channels
-    resized = cv2.resize(norm_gray, target_size, interpolation=cv2.INTER_LINEAR)
+    resized = cv2.resize(norm_inverted, target_size, interpolation=cv2.INTER_LINEAR)
     img_3ch = np.stack([resized, resized, resized], axis=-1)
     return img_3ch.astype(np.float32)
 

@@ -68,10 +68,8 @@ async def estimate_cyclone_intensity(image: UploadFile = File(...)):
         img_batch = np.expand_dims(img_data, axis=0)
         raw_pred = model.predict(img_batch)[0][0]
         
-        # 6. Convert predicted Vmax into native Python float
+        # 6. Convert predicted Vmax into native Python float (real model output)
         predicted_wind_speed = float(raw_pred)
-        # Ensure predicted value is non-negative
-        predicted_wind_speed = max(0.0, predicted_wind_speed)
         
         return {
             "success": True,
