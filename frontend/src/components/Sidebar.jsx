@@ -7,7 +7,10 @@ import {
   Database, 
   Users, 
   X,
-  Globe2
+  Globe2,
+  Bell,
+  User,
+  ChevronDown
 } from 'lucide-react';
 
 const navItems = [
@@ -68,6 +71,57 @@ const Sidebar = ({ isOpen, isMobile, closeSidebar, activeTab, setActiveTab }) =>
             </button>
           );
         })}
+
+        {/* Responsive Notification & User Account for viewport <= 340px */}
+        <div className="sidebar-mobile-controls pt-2 mt-2 border-t border-slate-200/80 space-y-1.5">
+          <style>{`
+            @media (min-width: 341px) {
+              .sidebar-mobile-controls {
+                display: none !important;
+              }
+            }
+            @media (max-width: 340px) {
+              .sidebar-mobile-controls {
+                display: block !important;
+              }
+            }
+          `}</style>
+
+          {/* Notifications in Sidebar (<= 300px) */}
+          <button
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-sky-50/80 hover:text-sky-700 transition-all duration-200"
+            title="Notifications"
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative flex items-center justify-center shrink-0">
+                <Bell size={18} className="text-slate-500" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-1 ring-white" />
+              </div>
+              <span className="whitespace-nowrap overflow-hidden text-ellipsis text-left">
+                Notifications
+              </span>
+            </div>
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-600 rounded-full">
+              1 New
+            </span>
+          </button>
+
+          {/* User Account in Sidebar (<= 300px) */}
+          <div
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-sky-50/80 hover:text-sky-700 transition-all duration-200 cursor-pointer"
+            title="User Account"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shrink-0 text-xs font-bold shadow-xs">
+                <User size={14} />
+              </div>
+              <span className="whitespace-nowrap overflow-hidden text-ellipsis text-left">
+                Hi, User
+              </span>
+            </div>
+            <ChevronDown size={14} className="text-slate-400 shrink-0" />
+          </div>
+        </div>
       </nav>
       
       {/* Bottom Globe Graphic & Motto */}
