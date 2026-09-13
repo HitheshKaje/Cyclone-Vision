@@ -1,39 +1,118 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy-700: #233554;
-  --color-navy-800: #112240;
-  --color-navy-900: #0a192f;
-  --color-cyan-400: #64ffda;
-  --color-cyan-500: #06b6d4;
-  --color-cyan-600: #0891b2;
+  --color-brand-50: #f0f9ff;
+  --color-brand-100: #e0f2fe;
+  --color-brand-200: #bae6fd;
+  --color-brand-300: #7dd3fc;
+  --color-brand-400: #38bdf8;
+  --color-brand-500: #0ea5e9;
+  --color-brand-600: #0284c7;
+  --color-brand-700: #0369a1;
+  --color-brand-800: #075985;
+  --color-brand-900: #0c4a6e;
 }
 
 body {
-  @apply bg-navy-900 text-slate-300 antialiased;
+  @apply bg-slate-50 text-slate-800 antialiased;
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: #f8fafc;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(224, 242, 254, 0.5) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(186, 230, 253, 0.4) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(240, 249, 255, 0.6) 0px, transparent 50%);
+  background-attachment: fixed;
 }
 
+/* Custom modern light scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  @apply bg-navy-900;
+  background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-navy-700 rounded-full;
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-600;
+  background: #94a3b8;
 }
 
-@layer components {
-  .glass-panel {
-    @apply bg-navy-800/80 backdrop-blur-md border border-slate-700/50 shadow-xl rounded-xl transition-all duration-300;
+/* Glass and Surface Panels */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(224, 242, 254, 0.85);
+  box-shadow: 0 4px 20px -2px rgba(14, 165, 233, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+  border-radius: 1rem;
+  transition: all 0.25s ease-in-out;
+}
+
+.glass-panel:hover {
+  border-color: rgba(186, 230, 253, 1);
+  box-shadow: 0 10px 25px -3px rgba(14, 165, 233, 0.1), 0 4px 8px -2px rgba(0, 0, 0, 0.04);
+}
+
+.glass-panel-subtle {
+  background: rgba(240, 249, 255, 0.6);
+  border: 1px solid rgba(224, 242, 254, 0.75);
+  border-radius: 0.75rem;
+}
+
+/* Scanline Animation for Satellite Analysis */
+@keyframes scanline-sweep {
+  0% {
+    top: 0%;
+    opacity: 0;
   }
-  .glass-panel:hover {
-    @apply border-slate-600/50 shadow-2xl;
+  15% {
+    opacity: 1;
   }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.scanline-laser {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, #06b6d4 25%, #38bdf8 50%, #06b6d4 75%, transparent 100%);
+  box-shadow: 0 0 12px #06b6d4, 0 0 24px #38bdf8;
+  animation: scanline-sweep 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  z-index: 20;
+}
+
+/* Radar pulse animation */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+}
+
+.radar-pulse-anim {
+  animation: pulse-ring 3s ease-in-out infinite;
+}
+
+/* Wind gauge smooth transition */
+.gauge-arc {
+  transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
 }
