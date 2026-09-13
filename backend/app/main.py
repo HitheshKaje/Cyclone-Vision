@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import detection
+from routes import detection, intensity
 
 app = FastAPI(title="CycloneVision API", description="AI-Driven Tropical Cyclone Detection API")
 
@@ -15,6 +15,7 @@ app.add_middleware(
 )
 
 app.include_router(detection.router, prefix="/api")
+app.include_router(intensity.router, prefix="/api")
 
 @app.get("/")
 def read_root():

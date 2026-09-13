@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, Activity, BarChart3, AlertTriangle, Info } from 'lucide-react';
+import { Target, Activity, BarChart3, AlertTriangle } from 'lucide-react';
 import OverviewCard from '../components/OverviewCard';
 import SatelliteUpload from '../components/SatelliteUpload';
 import DetectionResult from '../components/DetectionResult';
@@ -13,11 +13,17 @@ import SystemStatus from '../components/SystemStatus';
 
 const Dashboard = () => {
   const [analysisStatus, setAnalysisStatus] = useState("Pending"); // Pending, Analyzing, Completed, Error
+  const [intensityStatus, setIntensityStatus] = useState("Pending"); // Pending, Estimating, Completed, Not Applicable, Error
   const [predictionResult, setPredictionResult] = useState(null);
+  const [intensityResult, setIntensityResult] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
 
   const handleAnalysisComplete = (data) => {
     setPredictionResult(data);
+  };
+
+  const handleIntensityComplete = (data) => {
+    setIntensityResult(data);
   };
 
   return (
@@ -27,15 +33,32 @@ const Dashboard = () => {
         <OverviewCard 
           title="Detection Status" 
           icon={Target} 
-          value={analysisStatus === 'Analyzing' ? 'Analyzing' : analysisStatus === 'Completed' ? (predictionResult?.is_cyclone ? 'Cyclone Detected' : 'No Cyclone') : analysisStatus} 
+          value={analysisStatus === 'Analyzing' ? 'Analyzing...' : analysisStatus === 'Completed' ? (predictionResult?.is_cyclone ? 'Cyclone Detected' : 'No Cyclone') : analysisStatus} 
           subtitle={analysisStatus === 'Completed' ? `Confidence: ${predictionResult?.confidence_percent}%` : "Waiting for image upload"} 
           iconColor={analysisStatus === 'Completed' && predictionResult?.is_cyclone ? 'text-red-400' : 'text-cyan-400'}
         />
         <OverviewCard 
           title="Current Intensity" 
           icon={Activity} 
-          value="Pending" 
-          subtitle="Not available yet — Intensity module pending" 
+          value={
+            intensityStatus === 'Estimating'
+              ? 'Estimating...'
+              : intensityStatus === 'Completed' && intensityResult
+              ? `${intensityResult.predicted_wind_speed_kt} kt`
+              : intensityStatus === 'Not Applicable'
+              ? 'N/A'
+              : 'Pending'
+          } 
+          subtitle={
+            intensityStatus === 'Completed' && intensityResult
+              ? `Model: ${intensityResult.model}`
+              : intensityStatus === 'Not Applicable'
+              ? 'No cyclone detected'
+              : intensityStatus === 'Estimating'
+              ? 'Estimating intensity...'
+              : 'Awaiting cyclone detection'
+          } 
+          iconColor={intensityStatus === 'Completed' && intensityResult ? 'text-amber-400' : 'text-cyan-400'}
         />
         <OverviewCard 
           title="Cyclone Category" 
@@ -59,8 +82,11 @@ const Dashboard = () => {
           <div className="min-h-[300px] md:min-h-[400px] flex flex-col">
             <SatelliteUpload 
               onAnalysisComplete={handleAnalysisComplete}
+              onIntensityComplete={handleIntensityComplete}
               analysisStatus={analysisStatus}
               setAnalysisStatus={setAnalysisStatus}
+              intensityStatus={intensityStatus}
+              setIntensityStatus={setIntensityStatus}
               imagePreview={imagePreview}
               setImagePreview={setImagePreview}
             />
@@ -68,7 +94,11 @@ const Dashboard = () => {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <DetectionResult predictionResult={predictionResult} analysisStatus={analysisStatus} />
-            <IntensityCard />
+            <IntensityCard 
+              intensityResult={intensityResult} 
+              intensityStatus={intensityStatus} 
+              isCyclone={predictionResult?.is_cyclone}
+            />
           </div>
           
           <div className="min-h-[300px] md:min-h-[400px] flex flex-col">

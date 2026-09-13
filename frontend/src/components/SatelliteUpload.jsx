@@ -1,7 +1,16 @@
 import React, { useState, useRef } from 'react';
 import { UploadCloud, Image as ImageIcon, Loader2 } from 'lucide-react';
 
-const SatelliteUpload = ({ onAnalysisComplete, analysisStatus, setAnalysisStatus, imagePreview, setImagePreview }) => {
+const SatelliteUpload = ({
+  onAnalysisComplete,
+  onIntensityComplete,
+  analysisStatus,
+  setAnalysisStatus,
+  intensityStatus,
+  setIntensityStatus,
+  imagePreview,
+  setImagePreview
+}) => {
   const [file, setFile] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -16,6 +25,7 @@ const SatelliteUpload = ({ onAnalysisComplete, analysisStatus, setAnalysisStatus
       };
       reader.readAsDataURL(selectedFile);
       setAnalysisStatus('Pending');
+      setIntensityStatus('Pending');
     }
   };
 
@@ -23,26 +33,58 @@ const SatelliteUpload = ({ onAnalysisComplete, analysisStatus, setAnalysisStatus
     if (!file) return;
     
     setAnalysisStatus('Analyzing');
+    setIntensityStatus('Pending');
     
     const formData = new FormData();
     formData.append('image', file);
     
     try {
+      // Step 1: Objective 1 Cyclone Detection
       const response = await fetch('http://localhost:8000/api/detect', {
         method: 'POST',
         body: formData,
       });
       
       if (!response.ok) {
-        throw new Error('Analysis failed');
+        throw new Error('Detection request failed');
       }
       
-      const data = await response.json();
-      onAnalysisComplete(data);
+      const detectData = await response.json();
+      onAnalysisComplete(detectData);
       setAnalysisStatus('Completed');
+      
+      // Step 2: Objective 2 Intensity Estimation (ONLY if Cyclone is detected)
+      if (detectData.is_cyclone) {
+        setIntensityStatus('Estimating');
+        try {
+          const intensityFormData = new FormData();
+          intensityFormData.append('image', file);
+          const intensityResponse = await fetch('http://localhost:8000/api/intensity', {
+            method: 'POST',
+            body: intensityFormData,
+          });
+          
+          if (!intensityResponse.ok) {
+            throw new Error('Intensity request failed');
+          }
+          
+          const intensityData = await intensityResponse.json();
+          onIntensityComplete(intensityData);
+          setIntensityStatus('Completed');
+        } catch (intErr) {
+          console.error('Intensity Error:', intErr);
+          setIntensityStatus('Error');
+          onIntensityComplete(null);
+        }
+      } else {
+        // If No Cyclone is detected, do NOT call intensity API
+        setIntensityStatus('Not Applicable');
+        onIntensityComplete(null);
+      }
     } catch (error) {
-      console.error(error);
+      console.error('Detection Error:', error);
       setAnalysisStatus('Error');
+      setIntensityStatus('Pending');
     }
   };
 
@@ -51,7 +93,7 @@ const SatelliteUpload = ({ onAnalysisComplete, analysisStatus, setAnalysisStatus
       <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
         <h2 className="text-base sm:text-lg font-semibold text-slate-200">Satellite Image Analysis</h2>
         <span className="text-xs px-2 py-1 bg-slate-800 rounded-md text-slate-400 border border-slate-700">
-          {analysisStatus === 'Analyzing' ? 'Analyzing...' : 'Awaiting Input'}
+          {analysisStatus === 'Analyzing' ? 'Detecting Cyclone...' : intensityStatus === 'Estimating' ? 'Estimating Intensity...' : 'Awaiting Input'}
         </span>
       </div>
 
@@ -93,9 +135,9 @@ const SatelliteUpload = ({ onAnalysisComplete, analysisStatus, setAnalysisStatus
       <div className="mt-4 flex justify-end">
         <button 
           onClick={handleAnalyze}
-          disabled={!file || analysisStatus === 'Analyzing'} 
+          disabled={!file || analysisStatus === 'Analyzing' || intensityStatus === 'Estimating'} 
           className={`w-full sm:w-auto px-6 py-3 sm:py-2 rounded-lg font-medium border flex items-center justify-center gap-2 ${
-            file && analysisStatus !== 'Analyzing'
+            file && analysisStatus !== 'Analyzing' && intensityStatus !== 'Estimating'
               ? 'bg-cyan-600 text-cyan-50 border-cyan-500 cursor-pointer hover:bg-cyan-500' 
               : 'bg-cyan-600/50 text-cyan-200/50 cursor-not-allowed border-cyan-500/20'
           }`}
@@ -103,7 +145,12 @@ const SatelliteUpload = ({ onAnalysisComplete, analysisStatus, setAnalysisStatus
           {analysisStatus === 'Analyzing' ? (
             <>
               <Loader2 className="animate-spin" size={18} />
-              Analyzing...
+              Detecting Cyclone...
+            </>
+          ) : intensityStatus === 'Estimating' ? (
+            <>
+              <Loader2 className="animate-spin" size={18} />
+              Estimating Intensity...
             </>
           ) : (
             'Analyze Image'
