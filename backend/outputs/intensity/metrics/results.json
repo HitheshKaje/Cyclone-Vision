@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-09-13T00:22:48.447374",
+  "model_architecture": "EfficientNetB0-Regression",
+  "objective": "Objective 2: Tropical Cyclone Intensity Estimation",
+  "basin": "Indian Ocean (IO)",
+  "dataset_split": {
+    "total_frames": 3205,
+    "total_storms": 75,
+    "train_storms": 53,
+    "train_frames": 2325,
+    "val_storms": 11,
+    "val_frames": 497,
+    "test_storms": 11,
+    "test_frames": 383,
+    "test_storm_ids": [
+      "200504I",
+      "200602I",
+      "200605I",
+      "200705I",
+      "200801I",
+      "200804I",
+      "200806I",
+      "200902I",
+      "201002I",
+      "201204I",
+      "201402I"
+    ]
+  },
+  "training_summary": {
+    "epochs_completed": 50,
+    "best_epoch": 45,
+    "batch_size": 32,
+    "optimizer": "Adam(lr=1e-4)",
+    "loss_function": "Huber(delta=1.0)"
+  },
+  "test_metrics": {
+    "mae_knots": 10.7561,
+    "rmse_knots": 14.8302,
+    "r2_score": 0.5629
+  },
+  "model_path": "D:\\MainProjectMl\\ProjectCode\\backend\\models\\cyclone_intensity.keras"
+}
