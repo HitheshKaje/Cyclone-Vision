@@ -31,9 +31,9 @@ const PipelineStepper = ({ analysisStatus, intensityStatus, isCyclone }) => {
     {
       number: 4,
       title: 'Classification',
-      subtitle: 'Coming Next',
-      status: 'future',
-      badgeColor: 'bg-slate-300 text-slate-600',
+      subtitle: isIntensityDone ? 'LOW / MEDIUM / SEVERE' : 'Rule-based 3-tier scale',
+      status: isIntensityDone ? 'completed' : isDetectionDone && isCyclone ? 'active' : 'upcoming',
+      badgeColor: isIntensityDone ? 'bg-amber-600 text-white' : 'bg-slate-300 text-slate-600',
     },
     {
       number: 5,

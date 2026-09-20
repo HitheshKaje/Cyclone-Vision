@@ -13,7 +13,13 @@ INTENSITY_ML_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../
 if INTENSITY_ML_PATH not in sys.path:
     sys.path.append(INTENSITY_ML_PATH)
 
+# Add app directory to sys.path to import services reliably
+APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if APP_DIR not in sys.path:
+    sys.path.append(APP_DIR)
+
 from preprocessing_intensity import preprocess_single_image_file
+from services.classifier import get_cyclone_classifier
 
 # Global variable for model to avoid loading it on every request
 INTENSITY_MODEL = None
@@ -34,8 +40,7 @@ def get_intensity_model():
 @router.post("/intensity")
 async def estimate_cyclone_intensity(image: UploadFile = File(...)):
     """
-    Estimate the maximum sustained wind speed (Vmax in knots) of a tropical cyclone.
-    Expected output: continuous regression prediction in knots.
+    Estimate maximum sustained wind speed (Vmax in knots) and classify intensity (LOW, MEDIUM, SEVERE).
     """
     # 1. Validate file format
     if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
@@ -68,12 +73,20 @@ async def estimate_cyclone_intensity(image: UploadFile = File(...)):
         img_batch = np.expand_dims(img_data, axis=0)
         raw_pred = model.predict(img_batch)[0][0]
         
-        # 6. Convert predicted Vmax into native Python float (real model output)
+        # 6. Convert predicted Vmax into native Python float
         predicted_wind_speed = float(raw_pred)
+        
+        # 7. Apply Objective 3 rule-based classification
+        classifier = get_cyclone_classifier()
+        classification_result = classifier.classify(predicted_wind_speed)
         
         return {
             "success": True,
-            "predicted_wind_speed_kt": round(predicted_wind_speed, 1),
+            "predicted_wind_speed_kt": classification_result["wind_speed_kt"],
+            "wind_speed_kt": classification_result["wind_speed_kt"],
+            "wind_speed_kmh": classification_result["wind_speed_kmh"],
+            "classification": classification_result["classification"],
+            "description": classification_result["description"],
             "model": "EfficientNetB0-TCIR-Intensity"
         }
     except HTTPException:
@@ -84,3 +97,4 @@ async def estimate_cyclone_intensity(image: UploadFile = File(...)):
         # Cleanup temporary file
         if os.path.exists(temp_path):
             os.remove(temp_path)
+

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Activity, Wind, Info, Gauge, Loader2, AlertCircle } from 'lucide-react';
+import { Activity, Wind, Info, Gauge, Loader2, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
-const WindGauge = ({ windSpeedKt }) => {
+const WindGauge = ({ windSpeedKt, classification }) => {
   // Clamp for gauge visualization (0 to 140 knots)
   const maxScale = 140;
   const speed = typeof windSpeedKt === 'number' ? Math.max(0, windSpeedKt) : 0;
@@ -17,14 +17,15 @@ const WindGauge = ({ windSpeedKt }) => {
   const totalDash = circumference * arcFraction;
   const dashOffset = totalDash * (1 - percentage);
 
-  // Dynamic Color based on meteorological intensity
-  let strokeColor = "#0284c7"; // Sky blue (< 34 kt)
-  if (speed >= 34 && speed < 64) {
-    strokeColor = "#06b6d4"; // Cyan/Teal (Cyclonic Storm)
-  } else if (speed >= 64 && speed < 90) {
-    strokeColor = "#f59e0b"; // Amber (Severe)
-  } else if (speed >= 90) {
-    strokeColor = "#ef4444"; // Red (Very Severe / Super Cyclone)
+  // Dynamic color based on classification
+  let strokeColor = "#10b981"; // Emerald / Green for LOW
+  if (classification === 'MEDIUM') {
+    strokeColor = "#f59e0b"; // Amber for MEDIUM
+  } else if (classification === 'SEVERE') {
+    strokeColor = "#ef4444"; // Red for SEVERE
+  } else {
+    if (speed >= 64) strokeColor = "#ef4444";
+    else if (speed >= 34) strokeColor = "#f59e0b";
   }
 
   const speedKmh = (speed * 1.852).toFixed(1);
@@ -80,8 +81,24 @@ const WindGauge = ({ windSpeedKt }) => {
 
 const IntensityCard = ({ intensityResult, intensityStatus, isCyclone }) => {
   const isCompleted = intensityStatus === 'Completed' && intensityResult;
-  const windSpeedKt = isCompleted ? intensityResult.predicted_wind_speed_kt : null;
-  const windSpeedKmh = windSpeedKt !== null ? (windSpeedKt * 1.852).toFixed(1) : null;
+  
+  // Extract wind speed values
+  const windSpeedKt = isCompleted
+    ? (intensityResult.wind_speed_kt ?? intensityResult.predicted_wind_speed_kt)
+    : null;
+    
+  const windSpeedKmh = isCompleted
+    ? (intensityResult.wind_speed_kmh ?? (windSpeedKt !== null ? Number((windSpeedKt * 1.852).toFixed(1)) : null))
+    : null;
+
+  // Determine classification (from backend or fallback rule)
+  const classification = isCompleted
+    ? (intensityResult.classification || (windSpeedKt >= 64 ? 'SEVERE' : windSpeedKt >= 34 ? 'MEDIUM' : 'LOW'))
+    : null;
+
+  const description = isCompleted
+    ? (intensityResult.description || (classification === 'SEVERE' ? 'High-intensity severe tropical cyclone' : classification === 'MEDIUM' ? 'Moderate-intensity cyclonic storm' : 'Low-intensity tropical disturbance / depression'))
+    : null;
 
   return (
     <div className="glass-panel p-5 sm:p-6 flex flex-col justify-between">
@@ -92,60 +109,115 @@ const IntensityCard = ({ intensityResult, intensityStatus, isCyclone }) => {
             <Activity size={18} className="shrink-0" />
           </div>
           <h3 className="text-base font-bold text-slate-900">
-            Intensity Estimation <span className="text-xs font-semibold text-cyan-600">(Objective 2)</span>
+            Intensity & Classification <span className="text-xs font-semibold text-cyan-600">(Objectives 2 & 3)</span>
           </h3>
         </div>
         {isCompleted && (
           <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200">
-            Regression
+            AI + Rules
           </span>
         )}
       </div>
 
-      {/* Main Intensity Content */}
+      {/* Main Intensity & Classification Content */}
       {isCompleted ? (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
           {/* Left: Interactive Wind Speed Gauge */}
           <div className="md:col-span-5 flex justify-center border-b md:border-b-0 md:border-r border-sky-100 pb-3 md:pb-0 md:pr-3">
-            <WindGauge windSpeedKt={windSpeedKt} />
+            <WindGauge windSpeedKt={windSpeedKt} classification={classification} />
           </div>
 
-          {/* Right: Detailed Metadata Info */}
-          <div className="md:col-span-7 space-y-3">
+          {/* Right: Intensity & Classification Details */}
+          <div className="md:col-span-7 space-y-4">
+            
+            {/* Section 1: CYCLONE INTENSITY */}
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Estimated Maximum Sustained Wind Speed
+              <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+                CYCLONE INTENSITY
               </p>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl sm:text-3xl font-black text-sky-800">
-                  {windSpeedKt} kt
+              <div className="flex items-baseline gap-2.5 mt-1">
+                <span className="text-3xl sm:text-4xl font-black text-sky-900 tracking-tight">
+                  {windSpeedKt} KT
                 </span>
-                <span className="text-xs sm:text-sm font-semibold text-slate-500">
-                  ≈ {windSpeedKmh} km/h
+                <span className="text-sm sm:text-base font-bold text-slate-500">
+                  {windSpeedKmh} KM/H
                 </span>
               </div>
             </div>
 
-            <div className="space-y-1.5 pt-1 text-xs border-t border-sky-100/80">
-              <div className="flex items-center justify-between text-slate-600">
-                <span className="font-semibold text-slate-500">Model Used:</span>
-                <span className="font-bold text-slate-800 font-mono">
+            {/* Section 2: CLASSIFICATION */}
+            <div className="pt-2 border-t border-sky-100/90">
+              <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-1.5">
+                CLASSIFICATION
+              </p>
+              
+              {/* Distinct 3-Level Indicator (LOW | MEDIUM | SEVERE) */}
+              <div className="flex items-center gap-2 p-1.5 rounded-xl bg-slate-100/80 border border-slate-200">
+                {/* LOW Indicator */}
+                <div
+                  className={`flex-1 text-center py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
+                    classification === 'LOW'
+                      ? 'bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-300/80 scale-[1.02]'
+                      : 'text-slate-400 opacity-60'
+                  }`}
+                >
+                  LOW
+                </div>
+
+                {/* MEDIUM Indicator */}
+                <div
+                  className={`flex-1 text-center py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
+                    classification === 'MEDIUM'
+                      ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-300/80 scale-[1.02]'
+                      : 'text-slate-400 opacity-60'
+                  }`}
+                >
+                  MEDIUM
+                </div>
+
+                {/* SEVERE Indicator */}
+                <div
+                  className={`flex-1 text-center py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
+                    classification === 'SEVERE'
+                      ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-300/80 scale-[1.02]'
+                      : 'text-slate-400 opacity-60'
+                  }`}
+                >
+                  SEVERE
+                </div>
+              </div>
+
+              {/* Classification Subtitle / Description */}
+              <p className="text-xs font-semibold text-slate-700 mt-2 flex items-center gap-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    classification === 'SEVERE'
+                      ? 'bg-rose-600'
+                      : classification === 'MEDIUM'
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-500'
+                  }`}
+                />
+                <span>{description}</span>
+              </p>
+            </div>
+
+            {/* Model Provenance Metadata */}
+            <div className="space-y-1 pt-2 text-[11px] border-t border-sky-100/80 text-slate-500">
+              <div className="flex items-center justify-between">
+                <span>Intensity Model:</span>
+                <span className="font-bold text-slate-700 font-mono">
                   {intensityResult.model || 'EfficientNetB0-TCIR-Intensity'}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-slate-600">
-                <span className="font-semibold text-slate-500">Task:</span>
+              <div className="flex items-center justify-between">
+                <span>Classification Layer:</span>
                 <span className="font-semibold text-slate-700">
-                  Image-to-Intensity Regression
+                  Rule-Based Vmax Thresholds
                 </span>
               </div>
             </div>
 
-            {/* Info note */}
-            <div className="p-2.5 rounded-xl bg-sky-50/70 border border-sky-100 flex items-start gap-2 text-[11px] text-slate-600">
-              <Info size={14} className="text-sky-600 shrink-0 mt-0.5" />
-              <span>This is the model's estimated maximum sustained wind speed based on the satellite image.</span>
-            </div>
           </div>
         </div>
       ) : intensityStatus === 'Estimating' ? (
@@ -153,19 +225,19 @@ const IntensityCard = ({ intensityResult, intensityStatus, isCyclone }) => {
         <div className="p-8 rounded-2xl bg-cyan-50/40 border border-cyan-100 flex flex-col items-center justify-center text-center space-y-3">
           <Loader2 size={32} className="animate-spin text-cyan-600" />
           <div>
-            <p className="text-sm font-bold text-slate-800">Estimating Cyclone Intensity...</p>
-            <p className="text-xs text-slate-500 mt-0.5">Running EfficientNetB0 regression on convective storm features</p>
+            <p className="text-sm font-bold text-slate-800">Estimating Cyclone Intensity & Classification...</p>
+            <p className="text-xs text-slate-500 mt-0.5">Running EfficientNetB0 regression & rule-based classification</p>
           </div>
         </div>
       ) : intensityStatus === 'Not Applicable' ? (
-        /* Not applicable (No Cyclone) */
+        /* Not applicable (No Cyclone detected) */
         <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center text-center space-y-2">
           <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
             <Wind size={20} />
           </div>
-          <p className="text-sm font-bold text-slate-700">Intensity Estimation Skipped</p>
+          <p className="text-sm font-bold text-slate-700">Intensity & Classification Skipped</p>
           <p className="text-xs text-slate-500 max-w-xs">
-            Objective 1 detected No Cyclone in the uploaded image. Intensity estimation is only performed for active cyclone threats.
+            Objective 1 detected No Cyclone in the uploaded image. Intensity estimation and classification are only performed for active cyclone threats.
           </p>
         </div>
       ) : (
@@ -176,7 +248,7 @@ const IntensityCard = ({ intensityResult, intensityStatus, isCyclone }) => {
           </div>
           <p className="text-sm font-bold text-slate-700">Awaiting Cyclone Detection</p>
           <p className="text-xs text-slate-500 max-w-xs">
-            Intensity will be estimated dynamically when a cyclone is detected in the satellite frame.
+            Intensity and classification will be generated dynamically when a cyclone is detected in the satellite frame.
           </p>
         </div>
       )}
