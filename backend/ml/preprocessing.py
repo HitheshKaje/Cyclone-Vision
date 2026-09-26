@@ -5,10 +5,16 @@ from sklearn.model_selection import train_test_split
 
 IMG_SIZE = (224, 224)
 
-def load_and_preprocess_image(img_path):
+def load_and_preprocess_image(img_input):
     try:
-        # Read image
-        img = cv2.imread(img_path)
+        # Read image from array, bytes, or path
+        if isinstance(img_input, np.ndarray):
+            img = img_input
+        elif isinstance(img_input, bytes):
+            img = cv2.imdecode(np.frombuffer(img_input, np.uint8), cv2.IMREAD_COLOR)
+        else:
+            img = cv2.imread(str(img_input))
+
         if img is None:
             return None
             
@@ -20,7 +26,7 @@ def load_and_preprocess_image(img_path):
         
         return img
     except Exception as e:
-        print(f"Error loading {img_path}: {e}")
+        print(f"Error loading {img_input}: {e}")
         return None
 
 def load_dataset(dataset_dir):
