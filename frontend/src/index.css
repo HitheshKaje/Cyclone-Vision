@@ -59,3 +59,24 @@ body {
 .gauge-arc {
   transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease;
 }
+
+/* Cyclone Logo Smooth Clockwise (Rightward) Rotation */
+@keyframes spinClockwise {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-cyclone-spin {
+  animation: spinClockwise 12s linear infinite;
+  transform-origin: center center;
+  display: block;
+}
+
+.animate-cyclone-spin:hover {
+  animation-duration: 4s;
+}
+

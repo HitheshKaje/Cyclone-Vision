@@ -1,13 +1,14 @@
 import React from 'react';
 import { Menu, Bell, User, ChevronDown } from 'lucide-react';
+import cycloneLogo from '../assets/cyclone-logo.png';
 
 const CycloSafeLogo = () => (
-  <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center shadow-xs shrink-0">
-    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 14a4 4 0 1 1 4-4 4 4 0 0 1-4 4z" />
-      <path d="M12 6a6 6 0 0 1 6 6" />
-      <path d="M12 18a6 6 0 0 1-6-6" />
-    </svg>
+  <div className="flex items-center justify-center shrink-0">
+    <img 
+      src={cycloneLogo} 
+      alt="CycloSafe Cyclone Logo" 
+      className="w-10 h-10 sm:w-11 sm:h-11 object-contain animate-cyclone-spin"
+    />
   </div>
 );
 
@@ -28,13 +29,13 @@ const Header = ({ toggleSidebar }) => {
             </button>
           )}
 
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <CycloSafeLogo />
             <div className="flex flex-col min-w-0">
-              <span className="text-lg font-bold text-slate-900 tracking-tight leading-none truncate">
+              <span className="text-xl font-bold text-slate-900 tracking-tight leading-tight truncate">
                 Cyclo<span className="text-sky-600">Safe</span>
               </span>
-              <span className="hidden sm:inline-block text-[11px] font-medium text-slate-500 tracking-normal mt-0.5 truncate">
+              <span className="hidden sm:inline-block text-[11px] font-medium text-slate-500 tracking-normal truncate">
                 AI-Based Tropical Cyclone Monitoring
               </span>
             </div>
