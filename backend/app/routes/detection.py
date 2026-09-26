@@ -1,9 +1,11 @@
 import os
 import sys
 import time
+import logging
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from services.ml_service import ml_service
 
+logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
 
 def get_model():
@@ -35,10 +37,15 @@ async def detect_cyclone(image: UploadFile = File(...)):
         t_total = time.perf_counter() - t_start
 
         # Performance diagnostics
-        print(f"[PERF] Image read: {t_read:.4f}s")
-        print(f"[PERF] Image preprocessing: {t_prep:.4f}s")
-        print(f"[PERF] Detection inference: {t_infer:.4f}s")
-        print(f"[PERF] Total detection API: {t_total:.4f}s")
+        perf_output = (
+            f"[PERF] Image read: {t_read:.4f}s\n"
+            f"[PERF] Image preprocessing: {t_prep:.4f}s\n"
+            f"[PERF] Detection inference: {t_infer:.4f}s\n"
+            f"[PERF] Total detection API: {t_total:.4f}s\n"
+        )
+        sys.stderr.write(perf_output)
+        sys.stderr.flush()
+        print(perf_output, flush=True)
 
         return result
 

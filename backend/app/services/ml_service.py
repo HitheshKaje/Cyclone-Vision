@@ -25,8 +25,7 @@ from typing import Dict, Any, Optional, Tuple
 
 from services.classifier import get_cyclone_classifier, CycloneClassifier
 
-logger = logging.getLogger("cyclonevision.ml_service")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("uvicorn.error")
 
 # Target image size for both models
 TARGET_SIZE = (224, 224)
@@ -252,13 +251,20 @@ class MLService:
         t_total = time.perf_counter() - t_total_start
 
         # Performance terminal output matching exact required format
-        print(f"[PERF] Image read: {t_read:.4f}s")
-        print(f"[PERF] Image preprocessing: {t_prep_total:.4f}s")
-        print(f"[PERF] Detection inference: {t_infer_det:.4f}s")
+        perf_output = (
+            f"[PERF] Image read: {t_read:.4f}s\n"
+            f"[PERF] Image preprocessing: {t_prep_total:.4f}s\n"
+            f"[PERF] Detection inference: {t_infer_det:.4f}s\n"
+        )
         if det_result["is_cyclone"]:
-            print(f"[PERF] Intensity inference: {t_infer_int:.4f}s")
-            print(f"[PERF] Classification: {t_class:.4f}s")
-        print(f"[PERF] Total inference: {t_total:.4f}s")
+            perf_output += (
+                f"[PERF] Intensity inference: {t_infer_int:.4f}s\n"
+                f"[PERF] Classification: {t_class:.4f}s\n"
+            )
+        perf_output += f"[PERF] Total inference: {t_total:.4f}s\n"
+        sys.stderr.write(perf_output)
+        sys.stderr.flush()
+        print(perf_output, flush=True)
 
         return {
             "success": True,

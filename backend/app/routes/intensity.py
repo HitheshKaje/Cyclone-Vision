@@ -1,9 +1,11 @@
 import os
 import sys
 import time
+import logging
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from services.ml_service import ml_service
 
+logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
 
 def get_intensity_model():
@@ -42,11 +44,16 @@ async def estimate_cyclone_intensity(image: UploadFile = File(...)):
         t_total = time.perf_counter() - t_start
 
         # Performance diagnostics
-        print(f"[PERF] Image read: {t_read:.4f}s")
-        print(f"[PERF] Image preprocessing: {t_prep:.4f}s")
-        print(f"[PERF] Intensity inference: {t_infer:.4f}s")
-        print(f"[PERF] Classification: {t_class:.4f}s")
-        print(f"[PERF] Total intensity API: {t_total:.4f}s")
+        perf_output = (
+            f"[PERF] Image read: {t_read:.4f}s\n"
+            f"[PERF] Image preprocessing: {t_prep:.4f}s\n"
+            f"[PERF] Intensity inference: {t_infer:.4f}s\n"
+            f"[PERF] Classification: {t_class:.4f}s\n"
+            f"[PERF] Total intensity API: {t_total:.4f}s\n"
+        )
+        sys.stderr.write(perf_output)
+        sys.stderr.flush()
+        print(perf_output, flush=True)
 
         return result
 
