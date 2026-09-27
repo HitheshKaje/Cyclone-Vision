@@ -82,7 +82,7 @@ const HistoryPage = ({
                           <img 
                             src={item.imagePreview} 
                             alt="Thumbnail" 
-                            className="w-10 h-10 rounded-md object-contain bg-slate-900 border border-slate-200"
+                            className="w-10 h-10 rounded-md object-contain bg-[#F5F8FC] border border-slate-200"
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-[10px]">

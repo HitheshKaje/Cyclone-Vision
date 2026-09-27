@@ -231,7 +231,7 @@ const AnalyzePage = ({
           ) : (
             /* Professional Preview Container (contain, no stretch, preserved aspect ratio) */
             <div className="space-y-4">
-              <div className="min-h-[300px] sm:min-h-[380px] rounded-xl overflow-hidden relative border border-slate-200 bg-slate-950 flex items-center justify-center p-4">
+              <div className="min-h-[300px] sm:min-h-[380px] rounded-xl overflow-hidden relative border border-slate-200/90 bg-[#F5F8FC] shadow-xs flex items-center justify-center p-4">
                 <img
                   src={previewUrl}
                   alt="Uploaded Satellite Image Preview"
@@ -244,7 +244,7 @@ const AnalyzePage = ({
                     <button
                       type="button"
                       onClick={handleResetImage}
-                      className="px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-900 text-white text-xs font-medium border border-slate-700 shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-800 hover:text-sky-600 text-xs font-medium border border-slate-200/90 hover:border-sky-300 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <RotateCcw size={13} />
                       <span>Change Image</span>
@@ -281,7 +281,7 @@ const AnalyzePage = ({
                   type="button"
                   onClick={handleResetImage}
                   disabled={isAnalyzing}
-                  className="py-2.5 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="py-2.5 px-4 rounded-lg bg-white hover:bg-slate-50 text-slate-800 hover:text-sky-600 font-semibold text-xs sm:text-sm border border-slate-200 hover:border-sky-300 shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RotateCcw size={14} />
                   <span>Change Image</span>
@@ -301,7 +301,7 @@ const AnalyzePage = ({
 
         {/* 3. Analysis Progress Tracker */}
         {(isAnalyzing || isCompleted) && (
-          <div className="app-card p-5 space-y-4">
+          <div className="app-card bg-white border border-slate-200 rounded-xl shadow-xs p-5 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Pipeline Execution Status
@@ -315,12 +315,12 @@ const AnalyzePage = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Step 1: Cyclone Detection */}
-              <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 ${
+              <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 transition-colors ${
                 isCompleted || currentStage === 'Intensity' || currentStage === 'Classification'
-                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+                  ? 'bg-emerald-50/60 border-emerald-200/70 text-slate-800'
                   : currentStage === 'Detection'
-                  ? 'bg-sky-50 border-sky-300 text-sky-900 ring-1 ring-sky-300'
-                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                  ? 'bg-sky-50/70 border-sky-200 text-slate-800 ring-1 ring-sky-200'
+                  : 'bg-slate-50/60 border-slate-200/70 text-slate-500'
               }`}>
                 {isCompleted || currentStage === 'Intensity' || currentStage === 'Classification' ? (
                   <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
@@ -330,7 +330,7 @@ const AnalyzePage = ({
                   <Target size={18} className="text-slate-400 shrink-0" />
                 )}
                 <div>
-                  <p className="font-semibold">1. Cyclone Detection</p>
+                  <p className="font-semibold text-slate-900">1. Cyclone Detection</p>
                   <p className="text-[10px] text-slate-500">
                     {currentStage === 'Detection' ? 'Processing...' : isCompleted ? 'Completed' : 'Pending'}
                   </p>
@@ -338,18 +338,18 @@ const AnalyzePage = ({
               </div>
 
               {/* Step 2: Intensity Estimation */}
-              <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 ${
+              <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 transition-colors ${
                 isCompleted
                   ? currentAnalysis?.detection?.is_cyclone === false
-                    ? 'bg-slate-50 border-slate-200 text-slate-500'
-                    : 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+                    ? 'bg-slate-50/60 border-slate-200/70 text-slate-500'
+                    : 'bg-emerald-50/60 border-emerald-200/70 text-slate-800'
                   : currentStage === 'Intensity'
-                  ? 'bg-sky-50 border-sky-300 text-sky-900 ring-1 ring-sky-300'
-                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                  ? 'bg-sky-50/70 border-sky-200 text-slate-800 ring-1 ring-sky-200'
+                  : 'bg-slate-50/60 border-slate-200/70 text-slate-500'
               }`}>
                 {isCompleted ? (
                   currentAnalysis?.detection?.is_cyclone === false ? (
-                    <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">—</span>
+                    <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 text-[10px] font-bold flex items-center justify-center shrink-0">—</span>
                   ) : (
                     <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                   )
@@ -359,7 +359,7 @@ const AnalyzePage = ({
                   <Wind size={18} className="text-slate-400 shrink-0" />
                 )}
                 <div>
-                  <p className="font-semibold">2. Intensity Estimation</p>
+                  <p className="font-semibold text-slate-900">2. Intensity Estimation</p>
                   <p className="text-[10px] text-slate-500">
                     {currentStage === 'Intensity'
                       ? 'Estimating...'
@@ -371,18 +371,18 @@ const AnalyzePage = ({
               </div>
 
               {/* Step 3: Classification */}
-              <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 ${
+              <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 transition-colors ${
                 isCompleted
                   ? currentAnalysis?.detection?.is_cyclone === false
-                    ? 'bg-slate-50 border-slate-200 text-slate-500'
-                    : 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+                    ? 'bg-slate-50/60 border-slate-200/70 text-slate-500'
+                    : 'bg-emerald-50/60 border-emerald-200/70 text-slate-800'
                   : currentStage === 'Classification'
-                  ? 'bg-sky-50 border-sky-300 text-sky-900 ring-1 ring-sky-300'
-                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                  ? 'bg-sky-50/70 border-sky-200 text-slate-800 ring-1 ring-sky-200'
+                  : 'bg-slate-50/60 border-slate-200/70 text-slate-500'
               }`}>
                 {isCompleted ? (
                   currentAnalysis?.detection?.is_cyclone === false ? (
-                    <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">—</span>
+                    <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 text-[10px] font-bold flex items-center justify-center shrink-0">—</span>
                   ) : (
                     <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                   )
@@ -392,7 +392,7 @@ const AnalyzePage = ({
                   <Gauge size={18} className="text-slate-400 shrink-0" />
                 )}
                 <div>
-                  <p className="font-semibold">3. Classification</p>
+                  <p className="font-semibold text-slate-900">3. Classification</p>
                   <p className="text-[10px] text-slate-500">
                     {currentStage === 'Classification'
                       ? 'Categorizing...'
@@ -406,7 +406,7 @@ const AnalyzePage = ({
 
             {/* Completed Callout */}
             {isCompleted && (
-              <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-3 pt-3">
+              <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 pt-3">
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
                   <div>

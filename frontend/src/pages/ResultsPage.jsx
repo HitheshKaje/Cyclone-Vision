@@ -111,7 +111,7 @@ const ResultsPage = ({
             </div>
 
             {/* Satellite Image Display */}
-            <div className="w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center p-3 min-h-[300px]">
+            <div className="w-full bg-[#F5F8FC] rounded-xl overflow-hidden border border-slate-200/90 shadow-xs flex items-center justify-center p-3 min-h-[300px]">
               <img 
                 src={imagePreview} 
                 alt="Satellite Observation" 

@@ -27,7 +27,7 @@ const MainLayout = ({ children, activeTab, setActiveTab }) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+    <div className="min-h-screen flex flex-col bg-[#f7f9fc] text-slate-800">
       <Header toggleSidebar={toggleSidebar} />
       
       <div className="flex flex-1 overflow-hidden relative">

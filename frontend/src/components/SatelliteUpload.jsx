@@ -226,7 +226,7 @@ const SatelliteUpload = ({
           </div>
         ) : (
           /* Preview Container with Strict object-fit: contain */
-          <div className="flex-1 min-h-[280px] sm:min-h-[340px] rounded-xl overflow-hidden relative border border-slate-200 bg-slate-900 flex items-center justify-center p-2">
+          <div className="flex-1 min-h-[280px] sm:min-h-[340px] rounded-xl overflow-hidden relative border border-slate-200/90 bg-[#F5F8FC] shadow-xs flex items-center justify-center p-2">
             <input
               type="file"
               ref={fileInputRef}
@@ -247,7 +247,7 @@ const SatelliteUpload = ({
                 <button
                   type="button"
                   onClick={handleResetImage}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-900 text-white text-xs font-medium border border-slate-700 shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-800 hover:text-sky-600 text-xs font-medium border border-slate-200/90 hover:border-sky-300 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                   title="Remove image"
                 >
                   <RotateCcw size={13} />

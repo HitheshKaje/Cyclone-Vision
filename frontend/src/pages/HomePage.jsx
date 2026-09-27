@@ -192,7 +192,7 @@ const HomePage = ({
                   <img 
                     src={currentAnalysis.imagePreview} 
                     alt="Latest Observation Thumbnail" 
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-contain bg-slate-900 border border-slate-200 shrink-0"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-contain bg-[#F5F8FC] border border-slate-200 shrink-0"
                   />
                 )}
                 <div className="min-w-0 flex-1">
@@ -315,7 +315,7 @@ const HomePage = ({
                           <img 
                             src={item.imagePreview} 
                             alt="Thumbnail" 
-                            className="w-9 h-9 rounded-md object-contain bg-slate-900 border border-slate-200"
+                            className="w-9 h-9 rounded-md object-contain bg-[#F5F8FC] border border-slate-200"
                           />
                         ) : (
                           <div className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-[10px]">
