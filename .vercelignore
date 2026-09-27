@@ -1,0 +1,13 @@
+# Ignore heavy ML backend, models, datasets, and python virtual environments from Vercel deployments
+backend/
+model_backups/
+.venv/
+*.keras
+*.h5
+*.npz
+*.jpg
+*.png
+!frontend/
+!frontend/**
+__pycache__/
+*.pyc

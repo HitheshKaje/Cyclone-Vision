@@ -1,257 +1,225 @@
 import React from 'react';
-import { Activity, Wind, Info, Gauge, Loader2, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Wind, Gauge, ShieldCheck, AlertTriangle } from 'lucide-react';
 
-const WindGauge = ({ windSpeedKt, classification }) => {
-  // Clamp for gauge visualization (0 to 140 knots)
-  const maxScale = 140;
-  const speed = typeof windSpeedKt === 'number' ? Math.max(0, windSpeedKt) : 0;
-  const percentage = Math.min(1, speed / maxScale);
-  
-  // Radius and Arc parameters
-  const radius = 64;
-  const strokeWidth = 12;
-  const center = 85;
-  const circumference = 2 * Math.PI * radius;
-  // 240-degree arc (leave 120 degrees open at bottom)
-  const arcFraction = 0.75;
-  const totalDash = circumference * arcFraction;
-  const dashOffset = totalDash * (1 - percentage);
+const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisCompleted }) => {
+  // If analysis completed and isCyclone is false: show Not Applicable
+  if (isAnalysisCompleted && isCyclone === false) {
+    return (
+      <div className="app-card p-5 space-y-4">
+        {/* Intensity Section */}
+        <div>
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-slate-100 text-slate-600">
+                <Wind size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Intensity Estimation</h3>
+                <span className="text-[11px] text-slate-400">Objective 2</span>
+              </div>
+            </div>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              Not Applicable
+            </span>
+          </div>
 
-  // Dynamic color based on classification
-  let strokeColor = "#10b981"; // Emerald / Green for LOW
-  if (classification === 'MEDIUM') {
-    strokeColor = "#f59e0b"; // Amber for MEDIUM
-  } else if (classification === 'SEVERE') {
-    strokeColor = "#ef4444"; // Red for SEVERE
-  } else {
-    if (speed >= 64) strokeColor = "#ef4444";
-    else if (speed >= 34) strokeColor = "#f59e0b";
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-100 text-center">
+            <p className="text-sm font-semibold text-slate-600">Intensity: Not Applicable</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Skipped because Objective 1 determined no cyclone is present.
+            </p>
+          </div>
+        </div>
+
+        {/* Classification Section */}
+        <div>
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-slate-100 text-slate-600">
+                <Gauge size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Cyclone Classification</h3>
+                <span className="text-[11px] text-slate-400">Objective 3</span>
+              </div>
+            </div>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              Not Applicable
+            </span>
+          </div>
+
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-100 text-center">
+            <p className="text-sm font-semibold text-slate-600">Classification: Not Applicable</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Rule-based classification requires cyclone detection.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const speedKmh = (speed * 1.852).toFixed(1);
+  const isAvailable = Boolean(intensity && typeof intensity.wind_speed_kt === 'number');
+  const windKt = isAvailable ? intensity.wind_speed_kt : null;
+  const windKmh = isAvailable 
+    ? (intensity.wind_speed_kmh ?? Number((windKt * 1.852).toFixed(1)))
+    : null;
+
+  const currentClass = classification?.classification || intensity?.classification || null;
+  const classDescription = classification?.description || intensity?.description || null;
+
+  // Scale: 0 to 140 kt
+  const scalePercent = windKt != null ? Math.min(100, Math.max(0, (windKt / 140) * 100)) : 0;
 
   return (
-    <div className="flex flex-col items-center justify-center relative p-2">
-      <div className="relative w-44 h-44 flex items-center justify-center">
-        <svg viewBox="0 0 170 170" className="w-full h-full transform -rotate-135">
-          {/* Background Track Arc */}
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke="#e2e8f0"
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${totalDash} ${circumference}`}
-            strokeLinecap="round"
-          />
-          {/* Animated Value Arc */}
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${totalDash} ${circumference}`}
-            strokeDashoffset={dashOffset}
-            strokeLinecap="round"
-            className="gauge-arc"
-          />
-        </svg>
-
-        {/* Center Digital Display */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pt-2">
-          <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-none">
-            {speed.toFixed(1)}
-          </span>
-          <span className="text-xs sm:text-sm font-bold text-sky-700 uppercase tracking-wider mt-0.5">
-            kt
-          </span>
-        </div>
-      </div>
-
-      {/* Speed in km/h Subtitle */}
-      <p className="text-xs sm:text-sm font-bold text-slate-600 -mt-2">
-        ≈ {speedKmh} km/h
-      </p>
-    </div>
-  );
-};
-
-const IntensityCard = ({ intensityResult, intensityStatus, isCyclone }) => {
-  const isCompleted = intensityStatus === 'Completed' && intensityResult;
-  
-  // Extract wind speed values
-  const windSpeedKt = isCompleted
-    ? (intensityResult.wind_speed_kt ?? intensityResult.predicted_wind_speed_kt)
-    : null;
-    
-  const windSpeedKmh = isCompleted
-    ? (intensityResult.wind_speed_kmh ?? (windSpeedKt !== null ? Number((windSpeedKt * 1.852).toFixed(1)) : null))
-    : null;
-
-  // Determine classification (from backend or fallback rule)
-  const classification = isCompleted
-    ? (intensityResult.classification || (windSpeedKt >= 64 ? 'SEVERE' : windSpeedKt >= 34 ? 'MEDIUM' : 'LOW'))
-    : null;
-
-  const description = isCompleted
-    ? (intensityResult.description || (classification === 'SEVERE' ? 'High-intensity severe tropical cyclone' : classification === 'MEDIUM' ? 'Moderate-intensity cyclonic storm' : 'Low-intensity tropical disturbance / depression'))
-    : null;
-
-  return (
-    <div className="glass-panel p-5 sm:p-6 flex flex-col justify-between">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-cyan-100 text-cyan-700">
-            <Activity size={18} className="shrink-0" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">
-            Intensity & Classification <span className="text-xs font-semibold text-cyan-600">(Objectives 2 & 3)</span>
-          </h3>
-        </div>
-        {isCompleted && (
-          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200">
-            AI + Rules
-          </span>
-        )}
-      </div>
-
-      {/* Main Intensity & Classification Content */}
-      {isCompleted ? (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
-          {/* Left: Interactive Wind Speed Gauge */}
-          <div className="md:col-span-5 flex justify-center border-b md:border-b-0 md:border-r border-sky-100 pb-3 md:pb-0 md:pr-3">
-            <WindGauge windSpeedKt={windSpeedKt} classification={classification} />
-          </div>
-
-          {/* Right: Intensity & Classification Details */}
-          <div className="md:col-span-7 space-y-4">
-            
-            {/* Section 1: CYCLONE INTENSITY */}
+    <div className="app-card p-5 space-y-5">
+      {/* Objective 2: Intensity Estimation */}
+      <div>
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-sky-50 text-sky-700">
+              <Wind size={18} />
+            </div>
             <div>
-              <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
-                CYCLONE INTENSITY
-              </p>
-              <div className="flex items-baseline gap-2.5 mt-1">
-                <span className="text-3xl sm:text-4xl font-black text-sky-900 tracking-tight">
-                  {windSpeedKt} KT
-                </span>
-                <span className="text-sm sm:text-base font-bold text-slate-500">
-                  {windSpeedKmh} KM/H
-                </span>
+              <h3 className="text-sm font-semibold text-slate-900">Intensity Estimation</h3>
+              <span className="text-[11px] text-slate-400">Objective 2</span>
+            </div>
+          </div>
+
+          {isAvailable && (
+            <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+              Vmax Sustained
+            </span>
+          )}
+        </div>
+
+        {isAvailable ? (
+          <div className="space-y-3">
+            <div className="flex items-baseline justify-between">
+              <div>
+                <p className="text-xs text-slate-500 font-medium">Estimated Wind Speed</p>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <span className="text-2xl font-bold text-slate-900">{windKt}</span>
+                  <span className="text-xs font-semibold text-slate-500 uppercase">kt</span>
+                  <span className="text-xs text-slate-400 font-medium ml-1">
+                    (≈ {windKmh} km/h)
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[11px] text-slate-400 font-medium">Scale (0–140 kt)</span>
               </div>
             </div>
 
-            {/* Section 2: CLASSIFICATION */}
-            <div className="pt-2 border-t border-sky-100/90">
-              <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-1.5">
-                CLASSIFICATION
-              </p>
-              
-              {/* Distinct 3-Level Indicator (LOW | MEDIUM | SEVERE) */}
-              <div className="flex items-center gap-2 p-1.5 rounded-xl bg-slate-100/80 border border-slate-200">
-                {/* LOW Indicator */}
-                <div
-                  className={`flex-1 text-center py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
-                    classification === 'LOW'
-                      ? 'bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-300/80 scale-[1.02]'
-                      : 'text-slate-400 opacity-60'
-                  }`}
-                >
-                  LOW
-                </div>
-
-                {/* MEDIUM Indicator */}
-                <div
-                  className={`flex-1 text-center py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
-                    classification === 'MEDIUM'
-                      ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-300/80 scale-[1.02]'
-                      : 'text-slate-400 opacity-60'
-                  }`}
-                >
-                  MEDIUM
-                </div>
-
-                {/* SEVERE Indicator */}
-                <div
-                  className={`flex-1 text-center py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
-                    classification === 'SEVERE'
-                      ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-300/80 scale-[1.02]'
-                      : 'text-slate-400 opacity-60'
-                  }`}
-                >
-                  SEVERE
-                </div>
-              </div>
-
-              {/* Classification Subtitle / Description */}
-              <p className="text-xs font-semibold text-slate-700 mt-2 flex items-center gap-1.5">
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${
-                    classification === 'SEVERE'
-                      ? 'bg-rose-600'
-                      : classification === 'MEDIUM'
+            {/* Clean Horizontal Wind Scale */}
+            <div className="space-y-1">
+              <div className="relative h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                {/* 34 kt marker (24.3%) and 64 kt marker (45.7%) */}
+                <div className="absolute top-0 bottom-0 left-[24.3%] w-[1px] bg-slate-300 z-10" />
+                <div className="absolute top-0 bottom-0 left-[45.7%] w-[1px] bg-slate-300 z-10" />
+                <div 
+                  className={`h-full transition-all duration-700 rounded-full ${
+                    currentClass === 'SEVERE'
+                      ? 'bg-red-500'
+                      : currentClass === 'MEDIUM'
                       ? 'bg-amber-500'
                       : 'bg-emerald-500'
                   }`}
+                  style={{ width: `${scalePercent}%` }}
                 />
-                <span>{description}</span>
+              </div>
+
+              <div className="flex justify-between text-[10px] text-slate-400 font-medium px-0.5">
+                <span>0 kt</span>
+                <span>34 kt</span>
+                <span>64 kt</span>
+                <span>140 kt</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="py-4 text-center text-slate-400 space-y-1">
+            <p className="text-lg font-bold text-slate-300">—</p>
+            <p className="text-xs">Awaiting intensity estimation</p>
+          </div>
+        )}
+      </div>
+
+      {/* Objective 3: Classification */}
+      <div className="pt-2 border-t border-slate-100">
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-sky-50 text-sky-700">
+              <Gauge size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">Cyclone Classification</h3>
+              <span className="text-[11px] text-slate-400">Objective 3</span>
+            </div>
+          </div>
+
+          {currentClass && (
+            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+              currentClass === 'SEVERE'
+                ? 'bg-red-50 text-red-700 border-red-200'
+                : currentClass === 'MEDIUM'
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            }`}>
+              {currentClass}
+            </span>
+          )}
+        </div>
+
+        {currentClass ? (
+          <div className="space-y-3">
+            {classDescription && (
+              <p className="text-xs font-medium text-slate-600">
+                {classDescription}
               </p>
-            </div>
+            )}
 
-            {/* Model Provenance Metadata */}
-            <div className="space-y-1 pt-2 text-[11px] border-t border-sky-100/80 text-slate-500">
-              <div className="flex items-center justify-between">
-                <span>Intensity Model:</span>
-                <span className="font-bold text-slate-700 font-mono">
-                  {intensityResult.model || 'EfficientNetB0-TCIR-Intensity'}
-                </span>
+            {/* Strict 3-Tier Classification Table / Badge System */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {/* Tier 1: LOW (< 34 kt) */}
+              <div className={`p-2.5 rounded-lg border text-xs transition-colors ${
+                currentClass === 'LOW'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold ring-1 ring-emerald-300'
+                  : 'bg-slate-50 border-slate-200 text-slate-400 font-medium'
+              }`}>
+                <p className="font-bold text-[11px]">LOW</p>
+                <p className="text-[10px] mt-0.5">&lt; 34 kt</p>
               </div>
-              <div className="flex items-center justify-between">
-                <span>Classification Layer:</span>
-                <span className="font-semibold text-slate-700">
-                  Rule-Based Vmax Thresholds
-                </span>
+
+              {/* Tier 2: MEDIUM (>= 34 kt and < 64 kt) */}
+              <div className={`p-2.5 rounded-lg border text-xs transition-colors ${
+                currentClass === 'MEDIUM'
+                  ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold ring-1 ring-amber-300'
+                  : 'bg-slate-50 border-slate-200 text-slate-400 font-medium'
+              }`}>
+                <p className="font-bold text-[11px]">MEDIUM</p>
+                <p className="text-[10px] mt-0.5">&ge; 34 to &lt; 64 kt</p>
+              </div>
+
+              {/* Tier 3: SEVERE (>= 64 kt) */}
+              <div className={`p-2.5 rounded-lg border text-xs transition-colors ${
+                currentClass === 'SEVERE'
+                  ? 'bg-red-50 border-red-300 text-red-900 font-bold ring-1 ring-red-300'
+                  : 'bg-slate-50 border-slate-200 text-slate-400 font-medium'
+              }`}>
+                <p className="font-bold text-[11px]">SEVERE</p>
+                <p className="text-[10px] mt-0.5">&ge; 64 kt</p>
               </div>
             </div>
-
           </div>
-        </div>
-      ) : intensityStatus === 'Estimating' ? (
-        /* Estimating loading state */
-        <div className="p-8 rounded-2xl bg-cyan-50/40 border border-cyan-100 flex flex-col items-center justify-center text-center space-y-3">
-          <Loader2 size={32} className="animate-spin text-cyan-600" />
-          <div>
-            <p className="text-sm font-bold text-slate-800">Estimating Cyclone Intensity & Classification...</p>
-            <p className="text-xs text-slate-500 mt-0.5">Running EfficientNetB0 regression & rule-based classification</p>
+        ) : (
+          <div className="py-4 text-center text-slate-400 space-y-1">
+            <p className="text-lg font-bold text-slate-300">—</p>
+            <p className="text-xs">Awaiting classification</p>
           </div>
-        </div>
-      ) : intensityStatus === 'Not Applicable' ? (
-        /* Not applicable (No Cyclone detected) */
-        <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center text-center space-y-2">
-          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
-            <Wind size={20} />
-          </div>
-          <p className="text-sm font-bold text-slate-700">Intensity & Classification Skipped</p>
-          <p className="text-xs text-slate-500 max-w-xs">
-            Objective 1 detected No Cyclone in the uploaded image. Intensity estimation and classification are only performed for active cyclone threats.
-          </p>
-        </div>
-      ) : (
-        /* Awaiting state */
-        <div className="p-6 rounded-2xl bg-sky-50/40 border border-sky-100/80 flex flex-col items-center justify-center text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-white shadow-xs border border-sky-100 flex items-center justify-center text-sky-400">
-            <Gauge size={24} />
-          </div>
-          <p className="text-sm font-bold text-slate-700">Awaiting Cyclone Detection</p>
-          <p className="text-xs text-slate-500 max-w-xs">
-            Intensity and classification will be generated dynamically when a cyclone is detected in the satellite frame.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

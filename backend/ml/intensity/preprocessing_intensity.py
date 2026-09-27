@@ -41,26 +41,24 @@ def prepare_3channel_image(ir_channel_norm, target_size=TARGET_IMG_SIZE):
     img_3ch = np.stack([resized, resized, resized], axis=-1)
     return img_3ch.astype(np.float32)
 
-def preprocess_single_image_file(image_path, target_size=TARGET_IMG_SIZE):
+def preprocess_single_image_file(image_input, target_size=TARGET_IMG_SIZE):
     """
     Preprocess an arbitrary image file (e.g. uploaded via API or CLI)
     into the format expected by the intensity regression model.
-    
-    Scientific Note & Domain Limitation:
-    Standard visual/grayscale satellite imagery (JPG/PNG) has opposite polarity
-    to meteorological Infrared (IR1) brightness temperature data:
-      - In visual imagery: bright/dense cloud tops have high pixel values (~255 -> 1.0).
-      - In physical IR1 data: cold convective cloud tops have low Kelvin temperatures (~180K -> 0.0).
-    Applying polarity inversion (1.0 - norm_gray) maps visual cloud brightness
-    to the low-value representation learned by the TCIR IR1-trained model.
-    However, 8-bit visible JPGs lack true physical radiometric calibration (Kelvin).
+    Supports file path (str/Path), raw bytes, or numpy ndarray.
     """
-    if not os.path.exists(image_path):
-        raise FileNotFoundError(f"Image not found at: {image_path}")
-        
-    img = cv2.imread(image_path)
-    if img is None:
-        raise ValueError(f"Failed to read image at: {image_path}")
+    if isinstance(image_input, np.ndarray):
+        img = image_input
+    elif isinstance(image_input, bytes):
+        img = cv2.imdecode(np.frombuffer(image_input, np.uint8), cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("Failed to decode image from bytes.")
+    else:
+        if not os.path.exists(str(image_input)):
+            raise FileNotFoundError(f"Image not found at: {image_input}")
+        img = cv2.imread(str(image_input))
+        if img is None:
+            raise ValueError(f"Failed to read image at: {image_input}")
         
     # If image is grayscale or BGR, convert to grayscale first to get intensity/brightness
     if len(img.shape) == 3:

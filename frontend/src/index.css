@@ -1,34 +1,48 @@
 @import "tailwindcss";
 
 @theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --color-brand-50: #f0f9ff;
   --color-brand-100: #e0f2fe;
   --color-brand-200: #bae6fd;
-  --color-brand-300: #7dd3fc;
-  --color-brand-400: #38bdf8;
   --color-brand-500: #0ea5e9;
   --color-brand-600: #0284c7;
   --color-brand-700: #0369a1;
-  --color-brand-800: #075985;
-  --color-brand-900: #0c4a6e;
 }
 
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background-color: #f8fafc;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(224, 242, 254, 0.5) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(186, 230, 253, 0.4) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(240, 249, 255, 0.6) 0px, transparent 50%);
-  background-attachment: fixed;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f7f9fc;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom modern light scrollbar */
+/* Standard Professional Card Style */
+.app-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.875rem; /* 14px */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+}
+
+/* Backward-compatible alias for existing components */
+.glass-panel {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.875rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+}
+
+.glass-panel:hover {
+  border-color: #cbd5e1;
+}
+
+/* Clean Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: #f1f5f9;
@@ -41,78 +55,28 @@ body {
   background: #94a3b8;
 }
 
-/* Glass and Surface Panels */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(224, 242, 254, 0.85);
-  box-shadow: 0 4px 20px -2px rgba(14, 165, 233, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
-  border-radius: 1rem;
-  transition: all 0.25s ease-in-out;
-}
-
-.glass-panel:hover {
-  border-color: rgba(186, 230, 253, 1);
-  box-shadow: 0 10px 25px -3px rgba(14, 165, 233, 0.1), 0 4px 8px -2px rgba(0, 0, 0, 0.04);
-}
-
-.glass-panel-subtle {
-  background: rgba(240, 249, 255, 0.6);
-  border: 1px solid rgba(224, 242, 254, 0.75);
-  border-radius: 0.75rem;
-}
-
-/* Scanline Animation for Satellite Analysis */
-@keyframes scanline-sweep {
-  0% {
-    top: 0%;
-    opacity: 0;
-  }
-  15% {
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  100% {
-    top: 100%;
-    opacity: 0;
-  }
-}
-
-.scanline-laser {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent 0%, #06b6d4 25%, #38bdf8 50%, #06b6d4 75%, transparent 100%);
-  box-shadow: 0 0 12px #06b6d4, 0 0 24px #38bdf8;
-  animation: scanline-sweep 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  z-index: 20;
-}
-
-/* Radar pulse animation */
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.85);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.4;
-  }
-  100% {
-    transform: scale(0.85);
-    opacity: 0.8;
-  }
-}
-
-.radar-pulse-anim {
-  animation: pulse-ring 3s ease-in-out infinite;
-}
-
-/* Wind gauge smooth transition */
+/* Subtle Gauge Arc Transition */
 .gauge-arc {
-  transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease;
 }
+
+/* Cyclone Logo Smooth Clockwise (Rightward) Rotation */
+@keyframes spinClockwise {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-cyclone-spin {
+  animation: spinClockwise 12s linear infinite;
+  transform-origin: center center;
+  display: block;
+}
+
+.animate-cyclone-spin:hover {
+  animation-duration: 4s;
+}
+

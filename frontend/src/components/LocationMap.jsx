@@ -1,28 +1,37 @@
 import React from 'react';
-import { Map } from 'lucide-react';
+import { Map, MapPin } from 'lucide-react';
 
 const LocationMap = () => {
   return (
-    <div className="glass-panel p-4 sm:p-6 h-full flex flex-col">
-      <div className="flex items-center gap-2 mb-3 sm:mb-4">
-        <Map size={20} className="text-cyan-400 shrink-0" />
-        <h2 className="text-base sm:text-lg font-semibold text-slate-200">Cyclone Location</h2>
+    <div className="app-card p-5 sm:p-6 flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-sky-50 text-sky-700">
+            <Map size={20} />
+          </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-semibold text-slate-900">
+              Cyclone Map
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500">
+              Geospatial position monitoring
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 bg-navy-900/80 rounded-xl border border-slate-700/50 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px]">
-        {/* Placeholder grid background */}
-        <div className="absolute inset-0 opacity-10" 
-             style={{ 
-               backgroundImage: 'linear-gradient(#334155 1px, transparent 1px), linear-gradient(90deg, #334155 1px, transparent 1px)', 
-               backgroundSize: '20px 20px' 
-             }}>
+      {/* Map Canvas / Clean Empty State */}
+      <div className="flex-1 min-h-[360px] bg-slate-50 rounded-xl border border-slate-200 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-12 h-12 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-400 mb-3">
+          <MapPin size={24} />
         </div>
-        
-        <div className="z-10 flex flex-col items-center text-center p-4 sm:p-6 bg-navy-800/80 backdrop-blur-sm rounded-xl border border-slate-700/50 mx-4">
-          <Map size={32} className="text-slate-500 mb-2 sm:mb-3" />
-          <p className="text-slate-400 font-medium text-sm sm:text-base">Awaiting Location Data</p>
-          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 sm:mt-2 max-w-[200px]">Map interface will populate when backend coordinates are received.</p>
-        </div>
+        <h3 className="text-sm font-semibold text-slate-800 mb-1">
+          No cyclone location data available
+        </h3>
+        <p className="text-xs text-slate-500 max-w-sm">
+          Analyzed satellite images do not contain embedded geospatial coordinate metadata. Coordinates will display when provided by real telemetry sources.
+        </p>
       </div>
     </div>
   );
