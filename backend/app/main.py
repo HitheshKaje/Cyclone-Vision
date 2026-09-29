@@ -18,7 +18,7 @@ if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
 from services.ml_service import ml_service
-from routes import detection, intensity, classification
+from routes import detection, intensity, classification, live_map
 
 
 @asynccontextmanager
@@ -53,6 +53,7 @@ app.add_middleware(
 app.include_router(detection.router, prefix="/api")
 app.include_router(intensity.router, prefix="/api")
 app.include_router(classification.router, prefix="/api")
+app.include_router(live_map.router, prefix="/api")
 
 
 @app.post("/api/analyze")
