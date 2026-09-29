@@ -9,6 +9,18 @@ import {
   FileQuestion,
   Info
 } from 'lucide-react';
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Tooltip as RechartsTooltip,
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  ReferenceLine 
+} from 'recharts';
 
 const ResultsPage = ({
   currentAnalysis,
@@ -65,15 +77,16 @@ const ResultsPage = ({
     ? 'Not Applicable' 
     : (classification?.classification || intensity?.classification || null);
 
-  // SVG Ring calculation for Confidence
-  const circleRadius = 42;
-  const circumference = 2 * Math.PI * circleRadius;
-  const strokeOffset = confidencePercent != null 
-    ? circumference - (circumference * Math.min(100, Math.max(0, confidencePercent))) / 100 
-    : circumference;
+  // Recharts Data Prepare
+  const confidenceData = [
+    { name: 'Confidence', value: confidencePercent != null ? confidencePercent : 0 },
+    { name: 'Uncertainty', value: confidencePercent != null ? 100 - confidencePercent : 100 }
+  ];
+  const pieColor = isCyclone ? '#ef4444' : '#10b981';
 
-  // Scale: 0 to 140 kt for gauge
-  const scalePercent = windKt != null ? Math.min(100, Math.max(0, (windKt / 140) * 100)) : 0;
+  const intensityData = [
+    { name: 'Wind Speed', value: windKt != null ? windKt : 0 }
+  ];
 
   return (
     <div className="space-y-6 pb-8">
@@ -195,31 +208,33 @@ const ResultsPage = ({
                 </p>
               </div>
 
-              {/* Professional Circular Ring Visualization */}
-              <div className="relative w-28 h-28 flex items-center justify-center shrink-0">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r={circleRadius}
-                    className="stroke-slate-100"
-                    strokeWidth="8"
-                    fill="none"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r={circleRadius}
-                    className={isCyclone ? "stroke-red-500" : "stroke-emerald-500"}
-                    strokeWidth="8"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeOffset}
-                    strokeLinecap="round"
-                    fill="none"
-                    style={{ transition: 'stroke-dashoffset 0.8s ease' }}
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center justify-center text-center">
+              {/* Professional Recharts PieChart Visualization */}
+              <div className="relative w-28 h-28 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={confidenceData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={36}
+                      outerRadius={46}
+                      startAngle={90}
+                      endAngle={-270}
+                      dataKey="value"
+                      stroke="none"
+                      isAnimationActive={true}
+                    >
+                      <Cell key="cell-0" fill={pieColor} />
+                      <Cell key="cell-1" fill="#f1f5f9" />
+                    </Pie>
+                    <RechartsTooltip 
+                      formatter={(value, name) => [`${value}%`, name]}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                   <span className="text-base font-bold text-slate-900 leading-none">
                     {confidencePercent != null ? `${confidencePercent}%` : '—'}
                   </span>
@@ -284,29 +299,36 @@ const ResultsPage = ({
                   </span>
                 </div>
 
-                {/* Clean Horizontal Intensity Gauge */}
-                <div className="space-y-1.5">
-                  <div className="relative h-3 w-full bg-slate-100 rounded-full overflow-hidden">
-                    {/* Tier thresholds at 34 kt (24.3%) and 64 kt (45.7%) */}
-                    <div className="absolute top-0 bottom-0 left-[24.3%] w-[1.5px] bg-slate-300 z-10" title="34 kt threshold" />
-                    <div className="absolute top-0 bottom-0 left-[45.7%] w-[1.5px] bg-slate-300 z-10" title="64 kt threshold" />
-                    
-                    <div 
-                      className={`h-full transition-all duration-700 rounded-full ${
-                        calculatedClassification === 'SEVERE'
-                          ? 'bg-red-500'
-                          : calculatedClassification === 'MEDIUM'
-                          ? 'bg-amber-500'
-                          : 'bg-emerald-500'
-                      }`}
-                      style={{ width: `${scalePercent}%` }}
-                    />
+                {/* Dynamic Recharts BarChart Gauge */}
+                <div className="space-y-1 mt-2">
+                  <div className="h-20 w-full relative -ml-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart layout="vertical" data={intensityData} margin={{ top: 15, right: 15, bottom: 5, left: 15 }}>
+                        <XAxis type="number" domain={[0, 140]} hide />
+                        <YAxis dataKey="name" type="category" hide />
+                        
+                        <ReferenceLine x={34} stroke="#f59e0b" strokeDasharray="3 3" label={{ position: 'top', value: '34kt', fill: '#f59e0b', fontSize: 10, fontWeight: 600 }} />
+                        <ReferenceLine x={64} stroke="#ef4444" strokeDasharray="3 3" label={{ position: 'top', value: '64kt', fill: '#ef4444', fontSize: 10, fontWeight: 600 }} />
+                        
+                        <RechartsTooltip 
+                          cursor={{ fill: 'transparent' }} 
+                          formatter={(value) => [`${value} kt`, 'Estimated Wind Speed']}
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                        
+                        <Bar 
+                          dataKey="value" 
+                          barSize={12}
+                          radius={[4, 4, 4, 4]}
+                          fill={calculatedClassification === 'SEVERE' ? '#ef4444' : calculatedClassification === 'MEDIUM' ? '#f59e0b' : '#10b981'}
+                          background={{ fill: '#f1f5f9', radius: 4 }}
+                          isAnimationActive={true}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium px-0.5">
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium px-2 pb-1">
                     <span>0 kt</span>
-                    <span>34 kt (Medium)</span>
-                    <span>64 kt (Severe)</span>
                     <span>140 kt</span>
                   </div>
                 </div>
