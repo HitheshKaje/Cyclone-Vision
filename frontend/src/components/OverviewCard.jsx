@@ -4,7 +4,7 @@ import { HelpCircle } from 'lucide-react';
 const OverviewCard = ({ title, icon: Icon, value, subtitle }) => {
   return (
     <div className="glass-panel p-4 sm:p-5 flex flex-col gap-2 sm:gap-3">
-      <div className="flex justify-between items-center text-slate-400">
+      <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
         <div className="flex items-center gap-2">
           <Icon size={18} className="text-cyan-500/70 shrink-0" />
           <h3 className="font-medium text-xs sm:text-sm tracking-wide">{title}</h3>

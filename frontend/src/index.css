@@ -1,73 +1,154 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --color-brand-50: #f0f9ff;
-  --color-brand-100: #e0f2fe;
-  --color-brand-200: #bae6fd;
-  --color-brand-500: #0ea5e9;
-  --color-brand-600: #0284c7;
-  --color-brand-700: #0369a1;
+  --font-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-200: #bbf7d0;
+  --color-brand-500: #22c55e;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  
+  --color-space-900: #040814;
+  --color-space-800: #0a1128;
+  --color-space-700: #131f42;
+}
+
+:root {
+  --font-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  
+  /* LIGHT MODE VARIABLES */
+  --bg-color: #f8fafc;
+  --text-color: #0f172a;
+  
+  --bg-gradient-1: rgba(34, 197, 94, 0.08);
+  --bg-gradient-2: rgba(14, 165, 233, 0.08);
+  
+  --card-bg: rgba(255, 255, 255, 0.7);
+  --card-border: rgba(0, 0, 0, 0.1);
+  --card-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --card-hover-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --card-hover-border: rgba(0, 0, 0, 0.15);
+  
+  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(241, 245, 249, 0.9) 100%);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+
+  --scroll-track: rgba(226, 232, 240, 0.5);
+  --scroll-thumb: rgba(148, 163, 184, 0.5);
+  --scroll-thumb-hover: rgba(100, 116, 139, 0.8);
+}
+
+.dark {
+  /* DARK MODE VARIABLES */
+  --bg-color: #040814;
+  --text-color: #f8fafc;
+  
+  --bg-gradient-1: rgba(34, 197, 94, 0.05);
+  --bg-gradient-2: rgba(14, 165, 233, 0.05);
+  
+  --card-bg: rgba(10, 17, 40, 0.6);
+  --card-border: rgba(255, 255, 255, 0.05);
+  --card-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --card-hover-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --card-hover-border: rgba(255, 255, 255, 0.1);
+  
+  --glass-bg: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+
+  --scroll-track: rgba(4, 8, 20, 0.5);
+  --scroll-thumb: rgba(51, 65, 85, 0.5);
+  --scroll-thumb-hover: rgba(71, 85, 105, 0.8);
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background-color: #f7f9fc;
-  color: #0f172a;
+  font-family: var(--font-sans);
+  background-color: var(--bg-color);
+  background-image: 
+    radial-gradient(circle at 15% 50%, var(--bg-gradient-1), transparent 25%),
+    radial-gradient(circle at 85% 30%, var(--bg-gradient-2), transparent 25%);
+  color: var(--text-color);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Standard Professional Card Style */
+/* Premium Card Style with Glassmorphism */
 .app-card {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.875rem; /* 14px */
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, background 0.3s ease, border-color 0.3s ease;
 }
 
-/* Backward-compatible alias for existing components */
+.app-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--card-hover-shadow);
+  border-color: var(--card-hover-border);
+}
+
 .glass-panel {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.875rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+  box-shadow: var(--glass-shadow);
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-.glass-panel:hover {
-  border-color: #cbd5e1;
+/* Stunning Gradient Text */
+.text-gradient {
+  background: linear-gradient(135deg, #34d399 0%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* Clean Custom Scrollbar */
+/* Glowing Button Utility */
+.btn-glow {
+  position: relative;
+}
+.btn-glow::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(135deg, #10b981, #0ea5e9);
+  z-index: -1;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  filter: blur(8px);
+}
+.btn-glow:hover::after {
+  opacity: 0.7;
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--scroll-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--scroll-thumb);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--scroll-thumb-hover);
 }
 
-/* Subtle Gauge Arc Transition */
-.gauge-arc {
-  transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease;
-}
-
-/* Cyclone Logo Smooth Clockwise (Rightward) Rotation */
+/* Animations */
 @keyframes spinClockwise {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .animate-cyclone-spin {
@@ -80,3 +161,20 @@ body {
   animation-duration: 4s;
 }
 
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}

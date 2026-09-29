@@ -8,9 +8,15 @@ function App() {
   const [analysisHistory, setAnalysisHistory] = useState([]);
   const [analysisStatus, setAnalysisStatus] = useState('idle');
   const [currentStage, setCurrentStage] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   return (
-    <MainLayout activeTab={activeTab} setActiveTab={setActiveTab}>
+    <MainLayout 
+      activeTab={activeTab} 
+      setActiveTab={setActiveTab}
+      isDarkMode={isDarkMode}
+      toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+    >
       <Dashboard 
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
