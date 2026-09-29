@@ -37,6 +37,7 @@ const Dashboard = ({
           setAnalysisStatus={setAnalysisStatus}
           currentStage={currentStage}
           setCurrentStage={setCurrentStage}
+          analysisHistory={analysisHistory}
           setAnalysisHistory={setAnalysisHistory}
           setActiveTab={setActiveTab}
         />
@@ -46,6 +47,7 @@ const Dashboard = ({
       {activeTab === 'results' && (
         <ResultsPage 
           currentAnalysis={currentAnalysis}
+          analysisHistory={analysisHistory}
           setActiveTab={setActiveTab}
         />
       )}

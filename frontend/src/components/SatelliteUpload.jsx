@@ -170,16 +170,16 @@ const SatelliteUpload = ({
   return (
     <div className="app-card p-5 sm:p-6 flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-700/30">
+      <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200/50 dark:border-slate-700/30">
         <div>
-          <h2 className="text-base sm:text-lg font-semibold text-slate-100">
+          <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
             Upload Satellite Image
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             Select or drag an infrared or visual satellite image for analysis
           </p>
         </div>
-        <span className="text-[11px] font-medium text-slate-500 bg-slate-800 px-2.5 py-1 rounded-md hidden sm:inline-block">
+        <span className="text-[11px] font-medium text-slate-500 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-md hidden sm:inline-block">
           JPG, PNG, TIFF
         </span>
       </div>
@@ -195,7 +195,7 @@ const SatelliteUpload = ({
             className={`flex-1 min-h-[260px] sm:min-h-[300px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-6 text-center transition-colors cursor-pointer ${
               isDragging
                 ? 'border-sky-500 bg-emerald-500/100/10'
-                : 'border-slate-300 bg-slate-800/60 hover:bg-slate-800/60 hover:border-slate-400'
+                : 'border-slate-300 bg-slate-100/60 dark:bg-slate-800/60 hover:bg-slate-800/60 hover:border-slate-400'
             }`}
           >
             <input
@@ -206,11 +206,11 @@ const SatelliteUpload = ({
               className="hidden"
             />
             
-            <div className="w-12 h-12 rounded-full bg-[#1e293b] border border-slate-700/50 shadow-xs flex items-center justify-center mb-3 text-emerald-400">
+            <div className="w-12 h-12 rounded-full bg-white dark:bg-[#1e293b] border border-slate-200/50 dark:border-slate-700/50 shadow-xs flex items-center justify-center mb-3 text-emerald-400">
               <UploadCloud size={24} />
             </div>
             
-            <p className="text-sm font-semibold text-slate-200 mb-1">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">
               Click to browse or drag and drop image
             </p>
             <p className="text-xs text-slate-500 mb-4">
@@ -219,14 +219,14 @@ const SatelliteUpload = ({
 
             <button
               type="button"
-              className="px-4 py-2 rounded-lg bg-emerald-500/100 text-white font-medium text-xs shadow-xs hover:bg-emerald-600 transition-colors pointer-events-none"
+              className="px-4 py-2 rounded-lg bg-emerald-500/100 text-slate-900 dark:text-white font-medium text-xs shadow-xs hover:bg-emerald-600 transition-colors pointer-events-none"
             >
               Browse Files
             </button>
           </div>
         ) : (
           /* Preview Container with Strict object-fit: contain */
-          <div className="flex-1 min-h-[280px] sm:min-h-[340px] rounded-xl overflow-hidden relative border border-slate-700/50/90 bg-slate-900 shadow-xs flex items-center justify-center p-2">
+          <div className="flex-1 min-h-[280px] sm:min-h-[340px] rounded-xl overflow-hidden relative border border-slate-700/50/90 bg-white dark:bg-slate-900 shadow-xs flex items-center justify-center p-2">
             <input
               type="file"
               ref={fileInputRef}
@@ -247,7 +247,7 @@ const SatelliteUpload = ({
                 <button
                   type="button"
                   onClick={handleResetImage}
-                  className="px-3.5 py-1.5 rounded-lg bg-[#1e293b]/95 hover:bg-[#1e293b] text-slate-200 hover:text-emerald-400 text-xs font-medium border border-slate-700/50/90 hover:border-sky-300 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg bg-[#1e293b]/95 hover:bg-slate-100 dark:hover:bg-[#1e293b] text-slate-800 dark:text-slate-200 hover:text-emerald-400 text-xs font-medium border border-slate-700/50/90 hover:border-sky-300 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                   title="Remove image"
                 >
                   <RotateCcw size={13} />
@@ -259,10 +259,10 @@ const SatelliteUpload = ({
             {/* Active Analysis Stage Indicator Overlay */}
             {isAnalyzing && (
               <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] flex items-center justify-center p-4">
-                <div className="bg-[#1e293b] rounded-xl p-4 shadow-xl border border-slate-700/50 flex flex-col items-center max-w-sm w-full text-center space-y-3">
+                <div className="bg-white dark:bg-[#1e293b] rounded-xl p-4 shadow-xl border border-slate-200/50 dark:border-slate-700/50 flex flex-col items-center max-w-sm w-full text-center space-y-3">
                   <Loader2 size={24} className="animate-spin text-emerald-400" />
                   <div>
-                    <p className="text-sm font-semibold text-slate-100">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                       {currentStage === 'Detection' && 'Running Cyclone Detection (Objective 1)...'}
                       {currentStage === 'Intensity' && 'Estimating Wind Intensity (Objective 2)...'}
                       {currentStage === 'Classification' && 'Categorizing Intensity (Objective 3)...'}
@@ -293,8 +293,8 @@ const SatelliteUpload = ({
             disabled={!file || isAnalyzing}
             className={`flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${
               file && !isAnalyzing
-                ? 'bg-emerald-500/100 hover:bg-emerald-600 text-white shadow-xs cursor-pointer'
-                : 'bg-slate-800 text-slate-400 border border-slate-700/50 cursor-not-allowed'
+                ? 'bg-emerald-500/100 hover:bg-emerald-600 text-slate-900 dark:text-white shadow-xs cursor-pointer'
+                : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50 cursor-not-allowed'
             }`}
           >
             {isAnalyzing ? (

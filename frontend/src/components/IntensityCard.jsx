@@ -8,24 +8,24 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
       <div className="app-card p-5 space-y-4">
         {/* Intensity Section */}
         <div>
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/30">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/50 dark:border-slate-700/30">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-slate-800 text-slate-400">
+              <div className="p-1.5 rounded-md bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                 <Wind size={18} />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-slate-100">Intensity Estimation</h3>
-                <span className="text-[11px] text-slate-400">Objective 2</span>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Intensity Estimation</h3>
+                <span className="text-[11px] text-slate-600 dark:text-slate-400">Objective 2</span>
               </div>
             </div>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/50">
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50">
               Not Applicable
             </span>
           </div>
 
-          <div className="p-4 rounded-lg bg-slate-800 border border-slate-700/30 text-center">
-            <p className="text-sm font-semibold text-slate-400">Intensity: Not Applicable</p>
-            <p className="text-xs text-slate-400 mt-0.5">
+          <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/30 text-center">
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">Intensity: Not Applicable</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
               Skipped because Objective 1 determined no cyclone is present.
             </p>
           </div>
@@ -33,24 +33,24 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
 
         {/* Classification Section */}
         <div>
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/30">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/50 dark:border-slate-700/30">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-slate-800 text-slate-400">
+              <div className="p-1.5 rounded-md bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                 <Gauge size={18} />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-slate-100">Cyclone Classification</h3>
-                <span className="text-[11px] text-slate-400">Objective 3</span>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cyclone Classification</h3>
+                <span className="text-[11px] text-slate-600 dark:text-slate-400">Objective 3</span>
               </div>
             </div>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/50">
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50">
               Not Applicable
             </span>
           </div>
 
-          <div className="p-4 rounded-lg bg-slate-800 border border-slate-700/30 text-center">
-            <p className="text-sm font-semibold text-slate-400">Classification: Not Applicable</p>
-            <p className="text-xs text-slate-400 mt-0.5">
+          <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/30 text-center">
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">Classification: Not Applicable</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
               Rule-based classification requires cyclone detection.
             </p>
           </div>
@@ -75,19 +75,19 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
     <div className="app-card p-5 space-y-5">
       {/* Objective 2: Intensity Estimation */}
       <div>
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/30">
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/50 dark:border-slate-700/30">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-md bg-emerald-500/100/10 text-emerald-400">
               <Wind size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-100">Intensity Estimation</h3>
-              <span className="text-[11px] text-slate-400">Objective 2</span>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Intensity Estimation</h3>
+              <span className="text-[11px] text-slate-600 dark:text-slate-400">Objective 2</span>
             </div>
           </div>
 
           {isAvailable && (
-            <span className="text-[11px] font-medium text-slate-500 bg-slate-800 px-2 py-0.5 rounded-md">
+            <span className="text-[11px] font-medium text-slate-500 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md">
               Vmax Sustained
             </span>
           )}
@@ -99,22 +99,22 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
               <div>
                 <p className="text-xs text-slate-500 font-medium">Estimated Wind Speed</p>
                 <div className="flex items-baseline gap-2 mt-0.5">
-                  <span className="text-2xl font-bold text-slate-100">{windKt}</span>
+                  <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{windKt}</span>
                   <span className="text-xs font-semibold text-slate-500 uppercase">kt</span>
-                  <span className="text-xs text-slate-400 font-medium ml-1">
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium ml-1">
                     (≈ {windKmh} km/h)
                   </span>
                 </div>
               </div>
 
               <div className="text-right">
-                <span className="text-[11px] text-slate-400 font-medium">Scale (0–140 kt)</span>
+                <span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">Scale (0–140 kt)</span>
               </div>
             </div>
 
             {/* Clean Horizontal Wind Scale */}
             <div className="space-y-1">
-              <div className="relative h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
+              <div className="relative h-2.5 w-full bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden">
                 {/* 34 kt marker (24.3%) and 64 kt marker (45.7%) */}
                 <div className="absolute top-0 bottom-0 left-[24.3%] w-[1px] bg-slate-300 z-10" />
                 <div className="absolute top-0 bottom-0 left-[45.7%] w-[1px] bg-slate-300 z-10" />
@@ -130,7 +130,7 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
                 />
               </div>
 
-              <div className="flex justify-between text-[10px] text-slate-400 font-medium px-0.5">
+              <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-400 font-medium px-0.5">
                 <span>0 kt</span>
                 <span>34 kt</span>
                 <span>64 kt</span>
@@ -139,23 +139,23 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
             </div>
           </div>
         ) : (
-          <div className="py-4 text-center text-slate-400 space-y-1">
-            <p className="text-lg font-bold text-slate-300">—</p>
+          <div className="py-4 text-center text-slate-600 dark:text-slate-400 space-y-1">
+            <p className="text-lg font-bold text-slate-700 dark:text-slate-300">—</p>
             <p className="text-xs">Awaiting intensity estimation</p>
           </div>
         )}
       </div>
 
       {/* Objective 3: Classification */}
-      <div className="pt-2 border-t border-slate-700/30">
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/30">
+      <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/30">
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/50 dark:border-slate-700/30">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-md bg-emerald-500/100/10 text-emerald-400">
               <Gauge size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-100">Cyclone Classification</h3>
-              <span className="text-[11px] text-slate-400">Objective 3</span>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cyclone Classification</h3>
+              <span className="text-[11px] text-slate-600 dark:text-slate-400">Objective 3</span>
             </div>
           </div>
 
@@ -175,7 +175,7 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
         {currentClass ? (
           <div className="space-y-3">
             {classDescription && (
-              <p className="text-xs font-medium text-slate-400">
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
                 {classDescription}
               </p>
             )}
@@ -186,7 +186,7 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
               <div className={`p-2.5 rounded-lg border text-xs transition-colors ${
                 currentClass === 'LOW'
                   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold ring-1 ring-emerald-300'
-                  : 'bg-slate-800 border-slate-700/50 text-slate-400 font-medium'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50 text-slate-600 dark:text-slate-400 font-medium'
               }`}>
                 <p className="font-bold text-[11px]">LOW</p>
                 <p className="text-[10px] mt-0.5">&lt; 34 kt</p>
@@ -196,7 +196,7 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
               <div className={`p-2.5 rounded-lg border text-xs transition-colors ${
                 currentClass === 'MEDIUM'
                   ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 font-bold ring-1 ring-amber-300'
-                  : 'bg-slate-800 border-slate-700/50 text-slate-400 font-medium'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50 text-slate-600 dark:text-slate-400 font-medium'
               }`}>
                 <p className="font-bold text-[11px]">MEDIUM</p>
                 <p className="text-[10px] mt-0.5">&ge; 34 to &lt; 64 kt</p>
@@ -206,7 +206,7 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
               <div className={`p-2.5 rounded-lg border text-xs transition-colors ${
                 currentClass === 'SEVERE'
                   ? 'bg-red-500/10 border-red-500/30 text-red-400 font-bold ring-1 ring-red-300'
-                  : 'bg-slate-800 border-slate-700/50 text-slate-400 font-medium'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50 text-slate-600 dark:text-slate-400 font-medium'
               }`}>
                 <p className="font-bold text-[11px]">SEVERE</p>
                 <p className="text-[10px] mt-0.5">&ge; 64 kt</p>
@@ -214,8 +214,8 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
             </div>
           </div>
         ) : (
-          <div className="py-4 text-center text-slate-400 space-y-1">
-            <p className="text-lg font-bold text-slate-300">—</p>
+          <div className="py-4 text-center text-slate-600 dark:text-slate-400 space-y-1">
+            <p className="text-lg font-bold text-slate-700 dark:text-slate-300">—</p>
             <p className="text-xs">Awaiting classification</p>
           </div>
         )}

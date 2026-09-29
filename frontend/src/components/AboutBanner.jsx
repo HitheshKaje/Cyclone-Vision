@@ -12,10 +12,10 @@ const AboutBanner = () => {
             <FileText size={22} />
           </div>
           <div>
-            <h4 className="text-sm sm:text-base font-bold text-slate-100">
+            <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
               About CycloneVision
             </h4>
-            <p className="text-xs sm:text-sm text-slate-400">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
               CycloneVision is an AI-driven system for tropical cyclone detection, classification, and future track prediction using multi-source satellite data.
             </p>
           </div>
@@ -33,21 +33,21 @@ const AboutBanner = () => {
       {/* Learn More Modal Dialog */}
       {showModal && (
         <div 
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setShowModal(false)}
         >
           <div 
-            className="bg-[#1e293b] rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-sky-100 max-h-[90vh] overflow-y-auto space-y-6"
+            className="bg-white dark:bg-[#1e293b] rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-sky-100 max-h-[90vh] overflow-y-auto space-y-6"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-700/30 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-200/50 dark:border-slate-700/30 pb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-sky-100 text-emerald-400">
                   <Sparkles size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-100">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
                     CycloneVision Project Architecture
                   </h3>
                   <p className="text-xs text-slate-500">
@@ -57,16 +57,16 @@ const AboutBanner = () => {
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+                className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
 
             {/* Modal Content */}
-            <div className="space-y-4 text-xs sm:text-sm text-slate-400 leading-relaxed">
+            <div className="space-y-4 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
               <div>
-                <h4 className="font-bold text-slate-200 text-sm mb-1">Project Overview</h4>
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">Project Overview</h4>
                 <p>
                   CycloneVision is designed to provide real-time meteorological intelligence from multi-source geostationary satellite imagery (Himawari-8, GOES, INSAT-3D) to aid disaster preparedness and coastal protection.
                 </p>
@@ -94,8 +94,8 @@ const AboutBanner = () => {
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-slate-800 border border-slate-700/50">
-                  <div className="font-bold text-slate-300 mb-1 text-xs sm:text-sm">
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50">
+                  <div className="font-bold text-slate-700 dark:text-slate-300 mb-1 text-xs sm:text-sm">
                     Objective 3: Classification (Coming Next)
                   </div>
                   <p className="text-xs text-slate-500">
@@ -103,8 +103,8 @@ const AboutBanner = () => {
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-slate-800 border border-slate-700/50">
-                  <div className="font-bold text-slate-300 mb-1 text-xs sm:text-sm">
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50">
+                  <div className="font-bold text-slate-700 dark:text-slate-300 mb-1 text-xs sm:text-sm">
                     Objective 4: Risk Assessment (Coming Next)
                   </div>
                   <p className="text-xs text-slate-500">
@@ -115,10 +115,10 @@ const AboutBanner = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-end pt-4 border-t border-slate-700/30">
+            <div className="flex justify-end pt-4 border-t border-slate-200/50 dark:border-slate-700/30">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-xs sm:text-sm hover:bg-slate-800 transition-colors"
+                className="px-5 py-2.5 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold text-xs sm:text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 Close
               </button>

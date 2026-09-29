@@ -96,9 +96,9 @@ const MapPage = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-100px)] space-y-4 pb-6">
       {/* 1. Page Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-700/50">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200/50 dark:border-slate-700/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             India Coastal Cyclone Monitor
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
@@ -107,13 +107,13 @@ const MapPage = () => {
         </div>
         
         {/* Live Status Indicator */}
-        <div className="flex items-center gap-3 bg-[#1e293b] px-4 py-2 rounded-lg border border-slate-700/50 shadow-sm">
+        <div className="flex items-center gap-3 bg-white dark:bg-[#1e293b] px-4 py-2 rounded-lg border border-slate-200/50 dark:border-slate-700/50 shadow-sm">
           <div className="flex items-center gap-2">
             <div className={`w-2.5 h-2.5 rounded-full ${status === 'LIVE / Connected' ? 'bg-red-500/100 animate-pulse' : status === 'Updating' ? 'bg-amber-400' : 'bg-slate-300'}`} />
-            <span className="text-sm font-bold text-slate-200">{status}</span>
+            <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{status}</span>
           </div>
           {lastUpdated && (
-            <div className="text-xs text-slate-500 font-medium pl-3 border-l border-slate-700/50">
+            <div className="text-xs text-slate-500 font-medium pl-3 border-l border-slate-200/50 dark:border-slate-700/50">
               Last updated: {lastUpdated}
             </div>
           )}
@@ -122,11 +122,11 @@ const MapPage = () => {
 
       <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-[500px]">
         {/* 2. Map Container */}
-        <div className="flex-1 bg-[#1e293b] rounded-xl border border-slate-700/50 overflow-hidden shadow-sm relative h-full">
+        <div className="flex-1 bg-white dark:bg-[#1e293b] rounded-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden shadow-sm relative h-full">
           {error ? (
-             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800/90 z-10">
-               <AlertCircle size={32} className="text-slate-400 mb-3" />
-               <h3 className="text-lg font-semibold text-slate-200">{error}</h3>
+             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100/90 dark:bg-slate-800/90 z-10">
+               <AlertCircle size={32} className="text-slate-600 dark:text-slate-400 mb-3" />
+               <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{error}</h3>
                <p className="text-sm text-slate-500 mt-1">Backend or data source is unavailable.</p>
              </div>
           ) : null}
@@ -186,8 +186,8 @@ const MapPage = () => {
               >
                 <Popup className="custom-popup">
                   <div className="p-1">
-                    <h4 className="font-bold text-slate-100 text-sm mb-2">{cyclone.name}</h4>
-                    <div className="space-y-1 text-xs text-slate-400">
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-2">{cyclone.name}</h4>
+                    <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400">
                       <p><span className="font-semibold">Latitude:</span> {cyclone.latitude}°</p>
                       <p><span className="font-semibold">Longitude:</span> {cyclone.longitude}°</p>
                       {cyclone.wind_speed != null && (
@@ -197,7 +197,7 @@ const MapPage = () => {
                         <p><span className="font-semibold">Status:</span> {cyclone.status}</p>
                       )}
                       {cyclone.last_updated && (
-                        <p className="mt-2 text-[10px] text-slate-400">Update: {cyclone.last_updated}</p>
+                        <p className="mt-2 text-[10px] text-slate-600 dark:text-slate-400">Update: {cyclone.last_updated}</p>
                       )}
                     </div>
                   </div>
@@ -209,8 +209,8 @@ const MapPage = () => {
 
         {/* 3. Map Information Panel */}
         <div className="w-full md:w-80 flex flex-col gap-4 h-full">
-          <div className="bg-[#1e293b] rounded-xl border border-slate-700/50 p-5 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-100 mb-4 pb-3 border-b border-slate-700/30 flex items-center gap-2">
+          <div className="bg-white dark:bg-[#1e293b] rounded-xl border border-slate-200/50 dark:border-slate-700/50 p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-4 pb-3 border-b border-slate-200/50 dark:border-slate-700/30 flex items-center gap-2">
               <Activity size={16} className="text-emerald-400" />
               Cyclone Monitoring
             </h3>
@@ -218,7 +218,7 @@ const MapPage = () => {
             <div className="space-y-4">
               <div>
                 <span className="text-xs font-medium text-slate-500 block mb-1">Active Cyclones</span>
-                <div className="text-xl font-bold text-slate-200">
+                <div className="text-xl font-bold text-slate-800 dark:text-slate-200">
                   {cyclones.length}
                 </div>
               </div>
@@ -227,7 +227,7 @@ const MapPage = () => {
                 <span className="text-xs font-medium text-slate-500 block mb-1 flex items-center gap-1.5">
                   <Clock size={12} /> Last Data Update
                 </span>
-                <div className="text-sm font-medium text-slate-300">
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   {data?.updated_at ? new Date(data.updated_at).toLocaleString() : '-'}
                 </div>
               </div>
@@ -236,14 +236,14 @@ const MapPage = () => {
                 <span className="text-xs font-medium text-slate-500 block mb-1 flex items-center gap-1.5">
                   <Database size={12} /> Data Source
                 </span>
-                <div className="text-sm font-medium text-slate-300 break-words">
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 break-words">
                   {data?.source || '-'}
                 </div>
               </div>
 
               <div>
                 <span className="text-xs font-medium text-slate-500 block mb-1">Connection</span>
-                <div className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${status === 'LIVE / Connected' ? 'bg-emerald-500/100' : 'bg-slate-400'}`} />
                   {status}
                 </div>
@@ -251,8 +251,8 @@ const MapPage = () => {
             </div>
           </div>
           
-          <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-5 flex-1 overflow-hidden flex flex-col">
-            <h3 className="text-xs font-bold text-slate-100 mb-3 uppercase tracking-wider text-slate-500">
+          <div className="bg-slate-100/50 dark:bg-slate-800/30 rounded-xl border border-slate-200/50 dark:border-slate-700/50 p-5 flex-1 overflow-hidden flex flex-col">
+            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 mb-3 uppercase tracking-wider text-slate-500">
               Active Events
             </h3>
             {cyclones.length === 0 ? (
@@ -260,16 +260,16 @@ const MapPage = () => {
             ) : (
               <div className="space-y-3 overflow-y-auto flex-1 pr-1 custom-scrollbar">
                 {cyclones.map(cyc => (
-                  <div key={cyc.id} className="bg-[#1e293b] p-3 rounded-lg border border-slate-700/50 shadow-sm cursor-pointer hover:border-sky-300 transition-colors"
+                  <div key={cyc.id} className="bg-white dark:bg-[#1e293b] p-3 rounded-lg border border-slate-200/50 dark:border-slate-700/50 shadow-sm cursor-pointer hover:border-sky-300 transition-colors"
                        onClick={() => {
                          if (mapRef.current) {
                            mapRef.current.flyTo([cyc.latitude, cyc.longitude], 6);
                          }
                        }}>
-                    <div className="font-bold text-slate-200 text-sm mb-1">{cyc.name}</div>
+                    <div className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">{cyc.name}</div>
                     <div className="text-xs text-slate-500 flex justify-between">
                       <span>{cyc.latitude}°, {cyc.longitude}°</span>
-                      <span className="font-semibold text-slate-300">{cyc.status}</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{cyc.status}</span>
                     </div>
                   </div>
                 ))}

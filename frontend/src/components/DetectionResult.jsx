@@ -11,16 +11,16 @@ const DetectionResult = ({ detection }) => {
   return (
     <div className="app-card p-5 flex flex-col justify-between">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/30">
+      <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/50 dark:border-slate-700/30">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-md bg-emerald-500/100/10 text-emerald-400">
             <Target size={18} />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               Cyclone Detection
             </h3>
-            <span className="text-[11px] text-slate-400">Objective 1</span>
+            <span className="text-[11px] text-slate-600 dark:text-slate-400">Objective 1</span>
           </div>
         </div>
 
@@ -47,7 +47,7 @@ const DetectionResult = ({ detection }) => {
                 ) : (
                   <ShieldCheck size={20} className="text-emerald-500" />
                 )}
-                <span className="text-xl font-bold text-slate-100">
+                <span className="text-xl font-bold text-slate-900 dark:text-slate-100">
                   {isCyclone ? 'Cyclone Detected' : 'No Cyclone Detected'}
                 </span>
               </div>
@@ -55,7 +55,7 @@ const DetectionResult = ({ detection }) => {
 
             <div className="text-right">
               <p className="text-xs text-slate-500 font-medium">Confidence</p>
-              <p className="text-xl font-bold text-slate-100 mt-0.5">
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">
                 {confidencePercent != null ? `${confidencePercent}%` : '—'}
               </p>
             </div>
@@ -63,7 +63,7 @@ const DetectionResult = ({ detection }) => {
 
           {/* Clean Confidence Bar */}
           <div className="space-y-1.5">
-            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden">
               <div 
                 className={`h-full transition-all duration-500 rounded-full ${
                   isCyclone ? 'bg-red-500/100' : 'bg-emerald-500/100'
@@ -71,7 +71,7 @@ const DetectionResult = ({ detection }) => {
                 style={{ width: `${Math.min(100, Math.max(0, confidencePercent || 0))}%` }}
               />
             </div>
-            <div className="flex justify-between text-[11px] text-slate-400 font-medium">
+            <div className="flex justify-between text-[11px] text-slate-600 dark:text-slate-400 font-medium">
               <span>Model: {detection.model || 'EfficientNetB0'}</span>
               <span>Certainty: {confidencePercent != null ? `${confidencePercent}%` : '—'}</span>
             </div>
@@ -79,8 +79,8 @@ const DetectionResult = ({ detection }) => {
         </div>
       ) : (
         /* Empty State */
-        <div className="py-6 text-center text-slate-400 space-y-1">
-          <p className="text-lg font-bold text-slate-300">—</p>
+        <div className="py-6 text-center text-slate-600 dark:text-slate-400 space-y-1">
+          <p className="text-lg font-bold text-slate-700 dark:text-slate-300">—</p>
           <p className="text-xs">Awaiting image analysis</p>
         </div>
       )}
