@@ -20,7 +20,7 @@ const RiskAssessment = () => {
           </div>
           <div>
             <p className="text-xs text-slate-400">Risk Level</p>
-            <p className="text-sm font-medium text-slate-600">Unknown</p>
+            <p className="text-sm font-medium text-slate-400">Unknown</p>
           </div>
         </div>
         
@@ -30,7 +30,7 @@ const RiskAssessment = () => {
           </div>
           <div>
             <p className="text-xs text-slate-400">Affected Coastal Region</p>
-            <p className="text-sm font-medium text-slate-600">--</p>
+            <p className="text-sm font-medium text-slate-400">--</p>
           </div>
         </div>
 
@@ -40,7 +40,7 @@ const RiskAssessment = () => {
           </div>
           <div>
             <p className="text-xs text-slate-400">Safety Status</p>
-            <p className="text-sm font-medium text-slate-600">Awaiting Data</p>
+            <p className="text-sm font-medium text-slate-400">Awaiting Data</p>
           </div>
         </div>
       </div>

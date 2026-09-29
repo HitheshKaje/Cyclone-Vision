@@ -19,9 +19,9 @@ const HomePage = ({
   return (
     <div className="space-y-6 pb-8">
       {/* 1. Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-700/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight">
             Tropical Cyclone Monitoring
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
@@ -30,7 +30,7 @@ const HomePage = ({
         </div>
         <button
           onClick={() => setActiveTab('analyze')}
-          className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto"
+          className="px-4 py-2 rounded-lg bg-emerald-500/100 hover:bg-emerald-600 text-white font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto"
         >
           <span>Analyze Image</span>
           <ArrowRight size={15} />
@@ -41,13 +41,13 @@ const HomePage = ({
       <div className="app-card p-6 sm:p-8 bg-gradient-to-r from-sky-50/70 via-white to-sky-50/40 border border-sky-100/80">
         <div className="max-w-2xl space-y-3">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 text-[11px] font-semibold">
-            <Sparkles size={13} className="text-sky-600" />
+            <Sparkles size={13} className="text-emerald-400" />
             <span>AI-Driven Meteorological Intelligence</span>
           </div>
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 tracking-tight leading-snug">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-100 tracking-tight leading-snug">
             AI-powered tropical cyclone detection, intensity estimation, and classification.
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
             Multi-stage neural processing designed for coastal safety and satellite meteorological analysis.
           </p>
         </div>
@@ -56,7 +56,7 @@ const HomePage = ({
       {/* 3. How It Works (Explanatory UI) */}
       <div className="app-card p-5 sm:p-6 space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">
+          <h3 className="text-sm font-semibold text-slate-100">
             How It Works
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -66,49 +66,49 @@ const HomePage = ({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Stage 1 */}
-          <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 flex flex-col justify-between space-y-2">
-            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sky-600 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50/80 flex flex-col justify-between space-y-2">
+            <div className="w-9 h-9 rounded-lg bg-[#1e293b] border border-slate-700/50 flex items-center justify-center text-emerald-400 shadow-xs">
               <UploadCloud size={18} />
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stage 1</span>
-              <p className="text-xs sm:text-sm font-semibold text-slate-900 mt-0.5">Satellite Image</p>
+              <p className="text-xs sm:text-sm font-semibold text-slate-100 mt-0.5">Satellite Image</p>
               <p className="text-[11px] text-slate-500 mt-0.5">Multispectral or infrared satellite input acquisition</p>
             </div>
           </div>
 
           {/* Stage 2 */}
-          <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 flex flex-col justify-between space-y-2">
-            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sky-600 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50/80 flex flex-col justify-between space-y-2">
+            <div className="w-9 h-9 rounded-lg bg-[#1e293b] border border-slate-700/50 flex items-center justify-center text-emerald-400 shadow-xs">
               <Target size={18} />
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stage 2</span>
-              <p className="text-xs sm:text-sm font-semibold text-slate-900 mt-0.5">Cyclone Detection</p>
+              <p className="text-xs sm:text-sm font-semibold text-slate-100 mt-0.5">Cyclone Detection</p>
               <p className="text-[11px] text-slate-500 mt-0.5">Binary presence verification with neural confidence score</p>
             </div>
           </div>
 
           {/* Stage 3 */}
-          <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 flex flex-col justify-between space-y-2">
-            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sky-600 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50/80 flex flex-col justify-between space-y-2">
+            <div className="w-9 h-9 rounded-lg bg-[#1e293b] border border-slate-700/50 flex items-center justify-center text-emerald-400 shadow-xs">
               <Wind size={18} />
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stage 3</span>
-              <p className="text-xs sm:text-sm font-semibold text-slate-900 mt-0.5">Intensity Estimation</p>
+              <p className="text-xs sm:text-sm font-semibold text-slate-100 mt-0.5">Intensity Estimation</p>
               <p className="text-[11px] text-slate-500 mt-0.5">Maximum sustained wind speed estimation in knots (kt)</p>
             </div>
           </div>
 
           {/* Stage 4 */}
-          <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 flex flex-col justify-between space-y-2">
-            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sky-600 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50/80 flex flex-col justify-between space-y-2">
+            <div className="w-9 h-9 rounded-lg bg-[#1e293b] border border-slate-700/50 flex items-center justify-center text-emerald-400 shadow-xs">
               <Gauge size={18} />
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stage 4</span>
-              <p className="text-xs sm:text-sm font-semibold text-slate-900 mt-0.5">Classification</p>
+              <p className="text-xs sm:text-sm font-semibold text-slate-100 mt-0.5">Classification</p>
               <p className="text-[11px] text-slate-500 mt-0.5">Three-tier meteorological category (LOW, MEDIUM, SEVERE)</p>
             </div>
           </div>
@@ -120,10 +120,10 @@ const HomePage = ({
         {/* Ready to Analyze Card (5 cols on desktop) */}
         <div className="lg:col-span-4 app-card p-6 flex flex-col justify-between space-y-4">
           <div className="space-y-2">
-            <div className="w-10 h-10 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/100/10 border border-sky-100 flex items-center justify-center text-emerald-400">
               <Layers size={20} />
             </div>
-            <h3 className="text-base font-semibold text-slate-900">
+            <h3 className="text-base font-semibold text-slate-100">
               Ready to Analyze?
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
@@ -133,7 +133,7 @@ const HomePage = ({
 
           <button
             onClick={() => setActiveTab('analyze')}
-            className="w-full py-2.5 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            className="w-full py-2.5 px-4 rounded-lg bg-emerald-500/100 hover:bg-emerald-600 text-white font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
           >
             <span>Analyze Image</span>
             <ArrowRight size={15} />
@@ -142,9 +142,9 @@ const HomePage = ({
 
         {/* Latest Analysis Section (8 cols on desktop) */}
         <div className="lg:col-span-8 app-card p-6 flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-700/30">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">
+              <h3 className="text-sm font-semibold text-slate-100">
                 Latest Analysis
               </h3>
               <p className="text-[11px] text-slate-400">
@@ -154,7 +154,7 @@ const HomePage = ({
             {currentAnalysis && (
               <button
                 onClick={() => setActiveTab('results')}
-                className="text-xs font-semibold text-sky-600 hover:text-sky-700 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-emerald-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1 cursor-pointer"
               >
                 <span>View Full Results</span>
                 <ArrowRight size={13} />
@@ -165,10 +165,10 @@ const HomePage = ({
           {!currentAnalysis ? (
             /* Clean Empty State when no analysis has been run */
             <div className="py-8 flex flex-col items-center justify-center text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-1">
+              <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700/50 flex items-center justify-center text-slate-400 mb-1">
                 <FileQuestion size={22} />
               </div>
-              <h4 className="text-sm font-semibold text-slate-800">
+              <h4 className="text-sm font-semibold text-slate-200">
                 No analysis available
               </h4>
               <p className="text-xs text-slate-500 max-w-xs">
@@ -177,7 +177,7 @@ const HomePage = ({
               <div className="pt-2">
                 <button
                   onClick={() => setActiveTab('analyze')}
-                  className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-lg bg-emerald-500/100 hover:bg-emerald-600 text-white font-medium text-xs transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5"
                 >
                   <span>Analyze Image</span>
                   <ArrowRight size={14} />
@@ -192,20 +192,20 @@ const HomePage = ({
                   <img 
                     src={currentAnalysis.imagePreview} 
                     alt="Latest Observation Thumbnail" 
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-contain bg-[#F5F8FC] border border-slate-200 shrink-0"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-contain bg-slate-900 border border-slate-700/50 shrink-0"
                   />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900 truncate">
+                    <span className="text-sm font-semibold text-slate-100 truncate">
                       {currentAnalysis.fileName || 'Observation'}
                     </span>
                     {currentAnalysis.detection?.is_cyclone ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">
                         Cyclone Detected
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                         No Cyclone Detected
                       </span>
                     )}
@@ -218,34 +218,34 @@ const HomePage = ({
 
               {/* Real Metric Highlights */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/70">
+                <div className="p-3 rounded-lg bg-slate-800 border border-slate-700/50/70">
                   <p className="text-[11px] text-slate-500 font-medium">Detection</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5 truncate">
+                  <p className="text-sm font-bold text-slate-100 mt-0.5 truncate">
                     {currentAnalysis.detection?.is_cyclone ? 'Cyclone Detected' : 'No Cyclone'}
                   </p>
                 </div>
 
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/70">
+                <div className="p-3 rounded-lg bg-slate-800 border border-slate-700/50/70">
                   <p className="text-[11px] text-slate-500 font-medium">Confidence</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">
+                  <p className="text-sm font-bold text-slate-100 mt-0.5">
                     {currentAnalysis.detection?.confidence_percent != null 
                       ? `${currentAnalysis.detection.confidence_percent}%` 
                       : '—'}
                   </p>
                 </div>
 
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/70">
+                <div className="p-3 rounded-lg bg-slate-800 border border-slate-700/50/70">
                   <p className="text-[11px] text-slate-500 font-medium">Wind Speed</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5 truncate">
+                  <p className="text-sm font-bold text-slate-100 mt-0.5 truncate">
                     {currentAnalysis.intensity?.wind_speed_kt != null 
                       ? `${currentAnalysis.intensity.wind_speed_kt} kt`
                       : (currentAnalysis.detection?.is_cyclone === false ? 'Not Applicable' : '—')}
                   </p>
                 </div>
 
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/70">
+                <div className="p-3 rounded-lg bg-slate-800 border border-slate-700/50/70">
                   <p className="text-[11px] text-slate-500 font-medium">Classification</p>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5 truncate">
+                  <p className="text-sm font-bold text-slate-100 mt-0.5 truncate">
                     {currentAnalysis.detection?.is_cyclone === false
                       ? 'Not Applicable'
                       : (currentAnalysis.classification?.classification || 
@@ -261,9 +261,9 @@ const HomePage = ({
 
       {/* 5. Recent History Section */}
       <div className="app-card p-5 sm:p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-700/30">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-slate-100">
               Recent Analysis History
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -272,7 +272,7 @@ const HomePage = ({
           </div>
           <button
             onClick={() => setActiveTab('history')}
-            className="text-xs font-semibold text-sky-600 hover:text-sky-700 transition-colors inline-flex items-center gap-1 cursor-pointer"
+            className="text-xs font-semibold text-emerald-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1 cursor-pointer"
           >
             <span>View All</span>
             <ArrowRight size={13} />
@@ -281,14 +281,14 @@ const HomePage = ({
 
         {analysisHistory.length === 0 ? (
           <div className="py-8 text-center text-slate-400 space-y-1">
-            <p className="text-sm font-medium text-slate-600">No analysis history available</p>
+            <p className="text-sm font-medium text-slate-400">No analysis history available</p>
             <p className="text-xs text-slate-400">Perform an analysis to record session history.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[11px] bg-slate-50/80">
+                <tr className="border-b border-slate-700/50 text-slate-500 font-semibold uppercase tracking-wider text-[11px] bg-slate-800/80">
                   <th className="py-2.5 px-3">Date / Time</th>
                   <th className="py-2.5 px-3">Image</th>
                   <th className="py-2.5 px-3">Detection</th>
@@ -306,8 +306,8 @@ const HomePage = ({
                   const classification = item.classification?.classification || item.intensity?.classification;
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2.5 px-3 text-slate-600 font-medium whitespace-nowrap">
+                    <tr key={item.id} className="hover:bg-slate-800/80 transition-colors">
+                      <td className="py-2.5 px-3 text-slate-400 font-medium whitespace-nowrap">
                         {item.timestamp}
                       </td>
                       <td className="py-2.5 px-3">
@@ -315,10 +315,10 @@ const HomePage = ({
                           <img 
                             src={item.imagePreview} 
                             alt="Thumbnail" 
-                            className="w-9 h-9 rounded-md object-contain bg-[#F5F8FC] border border-slate-200"
+                            className="w-9 h-9 rounded-md object-contain bg-slate-900 border border-slate-700/50"
                           />
                         ) : (
-                          <div className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-[10px]">
+                          <div className="w-9 h-9 rounded-md bg-slate-800 border border-slate-700/50 flex items-center justify-center text-slate-400 text-[10px]">
                             N/A
                           </div>
                         )}
@@ -326,26 +326,26 @@ const HomePage = ({
                       <td className="py-2.5 px-3">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                           isCyclone 
-                            ? 'bg-red-50 text-red-700 border-red-200' 
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                         }`}>
                           {isCyclone ? 'Cyclone Detected' : 'No Cyclone'}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-800">
+                      <td className="py-2.5 px-3 font-semibold text-slate-200">
                         {conf != null ? `${conf}%` : '—'}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-800 font-medium">
+                      <td className="py-2.5 px-3 text-slate-200 font-medium">
                         {wind != null ? `${wind} kt` : (isCyclone === false ? 'Not Applicable' : '—')}
                       </td>
                       <td className="py-2.5 px-3">
                         {classification ? (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                             classification === 'SEVERE'
-                              ? 'bg-red-50 text-red-700 border-red-200'
+                              ? 'bg-red-500/10 text-red-400 border-red-500/20'
                               : classification === 'MEDIUM'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                           }`}>
                             {classification}
                           </span>
@@ -360,7 +360,7 @@ const HomePage = ({
                           onClick={() => {
                             setActiveTab('results');
                           }}
-                          className="px-2 py-1 text-xs font-semibold text-sky-700 hover:text-sky-800 hover:bg-sky-50 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          className="px-2 py-1 text-xs font-semibold text-emerald-400 hover:text-sky-800 hover:bg-emerald-500/100/10 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
                         >
                           <Eye size={13} />
                           <span>View</span>

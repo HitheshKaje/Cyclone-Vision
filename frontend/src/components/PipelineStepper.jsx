@@ -49,12 +49,12 @@ const PipelineStepper = ({ currentStage, isCompleted, isCyclone }) => {
                 {/* Step Indicator */}
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                   isSkipped
-                    ? 'bg-slate-100 text-slate-400 border border-slate-200'
+                    ? 'bg-slate-800 text-slate-400 border border-slate-700/50'
                     : isDone
                     ? 'bg-emerald-600 text-white'
                     : isActive
-                    ? 'bg-sky-600 text-white ring-4 ring-sky-100'
-                    : 'bg-slate-100 text-slate-400 border border-slate-200'
+                    ? 'bg-emerald-500/100 text-white ring-4 ring-sky-100'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700/50'
                 }`}>
                   {isDone ? <CheckCircle2 size={15} /> : step.id}
                 </div>
@@ -62,7 +62,7 @@ const PipelineStepper = ({ currentStage, isCompleted, isCyclone }) => {
                 {/* Step Text */}
                 <div className="min-w-0">
                   <p className={`text-xs font-semibold truncate ${
-                    isDone ? 'text-slate-900' : isActive ? 'text-sky-700' : 'text-slate-500'
+                    isDone ? 'text-slate-100' : isActive ? 'text-emerald-400' : 'text-slate-500'
                   }`}>
                     {step.name}
                   </p>

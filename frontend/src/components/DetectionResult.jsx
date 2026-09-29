@@ -11,13 +11,13 @@ const DetectionResult = ({ detection }) => {
   return (
     <div className="app-card p-5 flex flex-col justify-between">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+      <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/30">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-md bg-sky-50 text-sky-700">
+          <div className="p-1.5 rounded-md bg-emerald-500/100/10 text-emerald-400">
             <Target size={18} />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-slate-100">
               Cyclone Detection
             </h3>
             <span className="text-[11px] text-slate-400">Objective 1</span>
@@ -27,8 +27,8 @@ const DetectionResult = ({ detection }) => {
         {isAvailable && (
           <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
             isCyclone 
-              ? 'bg-red-50 text-red-700 border-red-200' 
-              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
           }`}>
             {isCyclone ? 'Cyclone Detected' : 'No Cyclone Detected'}
           </span>
@@ -47,7 +47,7 @@ const DetectionResult = ({ detection }) => {
                 ) : (
                   <ShieldCheck size={20} className="text-emerald-500" />
                 )}
-                <span className="text-xl font-bold text-slate-900">
+                <span className="text-xl font-bold text-slate-100">
                   {isCyclone ? 'Cyclone Detected' : 'No Cyclone Detected'}
                 </span>
               </div>
@@ -55,7 +55,7 @@ const DetectionResult = ({ detection }) => {
 
             <div className="text-right">
               <p className="text-xs text-slate-500 font-medium">Confidence</p>
-              <p className="text-xl font-bold text-slate-900 mt-0.5">
+              <p className="text-xl font-bold text-slate-100 mt-0.5">
                 {confidencePercent != null ? `${confidencePercent}%` : '—'}
               </p>
             </div>
@@ -63,10 +63,10 @@ const DetectionResult = ({ detection }) => {
 
           {/* Clean Confidence Bar */}
           <div className="space-y-1.5">
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
               <div 
                 className={`h-full transition-all duration-500 rounded-full ${
-                  isCyclone ? 'bg-red-500' : 'bg-emerald-500'
+                  isCyclone ? 'bg-red-500/100' : 'bg-emerald-500/100'
                 }`}
                 style={{ width: `${Math.min(100, Math.max(0, confidencePercent || 0))}%` }}
               />

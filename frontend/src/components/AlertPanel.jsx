@@ -13,7 +13,7 @@ const AlertPanel = () => {
       </div>
 
       <div className="flex flex-col items-center justify-center p-6 sm:p-8 text-center border-2 border-dashed border-slate-700/50 rounded-xl bg-navy-900/30 mx-2 sm:mx-0">
-        <CheckCircle size={32} className="text-slate-600 mb-2 sm:mb-3" />
+        <CheckCircle size={32} className="text-slate-400 mb-2 sm:mb-3" />
         <p className="text-slate-400 font-medium text-sm sm:text-base">No active alerts</p>
         <p className="text-[10px] sm:text-xs text-slate-500 mt-1 max-w-[250px]">System is monitoring for cyclone threats. Alerts will appear here.</p>
       </div>

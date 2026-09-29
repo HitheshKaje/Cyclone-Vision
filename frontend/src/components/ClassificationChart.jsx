@@ -24,7 +24,7 @@ const ClassificationChart = () => {
             <div className="flex justify-between text-xs">
               <span className="font-medium text-slate-400 w-16">{cat.label}</span>
               <span className="text-slate-500 hidden sm:inline">{cat.name}</span>
-              <span className="text-slate-600">0%</span>
+              <span className="text-slate-400">0%</span>
             </div>
             <div className="h-2 w-full bg-navy-900 rounded-full overflow-hidden border border-slate-800">
               <div 
