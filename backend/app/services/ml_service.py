@@ -171,8 +171,8 @@ class MLService:
         prob = float(prob_arr[0][0])
         t_infer = time.perf_counter() - t0
 
-        # Increased threshold to 0.85 to reduce false positives (e.g., black holes, random sea images)
-        is_cyclone = bool(prob > 0.85)
+        # Increased threshold to 0.95 because the model was 87% confident that a black hole was a cyclone!
+        is_cyclone = bool(prob > 0.95)
         confidence = float(prob if is_cyclone else (1.0 - prob))
         prediction = "Cyclone" if is_cyclone else "No Cyclone"
 
