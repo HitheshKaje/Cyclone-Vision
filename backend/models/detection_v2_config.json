@@ -1,0 +1,19 @@
+{
+    "input_size": [
+        224,
+        224,
+        3
+    ],
+    "class_names": [
+        "No_Cyclone",
+        "Cyclone"
+    ],
+    "classification_threshold": 0.52,
+    "training_dataset_info": {
+        "total_train": 873,
+        "total_val": 187,
+        "total_test": 188
+    },
+    "model_architecture": "EfficientNetV2B0",
+    "preprocessing": "Input normalized internally by EfficientNetV2B0 (expects 0-255 RGB)"
+}

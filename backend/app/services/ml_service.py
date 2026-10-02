@@ -46,6 +46,7 @@ class MLService:
         self.class_names: list = ["No_Cyclone", "Cyclone"]
         self.classifier: CycloneClassifier = get_cyclone_classifier()
         self.is_loaded: bool = False
+        self.detection_threshold: float = 0.95 # Default for V1
 
     @classmethod
     def get_instance(cls) -> "MLService":
@@ -95,6 +96,16 @@ class MLService:
 
         self.classifier = get_cyclone_classifier()
         logger.info(f"Objective 3 Classifier initialized (Low Max: {self.classifier.low_max} kt, Med Max: {self.classifier.medium_max} kt)")
+
+        if USE_DETECTOR_V2 and os.path.exists(DETECTION_V2_CONFIG_PATH):
+            try:
+                with open(DETECTION_V2_CONFIG_PATH, "r") as f:
+                    v2_cfg = json.load(f)
+                    if "classification_threshold" in v2_cfg:
+                        self.detection_threshold = v2_cfg["classification_threshold"]
+                        logger.info(f"Loaded V2 dynamic threshold: {self.detection_threshold}")
+            except Exception as e:
+                logger.warning(f"Could not load V2 config: {e}")
 
         # 4. Pre-warm models with dummy batch to compile TensorFlow computational graphs
         t0 = time.perf_counter()
@@ -171,8 +182,7 @@ class MLService:
         prob = float(prob_arr[0][0])
         t_infer = time.perf_counter() - t0
 
-        # Increased threshold to 0.95 because the model was 87% confident that a black hole was a cyclone!
-        is_cyclone = bool(prob > 0.95)
+        is_cyclone = bool(prob > 0.85)
         confidence = float(prob if is_cyclone else (1.0 - prob))
         prediction = "Cyclone" if is_cyclone else "No Cyclone"
 
