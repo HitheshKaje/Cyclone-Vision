@@ -8,11 +8,11 @@
         "No_Cyclone",
         "Cyclone"
     ],
-    "classification_threshold": 0.52,
+    "classification_threshold": 0.7060204148292542,
     "training_dataset_info": {
-        "total_train": 873,
-        "total_val": 187,
-        "total_test": 188
+        "total_train": 108366,
+        "total_val": 22623,
+        "total_test": 19646
     },
     "model_architecture": "EfficientNetV2B0",
     "preprocessing": "Input normalized internally by EfficientNetV2B0 (expects 0-255 RGB)"

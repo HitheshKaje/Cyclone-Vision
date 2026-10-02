@@ -35,6 +35,8 @@ BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 DETECTION_MODEL_PATH = os.path.join(BACKEND_DIR, "models", "cyclone_detector.keras")
 INTENSITY_MODEL_PATH = os.path.join(BACKEND_DIR, "models", "cyclone_intensity.keras")
 CLASS_NAMES_PATH = os.path.join(BACKEND_DIR, "models", "class_names.json")
+USE_DETECTOR_V2 = True
+DETECTION_V2_CONFIG_PATH = os.path.join(BACKEND_DIR, "models", "detection_v2_config.json")
 
 
 class MLService:
@@ -70,9 +72,13 @@ class MLService:
         # 1. Load Detection Model (Objective 1)
         if not os.path.exists(DETECTION_MODEL_PATH):
             raise FileNotFoundError(f"Detection model not found at: {DETECTION_MODEL_PATH}")
+
+        import tf_keras
+        import keras
+
         t0 = time.perf_counter()
         logger.info(f"Loading Objective 1 Detection Model: {DETECTION_MODEL_PATH}...")
-        self.detection_model = tf.keras.models.load_model(DETECTION_MODEL_PATH)
+        self.detection_model = keras.models.load_model(DETECTION_MODEL_PATH)
         t_det = time.perf_counter() - t0
         logger.info(f"-> Detection model loaded in {t_det:.2f}s")
 
@@ -81,7 +87,7 @@ class MLService:
             raise FileNotFoundError(f"Intensity model not found at: {INTENSITY_MODEL_PATH}")
         t0 = time.perf_counter()
         logger.info(f"Loading Objective 2 Intensity Model: {INTENSITY_MODEL_PATH}...")
-        self.intensity_model = tf.keras.models.load_model(INTENSITY_MODEL_PATH)
+        self.intensity_model = tf_keras.models.load_model(INTENSITY_MODEL_PATH)
         t_int = time.perf_counter() - t0
         logger.info(f"-> Intensity model loaded in {t_int:.2f}s")
 
@@ -108,13 +114,19 @@ class MLService:
                 logger.warning(f"Could not load V2 config: {e}")
 
         # 4. Pre-warm models with dummy batch to compile TensorFlow computational graphs
-        t0 = time.perf_counter()
-        logger.info("Pre-warming models to eliminate cold-start inference latency...")
-        dummy_input = np.zeros((1, TARGET_SIZE[0], TARGET_SIZE[1], 3), dtype=np.float32)
-        _ = self.detection_model.predict(dummy_input, verbose=0)
-        _ = self.intensity_model.predict(dummy_input, verbose=0)
-        t_warmup = time.perf_counter() - t0
-        logger.info(f"-> Computational graphs pre-warmed in {t_warmup:.2f}s")
+        # WARMUP IS DISABLED for local development so the backend starts in 5 seconds instead of 90 seconds.
+        # The only tradeoff is that the VERY FIRST image prediction will take a bit longer.
+        PERFORM_WARMUP = False
+        if PERFORM_WARMUP:
+            t0 = time.perf_counter()
+            logger.info("Pre-warming models to eliminate cold-start inference latency...")
+            dummy_input = np.zeros((1, TARGET_SIZE[0], TARGET_SIZE[1], 3), dtype=np.float32)
+            _ = self.detection_model.predict(dummy_input, verbose=0)
+            _ = self.intensity_model.predict(dummy_input, verbose=0)
+            t_warmup = time.perf_counter() - t0
+            logger.info(f"-> Computational graphs pre-warmed in {t_warmup:.2f}s")
+        else:
+            logger.info("Skipping graph pre-warming for faster startup times.")
 
         total_init_time = time.perf_counter() - t_start
         self.is_loaded = True
@@ -182,7 +194,7 @@ class MLService:
         prob = float(prob_arr[0][0])
         t_infer = time.perf_counter() - t0
 
-        is_cyclone = bool(prob > 0.85)
+        is_cyclone = bool(prob > self.detection_threshold)
         confidence = float(prob if is_cyclone else (1.0 - prob))
         prediction = "Cyclone" if is_cyclone else "No Cyclone"
 
