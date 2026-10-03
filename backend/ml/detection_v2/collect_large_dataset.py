@@ -8,8 +8,8 @@ from PIL import Image
 from collections import defaultdict
 
 # --- Configuration ---
-TARGET_CYCLONE = 55000
-TARGET_NO_CYCLONE = 55000
+TARGET_CYCLONE = 250000
+TARGET_NO_CYCLONE = 200000
 CONCURRENCY = 100
 IMG_SIZE = 224
 OUTPUT_DIR = r"d:\MainProjectMl\ProjectCode\backend\ml\dataset_v2"
@@ -127,7 +127,7 @@ async def main():
                 no_cyclone_obs.append({'sid': sid, 'time': iso_time, 'lat': lat, 'lon': lon})
                 
     # Also create completely random ocean coordinates for No_Cyclone to ensure diverse negative class
-    for _ in range(30000):
+    for _ in range(100000):
         rlat = random.uniform(-40, 40)
         rlon = random.uniform(-180, 180)
         ryear = random.randint(2005, 2023)
