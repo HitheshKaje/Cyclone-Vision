@@ -4,6 +4,7 @@ import AnalyzePage from './AnalyzePage';
 import ResultsPage from './ResultsPage';
 import MapPage from './MapPage';
 import HistoryPage from './HistoryPage';
+import SevenDaysPrediction from './SevenDaysPrediction';
 
 const Dashboard = ({
   activeTab = 'home',
@@ -66,6 +67,11 @@ const Dashboard = ({
           setCurrentAnalysis={setCurrentAnalysis}
           setActiveTab={setActiveTab}
         />
+      )}
+
+      {/* 6. 7 DAYS PREDICTION TAB */}
+      {activeTab === 'prediction' && (
+        <SevenDaysPrediction />
       )}
     </div>
   );
