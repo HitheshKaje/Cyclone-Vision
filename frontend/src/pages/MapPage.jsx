@@ -3,8 +3,7 @@ import { Map, MapPin, Activity, Clock, Database, AlertCircle, RefreshCw } from '
 import { MapContainer, TileLayer, Marker, Popup, Polyline, LayersControl, LayerGroup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-
-// Fix Leaflet's default icon path issues in React
+import { getApiBaseUrl } from '../utils/apiConfig';
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -21,7 +20,7 @@ const cycloneIcon = new L.divIcon({
   popupAnchor: [0, -10]
 });
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_URL = getApiBaseUrl();
 
 const MapPage = () => {
   const [data, setData] = useState(null);

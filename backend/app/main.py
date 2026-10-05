@@ -83,6 +83,43 @@ async def analyze_cyclone_image(image: UploadFile = File(...)):
 def read_root():
     return {"message": "Welcome to CycloneVision API", "models_loaded": ml_service.is_loaded}
 
+@app.get("/api/system/status")
+def get_system_status():
+    import json
+    
+    # Try to load real metrics from disk
+    dataset_name = "NASA GIBS / TCIR"
+    images_count = "Not available"
+    version = "Not available"
+    last_updated = "Not available"
+    
+    metrics_path = os.path.join(APP_DIR, "..", "outputs", "metrics", "results.json")
+    if os.path.exists(metrics_path):
+        try:
+            with open(metrics_path, "r") as f:
+                data = json.load(f)
+                images_count = data.get("total_test_images", "Not available")
+                version = "v1.0"
+                last_updated = time.ctime(os.path.getmtime(metrics_path))
+        except:
+            pass
+
+    return {
+        "status": {
+            "api": "Online",
+            "database": "Offline (No DB configured)",
+            "model": "Online" if ml_service.is_loaded else "Offline"
+        },
+        "model_version": "EfficientNetB0-CycloSafe (Active)",
+        "dataset": {
+            "name": dataset_name,
+            "images": images_count,
+            "classes": ml_service.class_names,
+            "version": version,
+            "last_updated": last_updated
+        }
+    }
+
 
 if __name__ == "__main__":
     import uvicorn

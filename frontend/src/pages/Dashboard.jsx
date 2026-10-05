@@ -4,6 +4,7 @@ import AnalyzePage from './AnalyzePage';
 import ResultsPage from './ResultsPage';
 import MapPage from './MapPage';
 import HistoryPage from './HistoryPage';
+import SettingsPage from './SettingsPage';
 
 const Dashboard = ({
   activeTab = 'home',
@@ -66,6 +67,11 @@ const Dashboard = ({
           setCurrentAnalysis={setCurrentAnalysis}
           setActiveTab={setActiveTab}
         />
+      )}
+
+      {/* 6. SETTINGS TAB */}
+      {activeTab === 'settings' && (
+        <SettingsPage />
       )}
     </div>
   );

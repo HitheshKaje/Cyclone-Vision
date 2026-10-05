@@ -8,7 +8,8 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000';
+import { getApiBaseUrl } from '../utils/apiConfig';
+const API_BASE = getApiBaseUrl();
 
 const SatelliteUpload = ({
   currentAnalysis,
