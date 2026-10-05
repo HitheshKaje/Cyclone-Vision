@@ -40,3 +40,6 @@ backend/ml/intensity/dataset/*.hdf5
 backend/ml/intensity/dataset/*.tar
 backend/ml/intensity/dataset/*.tar.gz
 backend/ml/intensity/dataset/*.npz
+backend/ml/dataset_v2/
+backend/ml/dataset_v3/
+backend/ml/dataset_split/
