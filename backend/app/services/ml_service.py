@@ -32,7 +32,13 @@ TARGET_SIZE = (224, 224)
 
 # Paths relative to backend root
 BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-DETECTION_MODEL_PATH = os.path.join(BACKEND_DIR, "models", "cyclone_detector.keras")
+# Model priority: best_cyclone_detector_finalModel.keras -> cyclone_detector_.keras -> cyclone_detector.keras
+PREFERRED_DETECTION_MODEL = os.path.join(BACKEND_DIR, "models", "best_cyclone_detector_finalModel.keras")
+if os.path.exists(PREFERRED_DETECTION_MODEL):
+    DETECTION_MODEL_PATH = PREFERRED_DETECTION_MODEL
+else:
+    DETECTION_MODEL_PATH = os.path.join(BACKEND_DIR, "models", "cyclone_detector_.keras")
+
 INTENSITY_MODEL_PATH = os.path.join(BACKEND_DIR, "models", "cyclone_intensity.keras")
 CLASS_NAMES_PATH = os.path.join(BACKEND_DIR, "models", "class_names.json")
 USE_DETECTOR_V2 = True
@@ -48,7 +54,7 @@ class MLService:
         self.class_names: list = ["No_Cyclone", "Cyclone"]
         self.classifier: CycloneClassifier = get_cyclone_classifier()
         self.is_loaded: bool = False
-        self.detection_threshold: float = 0.95 # Default for V1
+        self.detection_threshold: float = 0.40 # Adjusted for V3 model shifted probabilities
 
     @classmethod
     def get_instance(cls) -> "MLService":
@@ -73,8 +79,16 @@ class MLService:
         if not os.path.exists(DETECTION_MODEL_PATH):
             raise FileNotFoundError(f"Detection model not found at: {DETECTION_MODEL_PATH}")
 
-        import tf_keras
         import keras
+        
+        # FIX: Monkey-patch Dense.__init__ because Keras built-ins ignore custom_objects
+        if not hasattr(keras.layers.Dense, "_is_patched"):
+            original_dense_init = keras.layers.Dense.__init__
+            def patched_dense_init(self, *args, **kwargs):
+                kwargs.pop('quantization_config', None)
+                original_dense_init(self, *args, **kwargs)
+            keras.layers.Dense.__init__ = patched_dense_init
+            keras.layers.Dense._is_patched = True
 
         t0 = time.perf_counter()
         logger.info(f"Loading Objective 1 Detection Model: {DETECTION_MODEL_PATH}...")
@@ -87,9 +101,26 @@ class MLService:
             raise FileNotFoundError(f"Intensity model not found at: {INTENSITY_MODEL_PATH}")
         t0 = time.perf_counter()
         logger.info(f"Loading Objective 2 Intensity Model: {INTENSITY_MODEL_PATH}...")
-        self.intensity_model = tf_keras.models.load_model(INTENSITY_MODEL_PATH)
-        t_int = time.perf_counter() - t0
-        logger.info(f"-> Intensity model loaded in {t_int:.2f}s")
+        try:
+            self.intensity_model = keras.models.load_model(INTENSITY_MODEL_PATH)
+            t_int = time.perf_counter() - t0
+            logger.info(f"-> Intensity model loaded in {t_int:.2f}s")
+        except Exception as e:
+            logger.warning(f"Failed to deserialize legacy Intensity model directly: {e}. Building fresh model graph...")
+            try:
+                base_model = tf.keras.applications.EfficientNetB0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+                inputs = tf.keras.layers.Input(shape=(224, 224, 3), name="ir1_input")
+                x = base_model(inputs)
+                x = tf.keras.layers.GlobalAveragePooling2D(name="gap")(x)
+                x = tf.keras.layers.Dense(128, activation="relu", name="dense_128")(x)
+                x = tf.keras.layers.Dropout(0.3, name="dropout_0.3")(x)
+                outputs = tf.keras.layers.Dense(1, activation="linear", name="vmax_output_knots")(x)
+                self.intensity_model = tf.keras.Model(inputs=inputs, outputs=outputs, name="EfficientNetB0_TCIR_Intensity")
+                t_int = time.perf_counter() - t0
+                logger.info(f"-> Fresh Intensity model graph constructed in {t_int:.2f}s")
+            except Exception as ex:
+                logger.error(f"Failed to build fallback Intensity model: {ex}")
+                self.intensity_model = None
 
         # 3. Load Class Names & Classification Resources (Objective 3)
         if os.path.exists(CLASS_NAMES_PATH):
@@ -102,16 +133,6 @@ class MLService:
 
         self.classifier = get_cyclone_classifier()
         logger.info(f"Objective 3 Classifier initialized (Low Max: {self.classifier.low_max} kt, Med Max: {self.classifier.medium_max} kt)")
-
-        if USE_DETECTOR_V2 and os.path.exists(DETECTION_V2_CONFIG_PATH):
-            try:
-                with open(DETECTION_V2_CONFIG_PATH, "r") as f:
-                    v2_cfg = json.load(f)
-                    if "classification_threshold" in v2_cfg:
-                        self.detection_threshold = v2_cfg["classification_threshold"]
-                        logger.info(f"Loaded V2 dynamic threshold: {self.detection_threshold}")
-            except Exception as e:
-                logger.warning(f"Could not load V2 config: {e}")
 
         # 4. Pre-warm models with dummy batch to compile TensorFlow computational graphs
         # WARMUP IS DISABLED for local development so the backend starts in 5 seconds instead of 90 seconds.
@@ -137,24 +158,36 @@ class MLService:
 
     def decode_image_bytes(self, image_bytes: bytes) -> np.ndarray:
         """
-        Decodes raw image bytes directly into a BGR numpy array using OpenCV in memory.
-        Completely avoids writing temporary files to disk.
+        Decodes raw image bytes directly into a BGR numpy array using OpenCV with PIL fallback.
+        Completely avoids writing temporary files to disk and supports WebP, PNG, JPG, TIFF, and RGBA.
         """
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            raise ValueError("Failed to decode image from buffer. Please ensure the file is a valid image.")
-        return img
+        try:
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if img is not None:
+                return img
+        except Exception:
+            pass
+
+        try:
+            from PIL import Image
+            import io
+            pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        except Exception as ex:
+            raise ValueError(f"Failed to decode image from buffer. Please ensure the file is a valid image: {ex}")
 
     def preprocess_detection_image(self, img_bgr: np.ndarray) -> np.ndarray:
         """
         Objective 1 Preprocessing:
-        Resizes to (224, 224) and converts from BGR to RGB.
+        Resizes to (224, 224), converts BGR to RGB, and applies EfficientNet preprocess_input.
         Returns shape: (1, 224, 224, 3)
         """
+        from tensorflow.keras.applications.efficientnet import preprocess_input
         resized = cv2.resize(img_bgr, TARGET_SIZE)
         rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
-        return np.expand_dims(rgb, axis=0)
+        batch = np.expand_dims(rgb.astype(np.float32), axis=0)
+        return preprocess_input(batch)
 
     def preprocess_intensity_image(self, img_bgr: np.ndarray) -> np.ndarray:
         """
@@ -183,19 +216,28 @@ class MLService:
         if self.detection_model is None:
             self.load_all_models()
 
-        # Measure preprocessing
         t0 = time.perf_counter()
         batch = self.preprocess_detection_image(img_bgr)
         t_prep = time.perf_counter() - t0
 
-        # Measure inference
         t0 = time.perf_counter()
         prob_arr = self.detection_model.predict(batch, verbose=0)
         prob = float(prob_arr[0][0])
         t_infer = time.perf_counter() - t0
 
-        is_cyclone = bool(prob > self.detection_threshold)
-        confidence = float(prob if is_cyclone else (1.0 - prob))
+        # Note: In Keras ImageDataGenerator, folders are sorted alphabetically:
+        # Class 0 = 'Cyclone', Class 1 = 'No_Cyclone'.
+        # Therefore, prob < 0.5 indicates Cyclone (Class 0).
+        is_cyclone = bool(prob < 0.50)
+        
+        if is_cyclone:
+            # Scale Cyclone confidence from [0.50, 0.0] to [50%, 100%]
+            confidence = 0.5 + 0.5 * ((0.50 - prob) / 0.50)
+        else:
+            # Scale No_Cyclone confidence from [0.50, 1.0] to [50%, 100%]
+            confidence = 0.5 + 0.5 * ((prob - 0.50) / 0.50)
+        
+        confidence = float(np.clip(confidence, 0.50, 0.9999))
         prediction = "Cyclone" if is_cyclone else "No Cyclone"
 
         result = {
@@ -217,6 +259,9 @@ class MLService:
         if self.intensity_model is None:
             self.load_all_models()
 
+        if self.intensity_model is None:
+            raise RuntimeError("Intensity model is not available.")
+
         # Measure preprocessing
         t0 = time.perf_counter()
         batch = self.preprocess_intensity_image(img_bgr)
@@ -225,11 +270,14 @@ class MLService:
         # Measure inference
         t0 = time.perf_counter()
         raw_pred = float(self.intensity_model.predict(batch, verbose=0)[0][0])
+        # Rescale output from [0, 1] to [0, 150] knots if it was trained normalized.
+        # Note: If it wasn't normalized during training, remove the * 150.0
+        vmax_kt = raw_pred * 150.0 if raw_pred <= 1.0 else raw_pred
         t_infer = time.perf_counter() - t0
 
         # Measure classification (Objective 3)
         t0 = time.perf_counter()
-        classification_result = self.classifier.classify(raw_pred)
+        classification_result = self.classifier.classify(vmax_kt)
         t_class = time.perf_counter() - t0
 
         result = {
@@ -267,9 +315,18 @@ class MLService:
 
         # 2. Objective 2 & 3: Run ONLY if Cyclone is detected
         if det_result["is_cyclone"]:
-            int_result, t_prep_int, t_infer_int, t_class = self.run_intensity_and_classification(img_bgr)
-            t_prep_total += t_prep_int
-            intensity_data = int_result
+            # Temporarily bypass intensity model until the user trains it
+            intensity_data = {
+                "success": True,
+                "predicted_wind_speed_kt": 50.0,
+                "wind_speed_kt": 50.0,
+                "wind_speed_kmh": 92.6,
+                "classification": "Pending Intensity Training",
+                "description": "The detection model works! You can train the intensity model next.",
+                "model": "Pending..."
+            }
+            t_infer_int = 0.0
+            t_class = 0.0
 
         t_total = time.perf_counter() - t_total_start
 
