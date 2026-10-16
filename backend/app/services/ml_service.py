@@ -21,21 +21,61 @@ import logging
 import cv2
 import numpy as np
 import tensorflow as tf
+import keras
 from typing import Dict, Any, Optional, Tuple
 
 from services.classifier import get_cyclone_classifier, CycloneClassifier
 
 logger = logging.getLogger("uvicorn.error")
 
+# Global cross-version Keras deserialization compatibility patches
+# Fixes mismatches between models saved in Google Colab / Kaggle (Keras 3.5+) and local environments
+try:
+    if not hasattr(keras.layers.Dense, "_is_patched"):
+        original_dense_init = keras.layers.Dense.__init__
+        def patched_dense_init(self, *args, **kwargs):
+            kwargs.pop('quantization_config', None)
+            original_dense_init(self, *args, **kwargs)
+        keras.layers.Dense.__init__ = patched_dense_init
+        keras.layers.Dense._is_patched = True
+
+    if hasattr(keras.layers, "BatchNormalization") and not hasattr(keras.layers.BatchNormalization, "_is_patched"):
+        original_bn_init = keras.layers.BatchNormalization.__init__
+        def patched_bn_init(self, *args, **kwargs):
+            for k in ['renorm', 'renorm_clipping', 'renorm_momentum', 'synchronized']:
+                kwargs.pop(k, None)
+            original_bn_init(self, *args, **kwargs)
+        keras.layers.BatchNormalization.__init__ = patched_bn_init
+        keras.layers.BatchNormalization._is_patched = True
+
+    from keras.src.initializers.random_initializers import VarianceScaling
+    if not getattr(VarianceScaling, "_is_patched", False):
+        original_vs_init = VarianceScaling.__init__
+        def patched_vs_init(self, *args, **kwargs):
+            kwargs.pop('input_axes', None)
+            kwargs.pop('output_axes', None)
+            original_vs_init(self, *args, **kwargs)
+        VarianceScaling.__init__ = patched_vs_init
+        VarianceScaling._is_patched = True
+except Exception as patch_e:
+    logger.debug(f"Initializer compatibility patch notice: {patch_e}")
+
 # Target image size for both models
 TARGET_SIZE = (224, 224)
 
 # Paths relative to backend root
 BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-# Model priority: best_cyclone_detector_finalModel.keras -> cyclone_detector_.keras -> cyclone_detector.keras
-PREFERRED_DETECTION_MODEL = os.path.join(BACKEND_DIR, "models", "best_cyclone_detector_finalModel.keras")
+# Model priority: best_cyclone_detector_finalModel2.keras -> best_cyclone_detector_finalModel1.keras -> best_cyclone_detector_finalModel.keras -> cyclone_detector_.keras
+PREFERRED_DETECTION_MODEL = os.path.join(BACKEND_DIR, "models", "best_cyclone_detector_finalModel2.keras")
+FALLBACK_DETECTION_MODEL_1 = os.path.join(BACKEND_DIR, "models", "best_cyclone_detector_finalModel1.keras")
+FALLBACK_DETECTION_MODEL = os.path.join(BACKEND_DIR, "models", "best_cyclone_detector_finalModel.keras")
+
 if os.path.exists(PREFERRED_DETECTION_MODEL):
     DETECTION_MODEL_PATH = PREFERRED_DETECTION_MODEL
+elif os.path.exists(FALLBACK_DETECTION_MODEL_1):
+    DETECTION_MODEL_PATH = FALLBACK_DETECTION_MODEL_1
+elif os.path.exists(FALLBACK_DETECTION_MODEL):
+    DETECTION_MODEL_PATH = FALLBACK_DETECTION_MODEL
 else:
     DETECTION_MODEL_PATH = os.path.join(BACKEND_DIR, "models", "cyclone_detector_.keras")
 
@@ -62,12 +102,26 @@ class MLService:
             cls._instance = MLService()
         return cls._instance
 
+    def load_detection_model(self, force: bool = False) -> None:
+        """Loads or reloads the detection model if file modification time has changed."""
+        if not os.path.exists(DETECTION_MODEL_PATH):
+            raise FileNotFoundError(f"Detection model not found at: {DETECTION_MODEL_PATH}")
+        mtime = os.path.getmtime(DETECTION_MODEL_PATH)
+        if not force and self.detection_model is not None and getattr(self, "_detection_mtime", None) == mtime:
+            return
+
+        t0 = time.perf_counter()
+        logger.info(f"Loading Objective 1 Detection Model: {DETECTION_MODEL_PATH}...")
+        self.detection_model = keras.models.load_model(DETECTION_MODEL_PATH)
+        self._detection_mtime = mtime
+        t_det = time.perf_counter() - t0
+        logger.info(f"-> Detection model loaded in {t_det:.2f}s")
+
     def load_all_models(self) -> None:
         """
         Load all models and pre-warm them once at application startup.
         """
-        if self.is_loaded:
-            logger.info("MLService models are already loaded in memory.")
+        if self.is_loaded and self.detection_model is not None:
             return
 
         logger.info("==================================================")
@@ -76,25 +130,7 @@ class MLService:
         t_start = time.perf_counter()
 
         # 1. Load Detection Model (Objective 1)
-        if not os.path.exists(DETECTION_MODEL_PATH):
-            raise FileNotFoundError(f"Detection model not found at: {DETECTION_MODEL_PATH}")
-
-        import keras
-        
-        # FIX: Monkey-patch Dense.__init__ because Keras built-ins ignore custom_objects
-        if not hasattr(keras.layers.Dense, "_is_patched"):
-            original_dense_init = keras.layers.Dense.__init__
-            def patched_dense_init(self, *args, **kwargs):
-                kwargs.pop('quantization_config', None)
-                original_dense_init(self, *args, **kwargs)
-            keras.layers.Dense.__init__ = patched_dense_init
-            keras.layers.Dense._is_patched = True
-
-        t0 = time.perf_counter()
-        logger.info(f"Loading Objective 1 Detection Model: {DETECTION_MODEL_PATH}...")
-        self.detection_model = keras.models.load_model(DETECTION_MODEL_PATH)
-        t_det = time.perf_counter() - t0
-        logger.info(f"-> Detection model loaded in {t_det:.2f}s")
+        self.load_detection_model()
 
         # 2. Load Intensity Model (Objective 2)
         if not os.path.exists(INTENSITY_MODEL_PATH):
@@ -207,6 +243,62 @@ class MLService:
         img_3ch = np.stack([resized, resized, resized], axis=-1).astype(np.float32)
         return np.expand_dims(img_3ch, axis=0)
 
+    def validate_satellite_domain(self, img_bgr: np.ndarray) -> Tuple[bool, str]:
+        """
+        Validates whether an input image conforms to Earth meteorological satellite domains.
+        Rejects non-satellite imagery:
+          1. Household / Everyday objects (Coffee cups, tea mugs, tables, indoor photos).
+          2. Outer space / Astronomical scenes (black holes, galaxies, nebulae).
+        """
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+        h, w = gray.shape
+        total_pixels = h * w
+        
+        h_chan, s_chan, v_chan = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+
+        # 1. Check for Household / Everyday Photography (Coffee/Tea mugs, wooden tables, rooms)
+        # Real satellite imagery of Earth ocean/clouds has virtually 0% warm brown/table/coffee wood hues.
+        # Warm wood, coffee liquid, ceramic, skin, living room hues: H 8-28, S > 50, V > 40
+        warm_mask = (h_chan >= 8) & (h_chan <= 28) & (s_chan > 50) & (v_chan > 40)
+        warm_ratio = float(np.mean(warm_mask))
+        if warm_ratio > 0.22:
+            return False, "Non-satellite image detected (household object / everyday scene). CycloneVision only analyzes Earth meteorological satellite imagery (e.g. INSAT-3D, NOAA, GOES)."
+
+        # 2. Check for Outer Space / Astronomical Scene (Black hole, galaxy, nebula)
+        dark_mask = (gray < 30).astype(np.uint8)
+        dark_ratio = float(np.sum(dark_mask) / total_pixels)
+        
+        # Quadrant check: Satellite swaths only have black borders on 1 or 2 edges.
+        # Deep space scenes surround the object across all 4 quadrants.
+        h_half, w_half = h // 2, w // 2
+        q1 = np.mean(dark_mask[:h_half, :w_half])
+        q2 = np.mean(dark_mask[:h_half, w_half:])
+        q3 = np.mean(dark_mask[h_half:, :w_half])
+        q4 = np.mean(dark_mask[h_half:, w_half:])
+        quadrants_dark = sum(q > 0.15 for q in [q1, q2, q3, q4])
+        
+        # Star field check: high-frequency pinpoint bright spots in dark background
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        high_freq = cv2.subtract(gray, blurred)
+        star_candidates = (high_freq > 30) & (dark_mask == 1)
+        star_count = int(np.sum(star_candidates))
+        
+        # High saturation glow check (astronomical plasma / artificial neon accretion rings)
+        high_sat_in_space = (s_chan > 100) & (gray > 40)
+        sat_glow_ratio = float(np.sum(high_sat_in_space) / max(1, np.sum(gray > 40)))
+        
+        # Astronomical criteria:
+        # A. Broad dark void in 3+ quadrants with star field
+        if dark_ratio > 0.30 and quadrants_dark >= 3 and star_count > 30:
+            return False, "Outer space / astronomical scene detected (cosmic background with starfield). Please upload Earth meteorological satellite imagery."
+            
+        # B. Deep space void with colorful plasma accretion disc
+        if dark_ratio > 0.35 and quadrants_dark >= 3 and sat_glow_ratio > 0.35:
+            return False, "Astronomical scene detected (cosmic accretion disc against space void). Please upload Earth meteorological satellite imagery."
+            
+        return True, "Valid Earth satellite domain."
+
     def run_detection(self, img_bgr: np.ndarray) -> Tuple[Dict[str, Any], float, float]:
         """
         Run Objective 1 Cyclone Detection with performance timing.
@@ -220,14 +312,32 @@ class MLService:
         batch = self.preprocess_detection_image(img_bgr)
         t_prep = time.perf_counter() - t0
 
+        # Domain validation: reject outer space / astronomical images / everyday non-satellite photos
+        is_valid_domain, domain_reason = self.validate_satellite_domain(img_bgr)
+        if not is_valid_domain:
+            logger.info(f"Satellite Domain Validation Triggered: {domain_reason}")
+            result = {
+                "success": True,
+                "prediction": "Invalid Satellite Image",
+                "is_cyclone": False,
+                "is_valid_satellite": False,
+                "confidence": 0.0,
+                "confidence_percent": 0.0,
+                "status_label": "Invalid Input (Non-Satellite)",
+                "validation_message": domain_reason,
+                "description": domain_reason,
+                "model": f"Domain Ingestion Gate ({os.path.basename(DETECTION_MODEL_PATH)})",
+                "model_file": os.path.basename(DETECTION_MODEL_PATH)
+            }
+            return result, t_prep, 0.0
+
         t0 = time.perf_counter()
         prob_arr = self.detection_model.predict(batch, verbose=0)
         prob = float(prob_arr[0][0])
         t_infer = time.perf_counter() - t0
 
-        # Note: In Keras ImageDataGenerator, folders are sorted alphabetically:
-        # Class 0 = 'Cyclone', Class 1 = 'No_Cyclone'.
-        # Therefore, prob < 0.5 indicates Cyclone (Class 0).
+        # Standard binary classification threshold (0.50)
+        # Class 0 = 'Cyclone' (prob < 0.50), Class 1 = 'No_Cyclone' (prob >= 0.50)
         is_cyclone = bool(prob < 0.50)
         
         if is_cyclone:
@@ -246,7 +356,8 @@ class MLService:
             "is_cyclone": is_cyclone,
             "confidence": confidence,
             "confidence_percent": round(confidence * 100, 2),
-            "model": "EfficientNetB0"
+            "model": f"EfficientNetB0 ({os.path.basename(DETECTION_MODEL_PATH)})",
+            "model_file": os.path.basename(DETECTION_MODEL_PATH)
         }
         return result, t_prep, t_infer
 
