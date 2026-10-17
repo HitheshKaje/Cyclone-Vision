@@ -1,0 +1,36 @@
+{
+  "dataset_name": "CycloSafe Tropical Cyclone Intensity Dataset (Objective 2)",
+  "total_images_recorded": 15,
+  "unique_images_by_checksum": 13,
+  "verified_image_label_pairs": 15,
+  "corrupt_or_missing_files": 0,
+  "distinct_cyclone_ids": 1,
+  "date_range_covered": "2000-03-27 to 2000-03-29",
+  "satellite_sources": [
+    "NASA EOSDIS / MODIS Terra"
+  ],
+  "image_formats_and_color_modes": [
+    "JPEG (RGB)"
+  ],
+  "ground_truth_agencies": [
+    "IMD (India Meteorological Department)"
+  ],
+  "wind_speed_statistics_knots": {
+    "min": 25.0,
+    "max": 30.0,
+    "mean": 25.67,
+    "distribution_by_intensity_category": {
+      "Depression (<34 kts)": 15,
+      "Deep Depression (34-47 kts)": 0,
+      "Cyclonic Storm (48-63 kts)": 0,
+      "Severe Cyclonic Storm (64-89 kts)": 0,
+      "Very Severe Cyclonic Storm (90-119 kts)": 0,
+      "Extremely Severe / Super Cyclone (>=120 kts)": 0
+    }
+  },
+  "licensing_and_access": {
+    "satellite_license": "NASA Open Data Policy (EOSDIS/GIBS) - Public Domain / Open Research",
+    "ground_truth_license": "NOAA NCEI IBTrACS v04 - Public Domain / Unrestricted Scientific Use",
+    "usage": "Intended for training Objective 2 deep learning regression models (e.g. EfficientNet / ResNet) for maximum sustained wind speed estimation."
+  }
+}
