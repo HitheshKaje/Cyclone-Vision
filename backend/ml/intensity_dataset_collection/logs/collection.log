@@ -1,0 +1,4 @@
+2026-10-17 10:42:56,137 [INFO] Loaded existing checkpoint: 0 processed, 0 unique checksums.
+2026-10-17 10:42:56,144 [INFO] Total candidates: 36,624. Pending downloads: 36,624. Target: 15
+2026-10-17 10:42:59,677 [INFO] Progress: [15/15] Saved: 15 | Duplicates: 0 | Failed/Swath Gap: 0 | Total Unique: 13
+2026-10-17 10:42:59,680 [INFO] Collection run finished. Total unique verified images: 13
