@@ -2,3 +2,24 @@
 2026-10-17 10:42:56,144 [INFO] Total candidates: 36,624. Pending downloads: 36,624. Target: 15
 2026-10-17 10:42:59,677 [INFO] Progress: [15/15] Saved: 15 | Duplicates: 0 | Failed/Swath Gap: 0 | Total Unique: 13
 2026-10-17 10:42:59,680 [INFO] Collection run finished. Total unique verified images: 13
+2026-10-17 10:45:34,073 [INFO] Loaded existing checkpoint: 15 processed, 13 unique checksums.
+2026-10-17 10:45:34,102 [INFO] Total candidates: 106,700. Pending downloads: 106,685. Target: 500
+2026-10-17 10:45:43,910 [INFO] Progress: [100/500] Saved: 92 | Duplicates: 0 | Failed/Swath Gap: 8 | Total Unique: 102
+2026-10-17 10:45:52,738 [INFO] Progress: [200/500] Saved: 192 | Duplicates: 0 | Failed/Swath Gap: 8 | Total Unique: 199
+2026-10-17 10:46:01,954 [INFO] Progress: [300/500] Saved: 292 | Duplicates: 0 | Failed/Swath Gap: 8 | Total Unique: 295
+2026-10-17 10:46:11,216 [INFO] Progress: [400/500] Saved: 392 | Duplicates: 0 | Failed/Swath Gap: 8 | Total Unique: 388
+2026-10-17 10:46:20,428 [INFO] Progress: [500/500] Saved: 492 | Duplicates: 0 | Failed/Swath Gap: 8 | Total Unique: 488
+2026-10-17 10:46:20,433 [INFO] Collection run finished. Total unique verified images: 488
+2026-10-17 10:46:36,474 [INFO] Loaded existing checkpoint: 515 processed, 488 unique checksums.
+2026-10-17 10:46:36,487 [INFO] Total candidates: 106,700. Pending downloads: 106,185. Target: 1,000
+2026-10-17 10:46:45,538 [INFO] Progress: [100/1000] Saved: 100 | Duplicates: 0 | Failed/Swath Gap: 0 | Total Unique: 573
+2026-10-17 10:46:53,276 [INFO] Progress: [200/1000] Saved: 200 | Duplicates: 0 | Failed/Swath Gap: 0 | Total Unique: 670
+2026-10-17 10:47:02,001 [INFO] Progress: [300/1000] Saved: 299 | Duplicates: 1 | Failed/Swath Gap: 0 | Total Unique: 761
+2026-10-17 10:47:09,817 [INFO] Progress: [400/1000] Saved: 399 | Duplicates: 1 | Failed/Swath Gap: 0 | Total Unique: 861
+2026-10-17 10:47:17,723 [INFO] Progress: [500/1000] Saved: 499 | Duplicates: 1 | Failed/Swath Gap: 0 | Total Unique: 958
+2026-10-17 10:47:26,767 [INFO] Progress: [600/1000] Saved: 599 | Duplicates: 1 | Failed/Swath Gap: 0 | Total Unique: 1027
+2026-10-17 10:47:35,316 [INFO] Progress: [700/1000] Saved: 699 | Duplicates: 1 | Failed/Swath Gap: 0 | Total Unique: 1122
+2026-10-17 10:47:43,569 [INFO] Progress: [800/1000] Saved: 799 | Duplicates: 1 | Failed/Swath Gap: 0 | Total Unique: 1220
+2026-10-17 10:47:51,008 [INFO] Progress: [900/1000] Saved: 899 | Duplicates: 1 | Failed/Swath Gap: 0 | Total Unique: 1320
+2026-10-17 10:47:59,171 [INFO] Progress: [1000/1000] Saved: 999 | Duplicates: 1 | Failed/Swath Gap: 0 | Total Unique: 1415
+2026-10-17 10:47:59,198 [INFO] Collection run finished. Total unique verified images: 1,415

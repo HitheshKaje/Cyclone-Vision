@@ -1,11 +1,11 @@
 {
   "dataset_name": "CycloSafe Tropical Cyclone Intensity Dataset (Objective 2)",
-  "total_images_recorded": 15,
-  "unique_images_by_checksum": 13,
-  "verified_image_label_pairs": 15,
+  "total_images_recorded": 1506,
+  "unique_images_by_checksum": 1415,
+  "verified_image_label_pairs": 1506,
   "corrupt_or_missing_files": 0,
-  "distinct_cyclone_ids": 1,
-  "date_range_covered": "2000-03-27 to 2000-03-29",
+  "distinct_cyclone_ids": 41,
+  "date_range_covered": "2000-03-27 to 2005-06-30",
   "satellite_sources": [
     "NASA EOSDIS / MODIS Terra"
   ],
@@ -13,18 +13,20 @@
     "JPEG (RGB)"
   ],
   "ground_truth_agencies": [
+    "WMO Standard",
+    "JTWC/NHC",
     "IMD (India Meteorological Department)"
   ],
   "wind_speed_statistics_knots": {
-    "min": 25.0,
-    "max": 30.0,
-    "mean": 25.67,
+    "min": 15.0,
+    "max": 115.0,
+    "mean": 34.57,
     "distribution_by_intensity_category": {
-      "Depression (<34 kts)": 15,
-      "Deep Depression (34-47 kts)": 0,
-      "Cyclonic Storm (48-63 kts)": 0,
-      "Severe Cyclonic Storm (64-89 kts)": 0,
-      "Very Severe Cyclonic Storm (90-119 kts)": 0,
+      "Depression (<34 kts)": 963,
+      "Deep Depression (34-47 kts)": 320,
+      "Cyclonic Storm (48-63 kts)": 117,
+      "Severe Cyclonic Storm (64-89 kts)": 74,
+      "Very Severe Cyclonic Storm (90-119 kts)": 32,
       "Extremely Severe / Super Cyclone (>=120 kts)": 0
     }
   },
