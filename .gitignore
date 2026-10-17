@@ -11,6 +11,7 @@ env/
 *.jpeg
 *.png
 *.webp
+*.csv
 datasets/
 data/
 
