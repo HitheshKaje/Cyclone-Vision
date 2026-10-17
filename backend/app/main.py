@@ -81,7 +81,13 @@ async def analyze_cyclone_image(image: UploadFile = File(...)):
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to CycloneVision API", "models_loaded": ml_service.is_loaded}
+    # Reload trigger
+    from services.ml_service import DETECTION_MODEL_PATH
+    return {
+        "message": "Welcome to CycloneVision API",
+        "models_loaded": ml_service.is_loaded,
+        "active_detection_model": os.path.basename(DETECTION_MODEL_PATH)
+    }
 
 @app.get("/api/system/status")
 def get_system_status():

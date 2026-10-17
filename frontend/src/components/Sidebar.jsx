@@ -8,7 +8,8 @@ import {
   X,
   Users,
   ShieldAlert,
-  Settings
+  Settings,
+  TrendingUp
 } from 'lucide-react';
 
 const navItems = [
@@ -17,6 +18,7 @@ const navItems = [
   { id: 'results', label: 'Results', icon: BarChart3 },
   { id: 'map', label: 'Cyclone Map', icon: Map },
   { id: 'history', label: 'History', icon: History },
+  { id: 'prediction', label: '7 Days Prediction', icon: TrendingUp },
 ];
 
 const managementItems = [

@@ -5,8 +5,12 @@ __pycache__/
 venv/
 env/
 
-# Datasets
+# Datasets & Image files
 *.zip
+*.jpg
+*.jpeg
+*.png
+*.webp
 datasets/
 data/
 
@@ -34,12 +38,21 @@ build/
 
 # Backups
 model_backups/
+
 # Objective 2 - TCIR large dataset files
 backend/ml/intensity/dataset/*.h5
 backend/ml/intensity/dataset/*.hdf5
 backend/ml/intensity/dataset/*.tar
 backend/ml/intensity/dataset/*.tar.gz
 backend/ml/intensity/dataset/*.npz
+
+# Backend ML datasets
+backend/ml/dataset/
+backend/ml/dataset/**
+backend/ml/dataset*/
 backend/ml/dataset_v2/
 backend/ml/dataset_v3/
 backend/ml/dataset_split/
+backend/ml/Synthetic_Hard_Negatives*/
+backend/ml/Hard_Negatives_Dataset*/
+backend/ml/intensity/dataset/

@@ -15,8 +15,11 @@ def build_model(input_shape=(224, 224, 3)):
     # when passed inputs, or we can use the preprocessing layer.
     base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=input_shape)
     
-    # Freeze the base model layers
-    base_model.trainable = False
+    # Unfreeze the top 20 layers of the base model to allow fine-tuning on our dataset
+    # This prevents the model from relying purely on generic ImageNet features
+    base_model.trainable = True
+    for layer in base_model.layers[:-20]:
+        layer.trainable = False
     
     # Add classification head
     x = base_model.output

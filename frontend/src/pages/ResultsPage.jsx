@@ -8,6 +8,7 @@ import {
   ShieldCheck, 
   FileQuestion,
   Info,
+  AlertTriangle,
   BarChart4,
   Activity,
   PieChart as PieChartIcon
@@ -73,7 +74,9 @@ const ResultsPage = ({
   }
 
   const { detection, intensity, classification, fileName, imagePreview, timestamp } = currentAnalysis;
+  const isValidSatellite = detection?.is_valid_satellite !== false;
   const isCyclone = detection?.is_cyclone;
+  const validationMessage = detection?.validation_message;
   const confidencePercent = detection?.confidence_percent != null 
     ? detection.confidence_percent 
     : (detection?.confidence != null ? Number((detection.confidence * 100).toFixed(1)) : null);
@@ -83,7 +86,7 @@ const ResultsPage = ({
     ? intensity.wind_speed_kmh 
     : (windKt != null ? Number((windKt * 1.852).toFixed(1)) : null);
 
-  const calculatedClassification = isCyclone === false 
+  const calculatedClassification = (isCyclone === false || !isValidSatellite)
     ? 'Not Applicable' 
     : (classification?.classification || intensity?.classification || null);
 
@@ -238,29 +241,43 @@ const ResultsPage = ({
               </h3>
             </div>
             
-            <div className="w-full h-[240px] flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={stormRiskData}>
-                  <PolarGrid stroke="#e2e8f0" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                  <Radar
-                    name="Impact Risk"
-                    dataKey="value"
-                    stroke={classColor}
-                    strokeWidth={3}
-                    fill={classColor}
-                    fillOpacity={0.4}
-                  />
-                  <RechartsTooltip 
-                    formatter={(value) => [`${value}%`, 'Risk Level']}
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
+            {!isValidSatellite ? (
+              <div className="w-full h-[240px] flex flex-col items-center justify-center text-center p-4 space-y-2">
+                <AlertTriangle size={32} className="text-amber-500/80 mb-1" />
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Risk Analysis Inactive
+                </p>
+                <p className="text-[11px] text-slate-500 max-w-xs">
+                  Multivariate atmospheric risk calculation requires a validated Earth meteorological satellite image.
+                </p>
+              </div>
+            ) : (
+              <div className="w-full h-[240px] flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={stormRiskData}>
+                    <PolarGrid stroke="#e2e8f0" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                    <Radar
+                      name="Impact Risk"
+                      dataKey="value"
+                      stroke={classColor}
+                      strokeWidth={3}
+                      fill={classColor}
+                      fillOpacity={0.4}
+                    />
+                    <RechartsTooltip 
+                      formatter={(value) => [`${value}%`, 'Risk Level']}
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
             <p className="text-[11px] text-slate-600 dark:text-slate-400 text-center italic">
-              Multivariate risk analysis scaled 0-100% based on intensity constraints.
+              {!isValidSatellite 
+                ? 'Input rejected by Earth observation satellite domain verifier.' 
+                : 'Multivariate risk analysis scaled 0-100% based on intensity constraints.'}
             </p>
           </div>
         </div>
@@ -283,11 +300,13 @@ const ResultsPage = ({
               </div>
 
               <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                isCyclone 
-                  ? 'bg-red-500/10 text-red-400 border-red-500/20' 
-                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                !isValidSatellite
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  : isCyclone 
+                    ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
               }`}>
-                {isCyclone ? 'Cyclone Detected' : 'No Cyclone'}
+                {!isValidSatellite ? 'Invalid Satellite Image' : (isCyclone ? 'Cyclone Detected' : 'No Cyclone')}
               </span>
             </div>
 
@@ -295,19 +314,29 @@ const ResultsPage = ({
               <div className="space-y-1 text-center sm:text-left">
                 <p className="text-xs text-slate-500 font-medium">Detection Result</p>
                 <div className="flex items-center justify-center sm:justify-start gap-2 mt-0.5">
-                  {isCyclone ? (
+                  {!isValidSatellite ? (
+                    <AlertTriangle size={22} className="text-amber-500 shrink-0" />
+                  ) : isCyclone ? (
                     <ShieldAlert size={22} className="text-red-500 shrink-0" />
                   ) : (
                     <ShieldCheck size={22} className="text-emerald-500 shrink-0" />
                   )}
-                  <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
-                    {isCyclone ? 'Cyclone Detected' : 'No Cyclone Detected'}
+                  <span className={`text-xl sm:text-2xl font-bold ${
+                    !isValidSatellite
+                      ? 'text-amber-500 dark:text-amber-400'
+                      : 'text-slate-900 dark:text-slate-100'
+                  }`}>
+                    {!isValidSatellite 
+                      ? 'Invalid Satellite Image' 
+                      : (isCyclone ? 'Cyclone Detected' : 'No Cyclone Detected')}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  {isCyclone 
-                    ? 'Satellite pattern indicates active cyclonic circulation.' 
-                    : 'No evidence of cyclonic formation detected in image.'}
+                  {!isValidSatellite 
+                    ? (validationMessage || 'Uploaded image is not a valid Earth meteorological satellite capture (e.g. household object or outer space scene).')
+                    : isCyclone 
+                      ? 'Satellite pattern indicates active cyclonic circulation.' 
+                      : 'No evidence of cyclonic formation detected in image.'}
                 </p>
               </div>
 
@@ -316,8 +345,8 @@ const ResultsPage = ({
                 <svg style={{ height: 0, width: 0, position: 'absolute' }}>
                   <defs>
                     <linearGradient id="gradPie" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor={isCyclone ? '#ef4444' : '#10b981'} />
-                      <stop offset="100%" stopColor={isCyclone ? '#b91c1c' : '#047857'} />
+                      <stop offset="0%" stopColor={!isValidSatellite ? '#f59e0b' : (isCyclone ? '#ef4444' : '#10b981')} />
+                      <stop offset="100%" stopColor={!isValidSatellite ? '#d97706' : (isCyclone ? '#b91c1c' : '#047857')} />
                     </linearGradient>
                   </defs>
                 </svg>
@@ -347,10 +376,10 @@ const ResultsPage = ({
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                   <span className="text-base font-bold text-slate-900 dark:text-slate-100 leading-none">
-                    {confidencePercent != null ? `${confidencePercent}%` : '—'}
+                    {!isValidSatellite ? 'N/A' : (confidencePercent != null ? `${confidencePercent}%` : '—')}
                   </span>
                   <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium mt-0.5">
-                    Confidence
+                    {!isValidSatellite ? 'Rejected' : 'Confidence'}
                   </span>
                 </div>
               </div>
@@ -377,7 +406,16 @@ const ResultsPage = ({
               </span>
             </div>
 
-            {isCyclone === false ? (
+            {!isValidSatellite ? (
+              <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center space-y-1">
+                <p className="text-sm font-bold text-amber-500 dark:text-amber-400">
+                  Intensity: Not Applicable
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  Skipped because the input is not a verified Earth meteorological satellite image.
+                </p>
+              </div>
+            ) : isCyclone === false ? (
               /* No Cyclone Case: Not Applicable */
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/30 text-center space-y-1">
                 <p className="text-sm font-bold text-slate-600 dark:text-slate-400">
@@ -491,7 +529,16 @@ const ResultsPage = ({
               )}
             </div>
 
-            {isCyclone === false ? (
+            {!isValidSatellite ? (
+              <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center space-y-1">
+                <p className="text-sm font-bold text-amber-500 dark:text-amber-400">
+                  Classification: Not Applicable
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  Skipped because input is not a verified Earth meteorological satellite image.
+                </p>
+              </div>
+            ) : isCyclone === false ? (
               /* No Cyclone Case: Not Applicable */
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/30 text-center space-y-1">
                 <p className="text-sm font-bold text-slate-600 dark:text-slate-400">
