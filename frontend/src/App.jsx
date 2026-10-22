@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
-import CitizenApp from './citizen/CitizenApp';
+
+const CitizenApp = lazy(() => import('./citizen/CitizenApp'));
 
 function App() {
   const [currentPath, setCurrentPath] = useState(() => 
@@ -33,11 +34,17 @@ function App() {
   // If path is for the Citizen & Fisherman Portal (/citizen, /citizen/map, etc.)
   if (currentPath.startsWith('/citizen')) {
     return (
-      <CitizenApp
-        currentPath={currentPath}
-        onNavigate={navigateTo}
-        onSwitchToAdmin={() => navigateTo('/')}
-      />
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-300 font-semibold text-sm">
+          Loading CycloSafe...
+        </div>
+      }>
+        <CitizenApp
+          currentPath={currentPath}
+          onNavigate={navigateTo}
+          onSwitchToAdmin={() => navigateTo('/')}
+        />
+      </Suspense>
     );
   }
 
