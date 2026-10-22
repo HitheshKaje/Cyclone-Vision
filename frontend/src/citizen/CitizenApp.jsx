@@ -1,22 +1,48 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import CitizenLayout from './layouts/CitizenLayout';
 import CitizenHome from './pages/CitizenHome';
-import CycloneMap from './pages/CycloneMap';
-import CycloneHistory from './pages/CycloneHistory';
-import WeatherSafety from './pages/WeatherSafety';
-import EmergencyInformation from './pages/EmergencyInformation';
+import { Loader2 } from 'lucide-react';
+
+// Code-split non-essential sub-routes for budget Android devices
+const CycloneMap = lazy(() => import('./pages/CycloneMap'));
+const CycloneHistory = lazy(() => import('./pages/CycloneHistory'));
+const WeatherSafety = lazy(() => import('./pages/WeatherSafety'));
+const EmergencyInformation = lazy(() => import('./pages/EmergencyInformation'));
+
+const PageLoader = () => (
+  <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-slate-500">
+    <Loader2 size={32} className="animate-spin text-sky-500 mb-2" />
+    <span className="text-xs font-semibold uppercase tracking-wider">Loading coastal data...</span>
+  </div>
+);
 
 const CitizenApp = ({ currentPath, onNavigate, onSwitchToAdmin }) => {
   const renderCitizenPage = () => {
     switch (currentPath) {
       case '/citizen/map':
-        return <CycloneMap />;
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <CycloneMap />
+          </Suspense>
+        );
       case '/citizen/history':
-        return <CycloneHistory />;
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <CycloneHistory />
+          </Suspense>
+        );
       case '/citizen/weather':
-        return <WeatherSafety />;
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <WeatherSafety />
+          </Suspense>
+        );
       case '/citizen/emergency':
-        return <EmergencyInformation />;
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <EmergencyInformation />
+          </Suspense>
+        );
       case '/citizen':
       case '/citizen/':
       default:
