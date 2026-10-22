@@ -82,8 +82,11 @@ elif os.path.exists(FALLBACK_DETECTION_MODEL):
 else:
     DETECTION_MODEL_PATH = os.path.join(BACKEND_DIR, "models", "cyclone_detector_.keras")
 
+NEWEST_INTENSITY_MODEL = os.path.join(BACKEND_DIR, "models", "best_cyclone_intensity_v22.keras")
 PREFERRED_INTENSITY_MODEL = os.path.join(BACKEND_DIR, "models", "best_cyclone_intensity_v2.keras")
-if os.path.exists(PREFERRED_INTENSITY_MODEL):
+if os.path.exists(NEWEST_INTENSITY_MODEL):
+    INTENSITY_MODEL_PATH = NEWEST_INTENSITY_MODEL
+elif os.path.exists(PREFERRED_INTENSITY_MODEL):
     INTENSITY_MODEL_PATH = PREFERRED_INTENSITY_MODEL
 else:
     INTENSITY_MODEL_PATH = os.path.join(BACKEND_DIR, "models", "cyclone_intensity.keras")
