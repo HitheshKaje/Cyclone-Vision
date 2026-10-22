@@ -10,10 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "i18next": "^26.5.5",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.43.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-i18next": "^17.1.2",
     "react-leaflet": "^5.0.0",
     "recharts": "^3.10.1"
   },
@@ -26,6 +28,7 @@
     "oxlint": "^1.79.0",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.3.3",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vite-plugin-pwa": "^2.0.0"
   }
 }

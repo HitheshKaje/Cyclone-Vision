@@ -21,8 +21,22 @@ data/
 *.pt
 *.pth
 
-# Environment files
+# Environment & Secrets
 .env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+*.crt
+*.cert
+
+# Logs & Caches
+*.log
+logs/
+.cache/
+dev-dist/
+
 
 # VS Code
 .vscode/

@@ -1,0 +1,117 @@
+{
+  "app": {
+    "title": "CycloSafe",
+    "subtitle": "Citizen & Fisherman Coastal Safety Portal",
+    "badge": "Coastal Alert System",
+    "switch_to_admin": "Switch to Admin / Expert Portal",
+    "switch_to_citizen": "Citizen & Fisherman Safety Portal"
+  },
+  "nav": {
+    "home": "Home",
+    "map": "Live Map",
+    "history": "Past Cyclones",
+    "weather": "Weather & Sea",
+    "emergency": "Emergency SOS"
+  },
+  "status": {
+    "live": "LIVE DATA",
+    "last_known": "CACHED (LAST KNOWN)",
+    "stale": "OUTDATED DATA",
+    "unavailable": "DATA UNAVAILABLE",
+    "online": "Connected",
+    "offline": "Offline (Using Local Storage)",
+    "sample_data": "Sample Data / Simulated",
+    "last_updated": "Last updated",
+    "cached_at": "Cached at",
+    "source": "Source"
+  },
+  "safety": {
+    "title": "Coastal Sea Safety Advisory",
+    "official_warning": "Official Marine Bulletin",
+    "status_unavailable": "Official safety status unavailable",
+    "safe_sea": "Normal Conditions Reported",
+    "caution_sea": "Advisory / Rough Sea Conditions",
+    "danger_sea": "High Risk / Cyclone Warning",
+    "fishermen_warning": "Fishermen Advisory",
+    "do_not_venture": "Do not venture into the sea. Boats at sea must return to harbor immediately.",
+    "caution_venture": "Exercise caution. High waves and squally winds expected near coastline.",
+    "normal_venture": "No severe cyclone warning currently active for coastal waters.",
+    "warning_source": "Source: Official Meteorological / Disaster Management Bulletins"
+  },
+  "home": {
+    "greeting": "Coastal Community Safety",
+    "active_cyclone": "Active Cyclone Tracking",
+    "no_active_cyclone": "No active cyclones detected in immediate coastal monitoring zone",
+    "map_preview_title": "Coastal Situation Map",
+    "open_full_map": "Open Full Interactive Map",
+    "quick_emergency": "Emergency Contacts",
+    "listen_advisory": "Listen to Advisory (Audio)",
+    "stop_audio": "Stop Audio",
+    "audio_not_supported": "Voice audio is not supported in this browser.",
+    "audio_playing": "Playing audio advisory..."
+  },
+  "map": {
+    "title": "Interactive Coastal Cyclone Map",
+    "subtitle": "Real-time positions, storm tracking, and coastal boundaries",
+    "layers": {
+      "standard": "Standard Map",
+      "satellite": "Satellite View",
+      "terrain": "Terrain",
+      "ocean": "Ocean / Coastal"
+    },
+    "legend": {
+      "cyclone": "Cyclone Center",
+      "past_track": "Recorded Past Track",
+      "forecast_track": "Official Forecast Track",
+      "high_risk_zone": "High Alert Coastal Zone",
+      "distinction_note": "Solid line = Past verified observations. Dashed line = Forecast predictions."
+    },
+    "offline_notice": "Offline Mode: Showing last cached cyclone coordinates. Map background tiles may be limited."
+  },
+  "history": {
+    "title": "Historical Cyclones & Tracks",
+    "subtitle": "Verified records of past tropical cyclones affecting Indian coasts",
+    "select_cyclone": "Select a cyclone to view verified track",
+    "observation_time": "Observation Date",
+    "max_wind": "Max Recorded Wind Speed",
+    "category": "Intensity Category",
+    "landfall": "Landfall Location",
+    "verified_by": "Verified Source",
+    "track_explanation": "These are strictly historical observations from meteorological records (IMD/GDACS), not future forecasts."
+  },
+  "weather": {
+    "title": "Marine Weather & Coastal Conditions",
+    "subtitle": "Verified meteorological observations with timestamps and official sources",
+    "wind_speed": "Wind Speed",
+    "wind_direction": "Wind Direction",
+    "wave_height": "Swell / Wave Height",
+    "rainfall": "Precipitation",
+    "source_notice": "Only verified data from official sensors is presented. No speculative predictions.",
+    "unavailable_notice": "Real-time sensor telemetry currently unavailable for this coastal zone."
+  },
+  "emergency": {
+    "title": "Coastal Emergency Helplines & Guidance",
+    "subtitle": "Verified direct-dial numbers and official safety instructions",
+    "call_now": "Call Now",
+    "coast_guard": "Indian Coast Guard (Search & Rescue)",
+    "coast_guard_desc": "National maritime search and rescue toll-free emergency number.",
+    "marine_police": "Marine Coastal Police",
+    "marine_police_desc": "Coastal patrol and local maritime emergency response.",
+    "disaster_management": "National Disaster Management Helpline",
+    "disaster_management_desc": "State and national disaster relief operations.",
+    "cyclone_shelter": "Local Cyclone Relief Shelters",
+    "cyclone_shelter_desc": "Designated pucca cyclone shelters along coastal taluks.",
+    "safety_dos_donts": "Official Cyclone Safety Instructions",
+    "dos": [
+      "Keep battery-powered radio and emergency torch charged.",
+      "Anchor small fishing boats securely with double mooring lines.",
+      "Store adequate clean drinking water and dry rations.",
+      "Move to designated high-ground cyclone shelters if advised by authorities."
+    ],
+    "donts": [
+      "Do NOT venture out to sea when a red/orange alert is hoisted at ports.",
+      "Do NOT enter damaged or flood-weakened structures.",
+      "Do NOT spread unverified rumors; follow official radio/IMD bulletins."
+    ]
+  }
+}

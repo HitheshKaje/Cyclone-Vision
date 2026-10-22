@@ -9,7 +9,8 @@ import {
   Users,
   ShieldAlert,
   Settings,
-  TrendingUp
+  TrendingUp,
+  LifeBuoy
 } from 'lucide-react';
 
 const navItems = [
@@ -27,7 +28,7 @@ const managementItems = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-const Sidebar = ({ isOpen, isMobile, closeSidebar, activeTab, setActiveTab }) => {
+const Sidebar = ({ isOpen, isMobile, closeSidebar, activeTab, setActiveTab, onNavigateToCitizen }) => {
   return (
     <aside 
       className={`
@@ -126,6 +127,29 @@ const Sidebar = ({ isOpen, isMobile, closeSidebar, activeTab, setActiveTab }) =>
             );
           })}
         </div>
+
+        {/* Quick Link to Citizen & Fisherman Portal */}
+        {onNavigateToCitizen && (
+          <div className="pt-4 mt-2 border-t border-slate-200 dark:border-slate-800">
+            <button
+              onClick={() => {
+                onNavigateToCitizen();
+                if (isMobile) closeSidebar();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all cursor-pointer ${
+                !isOpen && !isMobile ? 'justify-center px-0' : ''
+              }`}
+              title="Citizen & Fisherman Coastal Safety Portal"
+            >
+              <LifeBuoy size={18} className="shrink-0 text-emerald-500" />
+              {(isOpen || isMobile) && (
+                <span className="truncate text-left">
+                  Citizen Portal &rarr;
+                </span>
+              )}
+            </button>
+          </div>
+        )}
       </nav>
     </aside>
   );

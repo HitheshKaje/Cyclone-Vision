@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Bell, User, ChevronDown, Sun, Moon } from 'lucide-react';
+import { Menu, Bell, User, ChevronDown, Sun, Moon, LifeBuoy } from 'lucide-react';
 import cycloneLogo from '../assets/cyclone-logo.png';
 
 const CycloSafeLogo = () => (
@@ -12,7 +12,7 @@ const CycloSafeLogo = () => (
   </div>
 );
 
-const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode }) => {
+const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode, onNavigateToCitizen }) => {
   return (
     <header className="h-16 bg-white dark:bg-[#0f172a] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 w-full select-none transition-colors duration-300">
       <div className="h-full px-4 sm:px-6 flex items-center justify-between gap-4">
@@ -42,8 +42,20 @@ const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode }) => {
           </div>
         </div>
 
-        {/* Right Side: Notification Icon + User Menu */}
+        {/* Right Side: Citizen Portal Button + Notification Icon + User Menu */}
         <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+          
+          {/* Quick Switch to Citizen & Fisherman Portal */}
+          {onNavigateToCitizen && (
+            <button
+              onClick={onNavigateToCitizen}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer"
+              title="Open Citizen & Fisherman Coastal Safety Portal"
+            >
+              <LifeBuoy size={14} className="text-emerald-500 animate-spin" style={{ animationDuration: '8s' }} />
+              <span className="hidden sm:inline">Citizen Portal</span>
+            </button>
+          )}
           
           {/* Theme Toggle */}
           <button 
