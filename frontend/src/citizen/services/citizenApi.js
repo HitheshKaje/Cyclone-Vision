@@ -69,7 +69,7 @@ export const fetchHistoricalCyclones = async () => {
 };
 
 /**
- * Fetch official coastal marine warnings & advisories
+ * Fetch official coastal marine warnings & advisories / lighthouse status
  */
 export const fetchOfficialAdvisories = async () => {
   const baseUrl = getApiBaseUrl();
@@ -92,26 +92,21 @@ export const fetchOfficialAdvisories = async () => {
 };
 
 /**
- * Admin action: Broadcast analysis results to the Citizen dashboard
+ * Publish detected cyclone analysis to Citizen & Lighthouse portals
  */
-export const broadcastCitizenAlert = async (alertPayload) => {
+export const publishCitizenBroadcast = async (payload) => {
   const baseUrl = getApiBaseUrl();
   try {
     const response = await fetchWithTimeout(`${baseUrl}/api/citizen/broadcast`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(alertPayload)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
     if (!response.ok) {
       throw new Error(`HTTP error ${response.status}`);
     }
     const data = await response.json();
-    return {
-      success: true,
-      data
-    };
+    return { success: true, data };
   } catch (err) {
     return {
       success: false,
@@ -121,51 +116,21 @@ export const broadcastCitizenAlert = async (alertPayload) => {
 };
 
 /**
- * Admin action: Clear the active coastal alert & stop siren
+ * Toggle coastal lighthouse acoustic siren and flashing beacon ON/OFF
  */
-export const clearCitizenAlert = async () => {
+export const toggleLighthouseSiren = async (sirenActive) => {
   const baseUrl = getApiBaseUrl();
   try {
-    const response = await fetchWithTimeout(`${baseUrl}/api/citizen/clear`, {
-      method: 'POST'
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}`);
-    }
-    const data = await response.json();
-    return {
-      success: true,
-      data
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: err.name === 'AbortError' ? 'Connection timed out' : err.message
-    };
-  }
-};
-
-/**
- * Toggle coastal lighthouse siren ON or OFF
- */
-export const toggleLighthouseSiren = async (active) => {
-  const baseUrl = getApiBaseUrl();
-  try {
-    const response = await fetchWithTimeout(`${baseUrl}/api/lighthouse/siren`, {
+    const response = await fetchWithTimeout(`${baseUrl}/api/citizen/broadcast/siren`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ active })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siren_active: sirenActive })
     });
     if (!response.ok) {
       throw new Error(`HTTP error ${response.status}`);
     }
     const data = await response.json();
-    return {
-      success: true,
-      data
-    };
+    return { success: true, data };
   } catch (err) {
     return {
       success: false,
@@ -175,20 +140,20 @@ export const toggleLighthouseSiren = async (active) => {
 };
 
 /**
- * Fetch current status of the lighthouse siren
+ * Clear coastal alert and restore normal status
  */
-export const fetchLighthouseStatus = async () => {
+export const clearCitizenBroadcast = async () => {
   const baseUrl = getApiBaseUrl();
   try {
-    const response = await fetchWithTimeout(`${baseUrl}/api/lighthouse/status`);
+    const response = await fetchWithTimeout(`${baseUrl}/api/citizen/broadcast/clear`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
     if (!response.ok) {
       throw new Error(`HTTP error ${response.status}`);
     }
     const data = await response.json();
-    return {
-      success: true,
-      data
-    };
+    return { success: true, data };
   } catch (err) {
     return {
       success: false,

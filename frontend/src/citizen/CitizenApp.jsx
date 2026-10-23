@@ -8,7 +8,6 @@ const CycloneMap = lazy(() => import('./pages/CycloneMap'));
 const CycloneHistory = lazy(() => import('./pages/CycloneHistory'));
 const WeatherSafety = lazy(() => import('./pages/WeatherSafety'));
 const EmergencyInformation = lazy(() => import('./pages/EmergencyInformation'));
-const LighthouseStation = lazy(() => import('./pages/LighthouseStation'));
 
 const PageLoader = () => (
   <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-slate-500">
@@ -42,12 +41,6 @@ const CitizenApp = ({ currentPath, onNavigate, onSwitchToAdmin }) => {
         return (
           <Suspense fallback={<PageLoader />}>
             <EmergencyInformation />
-          </Suspense>
-        );
-      case '/citizen/lighthouse':
-        return (
-          <Suspense fallback={<PageLoader />}>
-            <LighthouseStation />
           </Suspense>
         );
       case '/citizen':

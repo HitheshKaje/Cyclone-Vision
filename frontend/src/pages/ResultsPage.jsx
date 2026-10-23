@@ -32,7 +32,7 @@ import {
   Legend
 } from 'recharts';
 
-import AdminBroadcastCard from '../components/AdminBroadcastCard';
+import CoastalBroadcastControl from '../components/CoastalBroadcastControl';
 
 const ResultsPage = ({
   currentAnalysis,
@@ -183,14 +183,8 @@ const ResultsPage = ({
         </button>
       </div>
 
-      {/* Citizen Notification & Siren Control System */}
-      <AdminBroadcastCard 
-        currentAnalysis={currentAnalysis}
-        onNavigateToCitizen={() => {
-          window.history.pushState({}, '', '/citizen');
-          window.dispatchEvent(new PopStateEvent('popstate'));
-        }}
-      />
+      {/* Coastal Early Warning & Citizen Broadcast Controller */}
+      <CoastalBroadcastControl currentAnalysis={currentAnalysis} />
 
       {/* 2. Desktop Two-Column Layout for Current Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

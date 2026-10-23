@@ -44,77 +44,88 @@ const CitizenHome = ({ onNavigate }) => {
       if (res.success && res.data && res.data.available) {
         setAdvisory(res.data);
       } else {
-        // When no active alert has been broadcast by Admin:
-        setAdvisory({
-          available: false,
-          siren_active: false,
-          level: null,
-          title: 'No Active Cyclone Alert',
-          message: 'No active coastal cyclone warning is currently in force for Indian coastal waters.',
-          fishermen_directive: 'Regular seasonal fishing guidelines apply. Monitor local port signals.',
-          source: 'India Meteorological Department (IMD) / Coastal Authority',
-          issued_at: res.data?.issued_at || null
-        });
+        // If there's an active severe cyclone in GDACS feed, generate an honest observational advisory
+        if (cyclones.length > 0) {
+          const mainCyclone = cyclones[0];
+          setAdvisory({
+            available: true,
+            level: mainCyclone.status === 'Red' || mainCyclone.wind_speed > 100 ? 'RED' : 'YELLOW',
+            title: `Cyclone Advisory: ${mainCyclone.name}`,
+            message: mainCyclone.description || 'Tropical cyclonic circulation active in monitoring basin.',
+            fishermen_directive: mainCyclone.wind_speed > 60 
+              ? 'Fishermen are advised not to venture into deep sea waters.'
+              : 'Fishermen are advised to exercise caution near coastal waters.',
+            area: `${mainCyclone.latitude?.toFixed(1)}°N, ${mainCyclone.longitude?.toFixed(1)}°E Maritime Zone`,
+            source: metadata?.source || 'GDACS Meteorological Telemetry',
+            issued_at: mainCyclone.last_updated || metadata?.updated_at
+          });
+        } else {
+          // Rule: If verified warning data is unavailable, report unavailable
+          setAdvisory({
+            available: false,
+            level: null
+          });
+        }
       }
     };
 
     loadAdvisory();
-    // Fast polling (every 2.5s) for real-time synchronization with Admin broadcast
-    const interval = setInterval(loadAdvisory, 2500);
+    const pollInterval = setInterval(loadAdvisory, 2000);
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      clearInterval(pollInterval);
     };
-  }, []);
+  }, [cyclones, metadata]);
 
-  // Dynamically populated from Admin's live broadcast (no fake/static data)
-  const activeCyclone = advisory?.available ? {
-    id: 'admin_broadcast_cyclone',
-    name: advisory.cyclone_name || advisory.title || 'Observed Cyclonic System',
-    latitude: 14.8,
-    longitude: 74.2,
-    wind_speed: advisory.wind_speed_kmh,
-    status: advisory.classification || advisory.level || 'Active Warning',
-    last_updated: advisory.issued_at,
-    description: advisory.message,
-    source: advisory.source || 'Admin AI-Validated Satellite Telemetry'
-  } : null;
+  // Derive active cyclone dynamically from live Admin broadcast if active, else from telemetry feed
+  const activeCyclone = (advisory?.active && advisory?.cyclone_name)
+    ? {
+        name: advisory.cyclone_name,
+        status: advisory.level === 'RED' ? 'Severe Cyclone (Live Broadcast)' : 'Cyclone Alert',
+        latitude: advisory.coordinates?.lat || 14.8,
+        longitude: advisory.coordinates?.lng || 73.8,
+        wind_speed: advisory.wind_speed_kmh,
+        last_updated: advisory.issued_at,
+        description: advisory.message,
+        source: advisory.source
+      }
+    : (cyclones.length > 0 ? cyclones[0] : null);
 
   // Text for voice alert
   const voiceText = advisory?.available
     ? `${advisory.title}. ${advisory.message}. Fishermen advisory: ${advisory.fishermen_directive}`
+    : activeCyclone
+    ? `Active cyclone ${activeCyclone.name}. Maximum wind speed ${Math.round(activeCyclone.wind_speed || 0)} kilometers per hour.`
     : t('safety.status_unavailable');
 
   return (
     <div className="space-y-4 sm:space-y-6">
       
-      {/* 0. Live Coastal Siren Alert Banner (When Admin sounds siren) */}
+      {/* Active Coastal Lighthouse Siren Emergency Banner */}
       {advisory?.siren_active && (
-        <div className="w-full p-4 rounded-2xl bg-red-600 text-white border-2 border-white shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-pulse">
+        <div className="p-4 rounded-2xl bg-red-600 text-white shadow-xl animate-pulse flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-2 border-red-400">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-white/20 text-white">
-              <Volume2 size={24} className="animate-bounce" />
-            </div>
+            <Volume2 size={30} className="animate-bounce shrink-0" />
             <div>
-              <h4 className="text-base font-black uppercase tracking-wider">
-                🚨 Coastal Warning Siren Activated
-              </h4>
-              <p className="text-xs text-red-100 font-medium">
-                Connected coastal lighthouse siren beacons are currently sounding emergency evacuation alarm.
+              <h3 className="text-sm sm:text-base font-black tracking-wide uppercase flex items-center gap-2">
+                <span>🚨 COASTAL LIGHTHOUSE SIREN ACTIVE</span>
+                <span className="px-2 py-0.5 rounded-sm bg-white text-red-700 text-[10px] font-black">RED ALERT</span>
+              </h3>
+              <p className="text-xs font-semibold opacity-95 mt-0.5">
+                Acoustic sirens and emergency beacon lights are sounding along coastal stations. All vessels return to harbor immediately!
               </p>
             </div>
           </div>
-
           <button
-            onClick={() => onNavigate('/citizen/lighthouse')}
-            className="px-4 py-2 rounded-xl bg-white text-red-700 font-black text-xs hover:bg-red-50 transition-colors shadow-md shrink-0 cursor-pointer"
+            onClick={() => onNavigate('/lighthouse')}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white text-red-700 font-bold text-xs uppercase tracking-wider shrink-0 shadow-sm hover:bg-slate-100 transition-colors cursor-pointer text-center"
           >
-            Open Lighthouse Beacon &rarr;
+            Open Lighthouse Screen &rarr;
           </button>
         </div>
       )}
-
+      
       {/* 1. Offline & Stale Data Warning Banner */}
       <OfflineStatusBanner 
         isOnline={isOnline}

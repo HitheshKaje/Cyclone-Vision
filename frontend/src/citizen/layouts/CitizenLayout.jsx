@@ -94,16 +94,6 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
               </select>
             </div>
 
-            {/* Quick Link to Lighthouse Terminal */}
-            <button
-              onClick={() => onNavigate('/citizen/lighthouse')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-700 dark:text-red-400 border border-red-500/30 text-xs font-bold transition-all cursor-pointer"
-              title="Open Coastal Lighthouse Siren Beacon"
-            >
-              <Radio size={14} className="text-red-500" />
-              <span className="hidden md:inline">Lighthouse</span>
-            </button>
-
             {/* Switch to Admin Portal Button */}
             {onSwitchToAdmin && (
               <button
