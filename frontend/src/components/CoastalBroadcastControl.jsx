@@ -139,7 +139,7 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
               <span>Coastal Early Warning & Citizen Broadcast</span>
             </h2>
             <p className="text-xs text-slate-400">
-              Publish AI model findings directly to coastal fishermen & mobile lighthouse stations
+              Publish AI findings to citizen apps & trigger audible sirens on their mobile phones
             </p>
           </div>
         </div>
@@ -161,7 +161,7 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
           {isSirenBlasting && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-red-600 text-white animate-pulse shadow-lg shadow-red-500/50">
               <Volume2 size={14} />
-              SIREN BLOWING
+              SIREN BLOWING ON PHONES
             </span>
           )}
         </div>
@@ -266,7 +266,7 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
               onChange={(e) => setIncludeSirenOnPublish(e.target.checked)}
               className="w-4 h-4 rounded-sm border-slate-700 bg-slate-800 text-red-500 focus:ring-red-500 cursor-pointer"
             />
-            <span>Include Coastal Lighthouse Siren Alert with broadcast</span>
+            <span>Include Audible Siren alarm on citizens' phones with broadcast</span>
           </label>
         )}
 
@@ -292,7 +292,7 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
             )}
           </button>
 
-          {/* BUTTON 2: Lighthouse Siren Control (On/Off) */}
+          {/* BUTTON 2: Siren Sound Control (On/Off) */}
           <button
             onClick={handleToggleSiren}
             disabled={sirenToggling}
@@ -310,12 +310,12 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
             ) : isSirenBlasting ? (
               <>
                 <VolumeX size={18} />
-                <span>Silence Siren</span>
+                <span>Silence Siren on Phones</span>
               </>
             ) : (
               <>
                 <Volume2 size={18} />
-                <span>🚨 Trigger Lighthouse Siren</span>
+                <span>🚨 Sound Siren on Citizens' Phones</span>
               </>
             )}
           </button>

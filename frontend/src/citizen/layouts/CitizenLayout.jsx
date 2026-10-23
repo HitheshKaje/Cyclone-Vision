@@ -14,6 +14,7 @@ import {
 import cycloneLogo from '../../assets/cyclone-logo.png';
 import { changeLanguage } from '../i18n/config';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import EmergencySirenOverlay from '../components/EmergencySirenOverlay';
 
 const navItems = [
   { id: 'home', path: '/citizen', labelKey: 'nav.home', icon: Home },
@@ -34,6 +35,9 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300 pb-20 sm:pb-0">
       
+      {/* Real-time Emergency Audio Siren: Automatically sounds alarm on citizen mobile phones when admin activates it */}
+      <EmergencySirenOverlay onNavigateToLighthouse={() => onNavigate('/lighthouse')} />
+
       {/* 1. TOP APP BAR */}
       <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#0f172a]/95 border-b border-slate-200/80 dark:border-slate-800 backdrop-blur-md shadow-xs">
         <div className="max-w-4xl mx-auto px-3.5 sm:px-6 h-16 flex items-center justify-between gap-2">
