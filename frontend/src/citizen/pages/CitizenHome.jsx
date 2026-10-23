@@ -41,56 +41,33 @@ const CitizenHome = ({ onNavigate }) => {
       const res = await fetchOfficialAdvisories();
       if (!isMounted) return;
 
-      if (res.success && res.data && res.data.available) {
+      if (res.success && res.data) {
         setAdvisory(res.data);
-      } else {
-        // If there's an active severe cyclone in GDACS feed, generate an honest observational advisory
-        if (cyclones.length > 0) {
-          const mainCyclone = cyclones[0];
-          setAdvisory({
-            available: true,
-            level: mainCyclone.status === 'Red' || mainCyclone.wind_speed > 100 ? 'RED' : 'YELLOW',
-            title: `Cyclone Advisory: ${mainCyclone.name}`,
-            message: mainCyclone.description || 'Tropical cyclonic circulation active in monitoring basin.',
-            fishermen_directive: mainCyclone.wind_speed > 60 
-              ? 'Fishermen are advised not to venture into deep sea waters.'
-              : 'Fishermen are advised to exercise caution near coastal waters.',
-            area: `${mainCyclone.latitude?.toFixed(1)}°N, ${mainCyclone.longitude?.toFixed(1)}°E Maritime Zone`,
-            source: metadata?.source || 'GDACS Meteorological Telemetry',
-            issued_at: mainCyclone.last_updated || metadata?.updated_at
-          });
-        } else {
-          // Rule: If verified warning data is unavailable, report unavailable
-          setAdvisory({
-            available: false,
-            level: null
-          });
-        }
       }
     };
 
     loadAdvisory();
-    const pollInterval = setInterval(loadAdvisory, 2000);
+    const pollInterval = setInterval(loadAdvisory, 1500);
 
     return () => {
       isMounted = false;
       clearInterval(pollInterval);
     };
-  }, [cyclones, metadata]);
+  }, []);
 
-  // Derive active cyclone dynamically from live Admin broadcast if active, else from telemetry feed
+  // Derive active cyclone strictly from live Admin broadcast (no static/unrelated data)
   const activeCyclone = (advisory?.active && advisory?.cyclone_name)
     ? {
         name: advisory.cyclone_name,
         status: advisory.level === 'RED' ? 'Severe Cyclone (Live Broadcast)' : 'Cyclone Alert',
         latitude: advisory.coordinates?.lat || 14.8,
-        longitude: advisory.coordinates?.lng || 73.8,
+        longitude: advisory.coordinates?.lng || 73.5,
         wind_speed: advisory.wind_speed_kmh,
         last_updated: advisory.issued_at,
         description: advisory.message,
         source: advisory.source
       }
-    : (cyclones.length > 0 ? cyclones[0] : null);
+    : null;
 
   // Text for voice alert
   const voiceText = advisory?.available

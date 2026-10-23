@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   MapContainer, 
@@ -18,10 +18,12 @@ import {
   Map as MapIcon, 
   Layers, 
   WifiOff, 
-  Info 
+  Info,
+  CheckCircle2
 } from 'lucide-react';
 import { useCycloneData } from '../hooks/useCycloneData';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { fetchOfficialAdvisories } from '../services/citizenApi';
 import MapLayerControl from '../components/MapLayerControl';
 import OfflineStatusBanner from '../components/OfflineStatusBanner';
 

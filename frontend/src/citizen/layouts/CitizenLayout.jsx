@@ -94,6 +94,16 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
               </select>
             </div>
 
+            {/* Lighthouse Station Screen Button */}
+            <button
+              onClick={() => onNavigate('/lighthouse')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 text-xs font-bold transition-all cursor-pointer"
+              title="Open Coastal Lighthouse Siren Station (Mobile Terminal)"
+            >
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="hidden xs:inline">Lighthouse</span>
+            </button>
+
             {/* Switch to Admin Portal Button */}
             {onSwitchToAdmin && (
               <button

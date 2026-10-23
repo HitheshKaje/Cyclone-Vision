@@ -3,11 +3,11 @@ import CitizenLayout from './layouts/CitizenLayout';
 import CitizenHome from './pages/CitizenHome';
 import { Loader2 } from 'lucide-react';
 
-// Code-split non-essential sub-routes for budget Android devices
 const CycloneMap = lazy(() => import('./pages/CycloneMap'));
 const CycloneHistory = lazy(() => import('./pages/CycloneHistory'));
 const WeatherSafety = lazy(() => import('./pages/WeatherSafety'));
 const EmergencyInformation = lazy(() => import('./pages/EmergencyInformation'));
+const LighthouseStation = lazy(() => import('./pages/LighthouseStation'));
 
 const PageLoader = () => (
   <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-slate-500">
@@ -17,6 +17,14 @@ const PageLoader = () => (
 );
 
 const CitizenApp = ({ currentPath, onNavigate, onSwitchToAdmin }) => {
+  // Dedicated fullscreen Coastal Lighthouse Terminal (for user's secondary mobile phone)
+  if (currentPath === '/lighthouse' || currentPath === '/citizen/lighthouse') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <LighthouseStation onNavigateBack={() => onNavigate('/citizen')} />
+      </Suspense>
+    );
+  }
   const renderCitizenPage = () => {
     switch (currentPath) {
       case '/citizen/map':

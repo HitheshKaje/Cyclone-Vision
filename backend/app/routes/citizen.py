@@ -15,9 +15,9 @@ router = APIRouter()
 
 # In-memory Active Coastal Broadcast State
 ACTIVE_BROADCAST = {
-    "available": False,
+    "available": True,
     "active": False,
-    "cyclone_name": "No Active Cyclone",
+    "cyclone_name": None,
     "classification": "NONE",
     "wind_speed_kt": None,
     "wind_speed_kmh": None,
@@ -25,12 +25,12 @@ ACTIVE_BROADCAST = {
     "level": "NORMAL",             # NORMAL, YELLOW, ORANGE, RED
     "siren_active": False,         # Controls Lighthouse acoustic siren & strobe
     "title": "Normal Coastal Conditions",
-    "message": "No active coastal cyclone warning is currently in force for Indian coastal waters.",
+    "message": "No active coastal cyclone warning is currently in force for Indian coastal waters. All monitored maritime sectors clear.",
     "fishermen_directive": "Regular seasonal fishing guidelines apply. Monitor local port signals.",
     "area": "West & East Coast Maritime Zones",
-    "source": "CycloSafe Early Warning Command Center (AI Detection)",
+    "source": "CycloSafe Early Warning Command Center",
     "issued_at": datetime.utcnow().isoformat() + "Z",
-    "coordinates": {"lat": 16.5, "lng": 82.5}
+    "coordinates": {"lat": 14.8, "lng": 73.5}
 }
 
 class BroadcastPayload(BaseModel):
@@ -224,9 +224,9 @@ async def clear_citizen_broadcast():
     """
     global ACTIVE_BROADCAST
     ACTIVE_BROADCAST = {
-        "available": False,
+        "available": True,
         "active": False,
-        "cyclone_name": "No Active Cyclone",
+        "cyclone_name": None,
         "classification": "NONE",
         "wind_speed_kt": None,
         "wind_speed_kmh": None,
@@ -234,12 +234,12 @@ async def clear_citizen_broadcast():
         "level": "NORMAL",
         "siren_active": False,
         "title": "Normal Coastal Conditions",
-        "message": "All previous cyclone advisories cleared. Normal conditions reported.",
+        "message": "All previous cyclone advisories cleared. Monitored coastal waters report normal conditions.",
         "fishermen_directive": "Regular fishing operations permitted. Monitor standard harbor signals.",
         "area": "Coastal Maritime Zones",
         "source": "CycloSafe Early Warning Command Center",
         "issued_at": datetime.utcnow().isoformat() + "Z",
-        "coordinates": {"lat": 16.5, "lng": 82.5}
+        "coordinates": {"lat": 14.8, "lng": 73.5}
     }
     return {
         "success": True,
