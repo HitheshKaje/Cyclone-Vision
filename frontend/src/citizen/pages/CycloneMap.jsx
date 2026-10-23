@@ -81,13 +81,49 @@ const CycloneMap = () => {
   const { t } = useTranslation();
   const { isOnline } = useNetworkStatus();
   const { cyclones, metadata, loading, isCached, freshness } = useCycloneData();
+  const [advisory, setAdvisory] = useState(null);
   const [activeLayer, setActiveLayer] = useState('standard'); // 'standard' | 'satellite'
   const [tileError, setTileError] = useState(false);
   const mapRef = useRef(null);
 
-  // Map center: Bay of Bengal & Arabian Sea (Indian Coastal Region)
-  const defaultCenter = [16.5, 82.5];
-  const defaultZoom = 5;
+  // Poll live broadcast advisory from backend
+  useEffect(() => {
+    let isMounted = true;
+    const checkAdvisory = async () => {
+      const res = await fetchOfficialAdvisories();
+      if (isMounted && res.success && res.data) {
+        setAdvisory(res.data);
+      }
+    };
+    checkAdvisory();
+    const interval = setInterval(checkAdvisory, 1500);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Strict dynamic list: If Admin has active broadcast, display that detected cyclone
+  const mapCyclones = [];
+  if (advisory?.active && advisory?.cyclone_name) {
+    mapCyclones.push({
+      id: 'admin_broadcast_active',
+      name: advisory.cyclone_name,
+      status: advisory.level === 'RED' ? 'Severe Cyclone (Live Broadcast)' : 'Cyclone Alert',
+      latitude: advisory.coordinates?.lat || 14.8,
+      longitude: advisory.coordinates?.lng || 73.5,
+      wind_speed: advisory.wind_speed_kmh,
+      last_updated: advisory.issued_at,
+      description: advisory.message,
+      source: advisory.source || 'CycloSafe Admin AI Broadcast'
+    });
+  }
+
+  // Map center: Default to detected cyclone coords if active, else Indian Coastal Region
+  const defaultCenter = advisory?.active && advisory?.coordinates?.lat
+    ? [advisory.coordinates.lat, advisory.coordinates.lng]
+    : [16.5, 82.5];
+  const defaultZoom = advisory?.active ? 6 : 5;
 
   return (
     <div className="flex flex-col space-y-3 pb-6">
@@ -110,6 +146,29 @@ const CycloneMap = () => {
           />
         </div>
       </div>
+
+      {/* Real-time Marine Status Bar */}
+      {mapCyclones.length === 0 ? (
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+            <span>Normal Marine Observation: Monitored coastal sectors are clear of active cyclones.</span>
+          </div>
+          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+            Clear Waters
+          </span>
+        </div>
+      ) : (
+        <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-800 dark:text-red-300 text-xs font-bold flex items-center justify-between gap-2 animate-pulse">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="text-red-500 shrink-0" />
+            <span>Active Warning: Tracking {mapCyclones[0].name} ({mapCyclones[0].wind_speed} km/h)</span>
+          </div>
+          <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-sm bg-red-600 text-white">
+            Live Threat
+          </span>
+        </div>
+      )}
 
       {/* 2. Offline Notice Banner */}
       <OfflineStatusBanner 
@@ -169,8 +228,8 @@ const CycloneMap = () => {
             </>
           )}
 
-          {/* Markers for live or cached cyclones */}
-          {cyclones.map((cyclone) => {
+          {/* Markers for live broadcast cyclones */}
+          {mapCyclones.map((cyclone) => {
             const lat = Number(cyclone.latitude);
             const lng = Number(cyclone.longitude);
             if (isNaN(lat) || isNaN(lng)) return null;

@@ -12,7 +12,7 @@ const CycloSafeLogo = () => (
   </div>
 );
 
-const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode, onNavigateToCitizen }) => {
+const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode, onNavigateToCitizen, onNavigateToLighthouse }) => {
   return (
     <header className="h-16 bg-white dark:bg-[#0f172a] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 w-full select-none transition-colors duration-300">
       <div className="h-full px-4 sm:px-6 flex items-center justify-between gap-4">
@@ -42,9 +42,21 @@ const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode, onNavigateToCitizen
           </div>
         </div>
 
-        {/* Right Side: Citizen Portal Button + Notification Icon + User Menu */}
-        <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+        {/* Right Side: Citizen Portal Button + Lighthouse Siren Button + Notification Icon + User Menu */}
+        <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
           
+          {/* Quick Switch to Dedicated Lighthouse Siren Station */}
+          {onNavigateToLighthouse && (
+            <button
+              onClick={onNavigateToLighthouse}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 text-xs font-bold transition-all cursor-pointer"
+              title="Open Dedicated Coastal Lighthouse Siren Terminal"
+            >
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="hidden md:inline">Lighthouse Siren</span>
+            </button>
+          )}
+
           {/* Quick Switch to Citizen & Fisherman Portal */}
           {onNavigateToCitizen && (
             <button

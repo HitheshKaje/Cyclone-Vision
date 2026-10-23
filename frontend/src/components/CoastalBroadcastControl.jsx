@@ -9,8 +9,7 @@ import {
   RotateCcw,
   ShieldAlert,
   Send,
-  Anchor,
-  Beacon
+  Anchor
 } from 'lucide-react';
 import { 
   publishCitizenBroadcast, 

@@ -28,7 +28,7 @@ const managementItems = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-const Sidebar = ({ isOpen, isMobile, closeSidebar, activeTab, setActiveTab, onNavigateToCitizen }) => {
+const Sidebar = ({ isOpen, isMobile, closeSidebar, activeTab, setActiveTab, onNavigateToCitizen, onNavigateToLighthouse }) => {
   return (
     <aside 
       className={`
@@ -128,26 +128,48 @@ const Sidebar = ({ isOpen, isMobile, closeSidebar, activeTab, setActiveTab, onNa
           })}
         </div>
 
-        {/* Quick Link to Citizen & Fisherman Portal */}
-        {onNavigateToCitizen && (
-          <div className="pt-4 mt-2 border-t border-slate-200 dark:border-slate-800">
-            <button
-              onClick={() => {
-                onNavigateToCitizen();
-                if (isMobile) closeSidebar();
-              }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all cursor-pointer ${
-                !isOpen && !isMobile ? 'justify-center px-0' : ''
-              }`}
-              title="Citizen & Fisherman Coastal Safety Portal"
-            >
-              <LifeBuoy size={18} className="shrink-0 text-emerald-500" />
-              {(isOpen || isMobile) && (
-                <span className="truncate text-left">
-                  Citizen Portal &rarr;
-                </span>
-              )}
-            </button>
+        {/* Quick Links to Citizen & Lighthouse Terminals */}
+        {(onNavigateToCitizen || onNavigateToLighthouse) && (
+          <div className="pt-4 mt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+            {onNavigateToCitizen && (
+              <button
+                onClick={() => {
+                  onNavigateToCitizen();
+                  if (isMobile) closeSidebar();
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all cursor-pointer ${
+                  !isOpen && !isMobile ? 'justify-center px-0' : ''
+                }`}
+                title="Citizen & Fisherman Coastal Safety Portal"
+              >
+                <LifeBuoy size={18} className="shrink-0 text-emerald-500" />
+                {(isOpen || isMobile) && (
+                  <span className="truncate text-left">
+                    Citizen Portal &rarr;
+                  </span>
+                )}
+              </button>
+            )}
+
+            {onNavigateToLighthouse && (
+              <button
+                onClick={() => {
+                  onNavigateToLighthouse();
+                  if (isMobile) closeSidebar();
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-bold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 transition-all cursor-pointer ${
+                  !isOpen && !isMobile ? 'justify-center px-0' : ''
+                }`}
+                title="Coastal Lighthouse Siren Station Terminal"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                {(isOpen || isMobile) && (
+                  <span className="truncate text-left">
+                    Lighthouse Siren &rarr;
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         )}
       </nav>

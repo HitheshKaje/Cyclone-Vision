@@ -56,6 +56,7 @@ function App() {
       isDarkMode={isDarkMode}
       toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
       onNavigateToCitizen={() => navigateTo('/citizen')}
+      onNavigateToLighthouse={() => navigateTo('/lighthouse')}
     >
       <Dashboard 
         activeTab={activeTab} 

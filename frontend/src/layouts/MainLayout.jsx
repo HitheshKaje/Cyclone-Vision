@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 
-const MainLayout = ({ children, activeTab, setActiveTab, isDarkMode, toggleDarkMode, onNavigateToCitizen }) => {
+const MainLayout = ({ children, activeTab, setActiveTab, isDarkMode, toggleDarkMode, onNavigateToCitizen, onNavigateToLighthouse }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -41,6 +41,7 @@ const MainLayout = ({ children, activeTab, setActiveTab, isDarkMode, toggleDarkM
         isDarkMode={isDarkMode}
         toggleDarkMode={toggleDarkMode}
         onNavigateToCitizen={onNavigateToCitizen}
+        onNavigateToLighthouse={onNavigateToLighthouse}
       />
       
       <div className="flex flex-1 overflow-hidden relative">
@@ -51,6 +52,7 @@ const MainLayout = ({ children, activeTab, setActiveTab, isDarkMode, toggleDarkM
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           onNavigateToCitizen={onNavigateToCitizen}
+          onNavigateToLighthouse={onNavigateToLighthouse}
         />
         
         {/* Mobile Overlay */}
