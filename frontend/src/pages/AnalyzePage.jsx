@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import { getApiBaseUrl } from '../utils/apiConfig';
+import AdminBroadcastCard from '../components/AdminBroadcastCard';
 const API_BASE = getApiBaseUrl();
 
 const AnalyzePage = ({
@@ -466,6 +467,19 @@ const AnalyzePage = ({
                     <span>View Report</span>
                     <ArrowRight size={16} />
                   </button>
+                </div>
+              )}
+
+              {/* Citizen Notification & Siren Controls */}
+              {isCompleted && (
+                <div className="pt-2">
+                  <AdminBroadcastCard 
+                    currentAnalysis={currentAnalysis}
+                    onNavigateToCitizen={() => {
+                      window.history.pushState({}, '', '/citizen');
+                      window.dispatchEvent(new PopStateEvent('popstate'));
+                    }}
+                  />
                 </div>
               )}
             </div>

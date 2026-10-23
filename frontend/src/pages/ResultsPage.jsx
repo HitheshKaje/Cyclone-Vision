@@ -32,6 +32,8 @@ import {
   Legend
 } from 'recharts';
 
+import AdminBroadcastCard from '../components/AdminBroadcastCard';
+
 const ResultsPage = ({
   currentAnalysis,
   analysisHistory = [],
@@ -180,6 +182,15 @@ const ResultsPage = ({
           <ArrowRight size={14} />
         </button>
       </div>
+
+      {/* Citizen Notification & Siren Control System */}
+      <AdminBroadcastCard 
+        currentAnalysis={currentAnalysis}
+        onNavigateToCitizen={() => {
+          window.history.pushState({}, '', '/citizen');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }}
+      />
 
       {/* 2. Desktop Two-Column Layout for Current Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

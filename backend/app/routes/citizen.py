@@ -94,6 +94,64 @@ VERIFIED_HISTORICAL_CYCLONES = [
   }
 ]
 
+import os
+import json
+from pydantic import BaseModel
+from typing import Optional
+
+ALERT_STORAGE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs", "active_alert.json")
+
+def load_alert_from_disk() -> Dict[str, Any]:
+    if os.path.exists(ALERT_STORAGE_PATH):
+        try:
+            with open(ALERT_STORAGE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "available": False,
+        "siren_active": False,
+        "level": None,
+        "title": "No Active Cyclone Alert",
+        "cyclone_name": None,
+        "message": "No active coastal cyclone warning is currently in force for Indian coastal waters.",
+        "fishermen_directive": "Regular seasonal fishing guidelines apply. Monitor local port signals.",
+        "wind_speed_kmh": None,
+        "wind_speed_kt": None,
+        "classification": None,
+        "confidence": None,
+        "area": "Indian Coastal Waters",
+        "source": "India Meteorological Department (IMD) / Coastal Authority",
+        "issued_at": datetime.utcnow().isoformat() + "Z"
+    }
+
+def save_alert_to_disk(alert: Dict[str, Any]):
+    try:
+        os.makedirs(os.path.dirname(ALERT_STORAGE_PATH), exist_ok=True)
+        with open(ALERT_STORAGE_PATH, "w", encoding="utf-8") as f:
+            json.dump(alert, f, indent=2)
+    except Exception as e:
+        print(f"[citizen] Error saving alert to disk: {e}")
+
+ACTIVE_ALERT: Dict[str, Any] = load_alert_from_disk()
+
+class BroadcastAlertRequest(BaseModel):
+    title: Optional[str] = None
+    level: str = "RED"
+    cyclone_name: str = "Tropical Cyclone (Satellite Telemetry)"
+    message: Optional[str] = None
+    wind_speed_kmh: Optional[float] = None
+    wind_speed_kt: Optional[float] = None
+    classification: Optional[str] = None
+    confidence: Optional[float] = None
+    area: str = "Coastal Maritime Sector"
+    fishermen_directive: Optional[str] = None
+    siren_active: bool = False
+    source: str = "Admin Coastal Operations Center / Satellite AI Analysis"
+
+class SirenToggleRequest(BaseModel):
+    active: bool
+
 @router.get("/cyclones/history")
 async def get_historical_cyclones():
     """
@@ -110,16 +168,115 @@ async def get_historical_cyclones():
 @router.get("/citizen/alerts")
 async def get_citizen_alerts():
     """
-    Returns official marine/coastal safety advisories.
-    If no active bulletin is currently issued by meteorological centers,
-    truthfully reports available: false.
+    Returns the real-time coastal alert broadcasted by Admin.
+    If no alert has been broadcast, available: false is returned.
     """
+    global ACTIVE_ALERT
+    return ACTIVE_ALERT
+
+@router.post("/citizen/broadcast")
+async def broadcast_citizen_alert(req: BroadcastAlertRequest):
+    """
+    Admin endpoint: Broadcasts an alert with cyclone telemetry to the Citizen Dashboard.
+    Also controls whether the Coastal Lighthouse Siren is triggered.
+    """
+    global ACTIVE_ALERT
+    now_iso = datetime.utcnow().isoformat() + "Z"
+    
+    directive = req.fishermen_directive
+    if not directive:
+        if req.level == "RED":
+            directive = "Severe Danger: Do not venture into the sea. All boats must return to harbor immediately."
+        elif req.level == "ORANGE":
+            directive = "Caution: Rough sea conditions. Fishing operations suspended in deep waters."
+        else:
+            directive = "Advisory: Monitor weather bulletins before sailing."
+
+    msg = req.message
+    if not msg:
+        if req.wind_speed_kmh:
+            msg = f"Satellite pattern confirms {req.classification or 'cyclonic storm'}. Maximum sustained wind: {req.wind_speed_kmh:.0f} km/h ({req.wind_speed_kt or 0:.0f} kt)."
+        else:
+            msg = "Active cyclonic disturbance detected in monitoring basin."
+
+    ACTIVE_ALERT = {
+        "available": True,
+        "siren_active": req.siren_active,
+        "level": req.level.upper(),
+        "title": req.title or f"Cyclone Alert: {req.cyclone_name}",
+        "cyclone_name": req.cyclone_name,
+        "message": msg,
+        "wind_speed_kmh": req.wind_speed_kmh,
+        "wind_speed_kt": req.wind_speed_kt,
+        "classification": req.classification,
+        "confidence": req.confidence,
+        "area": req.area,
+        "fishermen_directive": directive,
+        "source": req.source,
+        "issued_at": now_iso
+    }
+    save_alert_to_disk(ACTIVE_ALERT)
+
     return {
+        "status": "success",
+        "message": "Alert successfully broadcast to Citizen Dashboard",
+        "alert": ACTIVE_ALERT
+    }
+
+@router.post("/citizen/clear")
+async def clear_citizen_alert():
+    """
+    Admin endpoint: Revokes/clears the active coastal alert and stops the siren.
+    """
+    global ACTIVE_ALERT
+    now_iso = datetime.utcnow().isoformat() + "Z"
+    ACTIVE_ALERT = {
         "available": False,
+        "siren_active": False,
         "level": None,
-        "title": "Official safety status unavailable",
+        "title": "No Active Cyclone Alert",
+        "cyclone_name": None,
         "message": "No active coastal cyclone warning is currently in force for Indian coastal waters.",
         "fishermen_directive": "Regular seasonal fishing guidelines apply. Monitor local port signals.",
-        "source": "India Meteorological Department (IMD) Marine Weather Bulletin",
-        "issued_at": datetime.utcnow().isoformat() + "Z"
+        "wind_speed_kmh": None,
+        "wind_speed_kt": None,
+        "classification": None,
+        "confidence": None,
+        "area": "Indian Coastal Waters",
+        "source": "India Meteorological Department (IMD) / Coastal Authority",
+        "issued_at": now_iso
+    }
+    save_alert_to_disk(ACTIVE_ALERT)
+    return {
+        "status": "success",
+        "message": "Alert cleared and siren deactivated",
+        "alert": ACTIVE_ALERT
+    }
+
+@router.post("/lighthouse/siren")
+async def toggle_lighthouse_siren(req: SirenToggleRequest):
+    """
+    Direct endpoint to trigger or silence the coastal lighthouse siren.
+    """
+    global ACTIVE_ALERT
+    ACTIVE_ALERT["siren_active"] = req.active
+    save_alert_to_disk(ACTIVE_ALERT)
+    return {
+        "status": "success",
+        "siren_active": ACTIVE_ALERT["siren_active"]
+    }
+
+@router.get("/lighthouse/status")
+async def get_lighthouse_status():
+    """
+    Returns current siren state and warning metadata for the Lighthouse station.
+    """
+    global ACTIVE_ALERT
+    return {
+        "siren_active": ACTIVE_ALERT.get("siren_active", False),
+        "available": ACTIVE_ALERT.get("available", False),
+        "level": ACTIVE_ALERT.get("level", None),
+        "cyclone_name": ACTIVE_ALERT.get("cyclone_name", ""),
+        "message": ACTIVE_ALERT.get("message", ""),
+        "issued_at": ACTIVE_ALERT.get("issued_at", "")
     }

@@ -3,6 +3,7 @@ import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 
 const CitizenApp = lazy(() => import('./citizen/CitizenApp'));
+const LighthouseStation = lazy(() => import('./citizen/pages/LighthouseStation'));
 
 function App() {
   const [currentPath, setCurrentPath] = useState(() => 
@@ -30,6 +31,19 @@ function App() {
       setCurrentPath(path);
     }
   };
+
+  // Dedicated Coastal Lighthouse Terminal (For User's Second Mobile Phone Demo)
+  if (currentPath === '/lighthouse' || currentPath === '/lighthouse/') {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white font-mono text-sm">
+          Connecting Coastal Lighthouse Terminal...
+        </div>
+      }>
+        <LighthouseStation />
+      </Suspense>
+    );
+  }
 
   // If path is for the Citizen & Fisherman Portal (/citizen, /citizen/map, etc.)
   if (currentPath.startsWith('/citizen')) {
