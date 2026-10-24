@@ -111,7 +111,7 @@ const EmergencySirenOverlay = ({ onNavigateToLighthouse }) => {
     <div 
       role="alert" 
       aria-live="assertive"
-      className="fixed top-0 inset-x-0 z-50 p-3 sm:p-4 bg-gradient-to-r from-red-700 via-red-600 to-rose-700 text-white shadow-2xl border-b-4 border-red-950 animate-in slide-in-from-top duration-300 select-none"
+      className="w-full p-2.5 sm:p-3 bg-gradient-to-r from-red-700 via-red-600 to-rose-700 text-white shadow-md border-b-2 border-red-950 select-none transition-all duration-300"
     >
       <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
         
