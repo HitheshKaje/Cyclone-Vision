@@ -4,7 +4,7 @@ import { RefreshCw, CheckCircle2, Clock, AlertTriangle, HelpCircle } from 'lucid
 import { DATA_FRESHNESS } from '../services/cycloneCache';
 
 const LastUpdatedIndicator = ({ freshness, timestamp, onRefresh, loading }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const getBadgeConfig = () => {
     switch (freshness?.status) {
@@ -40,6 +40,21 @@ const LastUpdatedIndicator = ({ freshness, timestamp, onRefresh, loading }) => {
     }
   };
 
+  const getLocalizedMessage = () => {
+    if (!freshness) return '';
+    const mins = freshness.ageMinutes ?? 0;
+    switch (freshness.status) {
+      case DATA_FRESHNESS.LIVE:
+        return mins === 0 ? t('freshness.updated_just_now') : t('freshness.updated_mins_ago', { mins });
+      case DATA_FRESHNESS.LAST_KNOWN:
+        return t('freshness.last_known_mins', { mins });
+      case DATA_FRESHNESS.STALE:
+        return t('freshness.stale_hours', { hours: Math.max(1, Math.round(mins / 60)) });
+      default:
+        return freshness.message || '';
+    }
+  };
+
   const badge = getBadgeConfig();
 
   return (
@@ -50,7 +65,7 @@ const LastUpdatedIndicator = ({ freshness, timestamp, onRefresh, loading }) => {
           {badge.text}
         </span>
         <span className="text-slate-600 dark:text-slate-400 font-medium hidden sm:inline">
-          {freshness?.message || ''}
+          {getLocalizedMessage()}
         </span>
       </div>
 

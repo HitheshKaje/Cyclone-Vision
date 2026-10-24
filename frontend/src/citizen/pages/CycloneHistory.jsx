@@ -44,7 +44,7 @@ const landfallIcon = new L.divIcon({
 });
 
 const CycloneHistory = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [historyRecords, setHistoryRecords] = useState([]);
   const [selectedCyclone, setSelectedCyclone] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +107,7 @@ const CycloneHistory = () => {
       <div className="p-3.5 sm:p-4 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-950 dark:text-sky-200 text-xs flex items-start gap-2.5">
         <Info size={18} className="text-sky-500 shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <strong className="block font-bold mb-0.5">Verified Historical Archives:</strong>
+          <strong className="block font-bold mb-0.5">{i18n.language === 'kn' ? 'ಪರಿಶೀಲಿಸಿದ ಐತಿಹಾಸಿಕ ದಾಖಲೆಗಳು:' : 'Verified Historical Archives:'}</strong>
           {t('history.track_explanation')}
         </div>
       </div>
@@ -143,7 +143,7 @@ const CycloneHistory = () => {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-700/60 pb-3">
             <div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                {selectedCyclone.basin} Basin
+                {selectedCyclone.basin} {t('history.basin')}
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
                 {selectedCyclone.name} ({selectedCyclone.year})
@@ -172,9 +172,9 @@ const CycloneHistory = () => {
             </div>
 
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="text-slate-500 text-[11px] block">Landfall Date</span>
+              <span className="text-slate-500 text-[11px] block">{t('history.landfall_date')}</span>
               <span className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {new Date(selectedCyclone.landfall_date).toLocaleDateString()}
+                {new Date(selectedCyclone.landfall_date).toLocaleDateString(i18n.language === 'kn' ? 'kn-IN' : 'en-US')}
               </span>
             </div>
 

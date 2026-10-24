@@ -35,8 +35,8 @@ const EMERGENCY_CONTACTS = [
   },
   {
     id: 'national_emergency',
-    titleKey: 'National All-in-One Helpline',
-    descKey: 'Police, Fire, and Emergency Disaster Services',
+    titleKey: 'emergency.national_emergency',
+    descKey: 'emergency.national_emergency_desc',
     phone: '112',
     displayPhone: '112 (Pan-India)',
     icon: Phone,

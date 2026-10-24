@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   Volume2, 
   VolumeX, 
@@ -24,6 +25,7 @@ const STATIONS = [
 ];
 
 const LighthouseStation = ({ onNavigateBack }) => {
+  const { t, i18n } = useTranslation();
   const [station, setStation] = useState(STATIONS[0]);
   const [isArmed, setIsArmed] = useState(false);
   const [sirenActive, setSirenActive] = useState(false);
@@ -181,6 +183,27 @@ const LighthouseStation = ({ onNavigateBack }) => {
 
   const isRedAlert = alertData?.level === 'RED' || sirenActive;
 
+  const getStationName = (s) => {
+    if (i18n.language !== 'kn') return s.name;
+    const names = {
+      'kaup': 'ಕಾಪು ಕರಾವಳಿ ಲೈಟ್‌ಹೌಸ್ (ಉಡುಪಿ / ಮಲ್ಪೆ)',
+      'mangalore': 'ಮಂಗಳೂರು ಬಂದರು ಲೈಟ್ ಬೀಕನ್ #01',
+      'karwar': 'ಕಾರವಾರ ಆಯಿಸ್ಟರ್ ರಾಕ್ಸ್ ಲೈಟ್‌ಹೌಸ್',
+      'visakhapatnam': 'ವಿಶಾಖಪಟ್ಟಣಂ ಡಾಲ್ಫಿನ್ ನೋಸ್ ಲೈಟ್',
+      'paradip': 'ಪಾರಾದೀಪ್ ಕರಾವಳಿ ಎಚ್ಚರಿಕೆ ಟವರ್'
+    };
+    return names[s.id] || s.name;
+  };
+
+  const getStationSignal = (sig) => {
+    if (i18n.language !== 'kn') return sig;
+    if (sig.includes('10')) return 'ಸಿಗ್ನಲ್ 10 (ಮಹಾ ಅಪಾಯ)';
+    if (sig.includes('09')) return 'ಸಿಗ್ನಲ್ 09 (ತೀವ್ರ ಎಚ್ಚರಿಕೆ)';
+    if (sig.includes('08')) return 'ಸಿಗ್ನಲ್ 08 (ಚಂಡಮಾರುತದ ಅಪಾಯ)';
+    if (sig.includes('11')) return 'ಸಿಗ್ನಲ್ 11 (ಸಂಪರ್ಕ ಕಡಿತ / ತೀವ್ರ ಲ್ಯಾಂಡ್‌ಫಾಲ್)';
+    return sig;
+  };
+
   return (
     <div className={`min-h-screen w-full flex flex-col justify-between p-4 sm:p-6 transition-all duration-500 font-sans select-none relative overflow-hidden ${
       sirenActive 
@@ -225,10 +248,10 @@ const LighthouseStation = ({ onNavigateBack }) => {
             </div>
             <div>
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
-                CycloSafe Coastal Warning Beacon
+                {t('lighthouse.beacon_title')}
               </span>
               <h1 className="text-base sm:text-lg font-black tracking-tight text-white">
-                {station.name}
+                {getStationName(station)}
               </h1>
             </div>
           </div>
@@ -241,7 +264,7 @@ const LighthouseStation = ({ onNavigateBack }) => {
               ? 'bg-red-500 text-white border-white animate-pulse'
               : 'bg-slate-800 text-slate-300 border-slate-700'
           }`}>
-            {station.signal}
+            {getStationSignal(station.signal)}
           </span>
         </div>
       </header>
@@ -261,20 +284,20 @@ const LighthouseStation = ({ onNavigateBack }) => {
             <>
               <Volume2 size={64} className="text-white animate-bounce mb-2" />
               <span className="text-xs sm:text-sm font-black uppercase tracking-widest text-white">
-                SIREN BLASTING
+                {t('lighthouse.siren_blasting')}
               </span>
               <span className="text-[10px] font-bold text-red-100">
-                FOGHORN ACTIVE
+                {t('lighthouse.foghorn_active')}
               </span>
             </>
           ) : (
             <>
               <VolumeX size={48} className="text-slate-400 mb-2" />
               <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300">
-                {isArmed ? 'BEACON STANDBY' : 'TAP TO ARM'}
+                {isArmed ? t('lighthouse.beacon_standby') : t('lighthouse.tap_to_arm')}
               </span>
               <span className="text-[10px] text-slate-500">
-                {isArmed ? 'Listening to Admin' : 'Audio Disabled'}
+                {isArmed ? t('lighthouse.listening_admin') : t('lighthouse.audio_disabled')}
               </span>
             </>
           )}
@@ -286,21 +309,23 @@ const LighthouseStation = ({ onNavigateBack }) => {
             <Radio size={14} className={sirenActive ? 'text-red-400 animate-ping' : 'text-emerald-400'} />
             <span>
               {sirenActive 
-                ? 'EMERGENCY BROADCAST SYNCHRONIZED' 
+                ? t('lighthouse.synchronized') 
                 : alertData?.active 
-                ? 'ALERT ISSUED — SIREN STANDBY' 
-                : 'NORMAL MONITORING WATCH'}
+                ? t('lighthouse.alert_standby') 
+                : t('lighthouse.normal_watch')}
             </span>
           </div>
 
           <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
             {sirenActive 
-              ? 'RED ALERT: EVACUATE SEA WATERS' 
-              : alertData?.title || 'Normal Maritime State'}
+              ? t('lighthouse.evacuate_heading') 
+              : (i18n.language === 'kn' ? t('lighthouse.normal_heading') : (alertData?.title || 'Normal Maritime State'))}
           </h2>
 
           <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed font-medium">
-            {alertData?.message || 'Lighthouse beacon receiver connected to CycloSafe AI early warning telemetry. Audio siren triggers instantly when Admin hoists emergency danger signals.'}
+            {i18n.language === 'kn' 
+              ? (sirenActive ? t('siren.warning_desc') : t('safety.normal_venture')) 
+              : (alertData?.message || 'Lighthouse beacon receiver connected to CycloSafe AI early warning telemetry. Audio siren triggers instantly when Admin hoists emergency danger signals.')}
           </p>
         </div>
 
@@ -308,15 +333,15 @@ const LighthouseStation = ({ onNavigateBack }) => {
         {alertData?.active && (
           <div className="w-full p-3.5 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 grid grid-cols-3 gap-2 text-center text-xs">
             <div>
-              <span className="text-[10px] text-slate-400 block uppercase">Detected Storm</span>
+              <span className="text-[10px] text-slate-400 block uppercase">{t('lighthouse.detected_storm')}</span>
               <span className="font-bold text-white text-sm truncate block">{alertData.cyclone_name}</span>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 block uppercase">Wind Speed</span>
+              <span className="text-[10px] text-slate-400 block uppercase">{t('lighthouse.wind_speed')}</span>
               <span className="font-bold text-amber-400 text-sm">{alertData.wind_speed_kmh} km/h</span>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 block uppercase">Category</span>
+              <span className="text-[10px] text-slate-400 block uppercase">{t('lighthouse.category')}</span>
               <span className="font-bold text-red-400 text-sm">{alertData.classification}</span>
             </div>
           </div>
@@ -329,7 +354,7 @@ const LighthouseStation = ({ onNavigateBack }) => {
             className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-400 hover:to-sky-400 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/30 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2"
           >
             <Smartphone size={18} />
-            <span>Tap to Arm Audio on this Phone</span>
+            <span>{t('lighthouse.tap_arm_button')}</span>
           </button>
         )}
 
@@ -344,7 +369,7 @@ const LighthouseStation = ({ onNavigateBack }) => {
             }`}
           >
             {manualOverride ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            <span>{manualOverride ? 'Stop Test Siren' : 'Test Siren (Demo Override)'}</span>
+            <span>{manualOverride ? t('lighthouse.stop_test_siren') : t('lighthouse.test_siren')}</span>
           </button>
 
           {/* Station Switcher Modal / Select */}
@@ -358,7 +383,7 @@ const LighthouseStation = ({ onNavigateBack }) => {
           >
             {STATIONS.map((s) => (
               <option key={s.id} value={s.id} className="bg-slate-900 text-white">
-                {s.name}
+                {getStationName(s)}
               </option>
             ))}
           </select>
@@ -370,11 +395,11 @@ const LighthouseStation = ({ onNavigateBack }) => {
       <footer className="relative z-10 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${sirenActive ? 'bg-red-500 animate-ping' : 'bg-emerald-400'}`} />
-          <span>Lighthouse Status: {sirenActive ? 'SIREN & REVOLVING BEACON HOISTED' : 'STANDBY - NORMAL ILLUMINATION'}</span>
+          <span>{i18n.language === 'kn' ? 'ಲೈಟ್‌ಹೌಸ್ ಸ್ಥಿತಿ: ' : 'Lighthouse Status: '}{sirenActive ? t('lighthouse.status_hoisted') : t('lighthouse.status_normal')}</span>
         </div>
         <div className="flex items-center gap-3 text-slate-400">
-          <span>Focal Height: {station.focalHeight}</span>
-          <span>Optical Range: 22 Nautical Miles</span>
+          <span>{i18n.language === 'kn' ? 'ಎತ್ತರ: ' : 'Focal Height: '}{i18n.language === 'kn' ? station.focalHeight.replace('above MSL', 'ಸಮುದ್ರ ಮಟ್ಟದಿಂದ ಮೇಲೆ') : station.focalHeight}</span>
+          <span>{i18n.language === 'kn' ? 'ದೃಗ್ವಿಷಯ ಶ್ರೇಣಿ: ೨೨ ನಾಟಿಕಲ್ ಮೈಲಿ' : 'Optical Range: 22 Nautical Miles'}</span>
         </div>
       </footer>
 

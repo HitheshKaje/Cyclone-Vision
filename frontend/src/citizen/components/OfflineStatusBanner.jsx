@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { DATA_FRESHNESS } from '../services/cycloneCache';
 
 const OfflineStatusBanner = ({ isOnline, isCached, freshness, metadata }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // If online and live data is being shown, do not render warning banner
   if (isOnline && !isCached && freshness.status === DATA_FRESHNESS.LIVE) {
@@ -12,11 +12,11 @@ const OfflineStatusBanner = ({ isOnline, isCached, freshness, metadata }) => {
   }
 
   const observationTime = metadata?.updated_at 
-    ? new Date(metadata.updated_at).toLocaleString() 
-    : 'Unknown';
+    ? new Date(metadata.updated_at).toLocaleString(i18n.language === 'kn' ? 'kn-IN' : 'en-US') 
+    : (i18n.language === 'kn' ? 'ತಿಳಿದಿಲ್ಲ' : 'Unknown');
     
   const cachedTime = metadata?.cached_at 
-    ? new Date(metadata.cached_at).toLocaleTimeString() 
+    ? new Date(metadata.cached_at).toLocaleTimeString(i18n.language === 'kn' ? 'kn-IN' : 'en-US') 
     : null;
 
   const isStale = freshness.status === DATA_FRESHNESS.STALE;
@@ -49,8 +49,8 @@ const OfflineStatusBanner = ({ isOnline, isCached, freshness, metadata }) => {
           
           <p className="leading-relaxed font-medium">
             {!isOnline 
-              ? `OFFLINE — Showing previously saved cyclone information. Last observation: ${observationTime}. Current conditions may be different.`
-              : `Showing previously saved cyclone information. Last observation: ${observationTime}. Current conditions may differ.`
+              ? t('freshness.offline_showing_saved', { time: observationTime })
+              : t('freshness.showing_saved', { time: observationTime })
             }
           </p>
           

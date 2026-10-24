@@ -50,7 +50,7 @@ const WeatherSafety = () => {
       <div className="p-3.5 sm:p-4 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 flex items-start gap-2.5">
         <Info size={16} className="text-sky-500 shrink-0 mt-0.5" />
         <p className="leading-relaxed">
-          <strong>Official Observational Standards:</strong> {t('weather.source_notice')} Tide and swell calculations are never synthesized without live coastal buoy telemetry.
+          <strong>{t('weather.standards_title')}</strong> {t('weather.standards_desc')}
         </p>
       </div>
 
@@ -59,11 +59,11 @@ const WeatherSafety = () => {
         <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-3">
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Wind size={18} className="text-red-500" />
-            <span>Active Storm Meteorological Feed</span>
+            <span>{t('weather.active_feed')}</span>
           </h3>
           {metadata?.source && (
             <span className="text-[11px] text-slate-500 font-medium">
-              Source: {metadata.source}
+              {t('status.source')}: {metadata.source}
             </span>
           )}
         </div>
@@ -86,7 +86,7 @@ const WeatherSafety = () => {
 
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                Disturbance Location
+                {t('weather.location')}
               </span>
               <div className="text-base font-bold text-slate-900 dark:text-slate-100">
                 {activeCyclone.latitude}°N, {activeCyclone.longitude}°E
@@ -98,7 +98,7 @@ const WeatherSafety = () => {
           </div>
         ) : (
           <div className="p-6 text-center text-slate-500 text-sm">
-            No active severe storm observed in immediate coastal tracking zones.
+            {t('weather.no_severe_storm')}
           </div>
         )}
       </div>
@@ -107,7 +107,7 @@ const WeatherSafety = () => {
       <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
         <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <Waves size={18} className="text-sky-500" />
-          <span>Coastal Ocean & Swell Telemetry</span>
+          <span>{t('weather.ocean_telemetry')}</span>
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -117,17 +117,17 @@ const WeatherSafety = () => {
               {t('weather.wave_height')}
             </span>
             <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-              Real-time wave rider buoy telemetry currently unavailable for this specific offshore grid.
+              {t('weather.wave_unavailable')}
             </span>
           </div>
 
           {/* Tide Information */}
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-700">
             <span className="text-xs font-bold text-slate-500 block mb-1">
-              High-Tide & Swell Timings
+              {t('weather.tide_title')}
             </span>
             <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-              Please refer to official INCOIS (Indian National Centre for Ocean Information Services) tide tables at local harbor master stations.
+              {t('weather.tide_desc')}
             </span>
           </div>
         </div>
@@ -137,12 +137,12 @@ const WeatherSafety = () => {
       <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200">
         <h3 className="text-sm font-bold flex items-center gap-2 mb-2">
           <ShieldAlert size={18} className="text-amber-600 dark:text-amber-400" />
-          <span>Official Maritime Fishermen Guidelines</span>
+          <span>{t('weather.fishermen_guidelines')}</span>
         </h3>
         <ul className="text-xs space-y-2 font-medium leading-relaxed list-disc list-inside">
-          <li>Check harbor signal flags before casting nets (Signals 1 to 11).</li>
-          <li>Never rely on mobile internet while sailing beyond 10-15 nautical miles from the coast; carry VHF marine radios on channel 16.</li>
-          <li>Ensure all crew have certified life jackets and personal locator beacons before leaving port.</li>
+          <li>{t('weather.guideline_1')}</li>
+          <li>{t('weather.guideline_2')}</li>
+          <li>{t('weather.guideline_3')}</li>
         </ul>
       </div>
 

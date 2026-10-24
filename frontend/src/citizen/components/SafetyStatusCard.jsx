@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
  * Never infers "Safe" automatically from lack of detection or ML confidence!
  */
 const SafetyStatusCard = ({ advisory }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // If no advisory supplied or status is explicitly unavailable:
   const isAvailable = advisory && advisory.available === true && advisory.level;
@@ -30,7 +30,9 @@ const SafetyStatusCard = ({ advisory }) => {
               {t('safety.status_unavailable')}
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              No verified coastal bulletin is currently linked for this sector. Please check official IMD (India Meteorological Department) or local Port Officer signals before venturing into sea.
+              {i18n.language === 'kn'
+                ? "ಈ ವಲಯಕ್ಕೆ ಯಾವುದೇ ಪರಿಶೀಲಿಸಿದ ಕರಾವಳಿ ಬುಲೆಟಿನ್ ಪ್ರಸ್ತುತ ಲಿಂಕ್ ಆಗಿಲ್ಲ. ಸಮುದ್ರಕ್ಕೆ ಇಳಿಯುವ ಮುನ್ನ ದಯವಿಟ್ಟು ಅಧಿಕೃತ ಐಎಂಡಿ (IMD) ಅಥವಾ ಸ್ಥಳೀಯ ಬಂದರು ಅಧಿಕಾರಿಗಳ ಸಂಕೇತಗಳನ್ನು ಪರಿಶೀಲಿಸಿ."
+                : "No verified coastal bulletin is currently linked for this sector. Please check official IMD (India Meteorological Department) or local Port Officer signals before venturing into sea."}
             </p>
             <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 flex items-center gap-1.5">
               <Info size={13} />
@@ -49,7 +51,7 @@ const SafetyStatusCard = ({ advisory }) => {
     iconColor: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
     icon: AlertOctagon,
     title: t('safety.caution_sea'),
-    badge: 'YELLOW / ADVISORY'
+    badge: t('safety.badge_yellow')
   };
 
   if (level === 'RED' || level === 'DANGER' || level === 'SEVERE') {
@@ -58,7 +60,7 @@ const SafetyStatusCard = ({ advisory }) => {
       iconColor: 'bg-red-600/20 text-red-600 dark:text-red-400',
       icon: AlertOctagon,
       title: t('safety.danger_sea'),
-      badge: 'RED ALERT / DANGER'
+      badge: t('safety.badge_red')
     };
   } else if (level === 'GREEN' || level === 'NORMAL') {
     levelConfig = {
@@ -66,7 +68,7 @@ const SafetyStatusCard = ({ advisory }) => {
       iconColor: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
       icon: ShieldCheck,
       title: t('safety.safe_sea'),
-      badge: 'NORMAL'
+      badge: t('safety.badge_normal')
     };
   }
 
@@ -86,17 +88,29 @@ const SafetyStatusCard = ({ advisory }) => {
             </span>
             {advisory.issued_at && (
               <span className="text-[11px] opacity-80">
-                Issued: {new Date(advisory.issued_at).toLocaleString()}
+                {t('safety.issued')}: {new Date(advisory.issued_at).toLocaleString(i18n.language === 'kn' ? 'kn-IN' : 'en-US')}
               </span>
             )}
           </div>
 
           <h2 className="text-lg sm:text-2xl font-black tracking-tight mb-2">
-            {advisory.title || levelConfig.title}
+            {i18n.language === 'kn' 
+              ? (level === 'RED' || level === 'DANGER' || level === 'SEVERE'
+                  ? t('safety.danger_sea')
+                  : (level === 'GREEN' || level === 'NORMAL'
+                      ? t('safety.safe_sea')
+                      : (advisory.title || levelConfig.title)))
+              : (advisory.title || levelConfig.title)}
           </h2>
 
           <p className="text-xs sm:text-sm font-medium leading-relaxed mb-3">
-            {advisory.message || (level === 'RED' ? t('safety.do_not_venture') : t('safety.caution_venture'))}
+            {i18n.language === 'kn'
+              ? (level === 'RED' || level === 'DANGER' || level === 'SEVERE'
+                  ? t('safety.do_not_venture')
+                  : (level === 'GREEN' || level === 'NORMAL'
+                      ? t('safety.normal_venture')
+                      : (advisory.message || t('safety.caution_venture'))))
+              : (advisory.message || (level === 'RED' ? t('safety.do_not_venture') : t('safety.caution_venture')))}
           </p>
 
           {/* Fishermen specific callout */}
@@ -104,14 +118,20 @@ const SafetyStatusCard = ({ advisory }) => {
             <Anchor size={18} className="shrink-0 mt-0.5 text-sky-500" />
             <div>
               <span className="font-bold underline uppercase">{t('safety.fishermen_warning')}:</span>{' '}
-              {advisory.fishermen_directive || (level === 'RED' ? t('safety.do_not_venture') : t('safety.caution_venture'))}
+              {i18n.language === 'kn'
+                ? (level === 'RED' || level === 'DANGER' || level === 'SEVERE'
+                    ? t('safety.do_not_venture')
+                    : (level === 'GREEN' || level === 'NORMAL'
+                        ? t('safety.normal_directive')
+                        : (advisory.fishermen_directive || t('safety.caution_venture'))))
+                : (advisory.fishermen_directive || (level === 'RED' ? t('safety.do_not_venture') : t('safety.caution_venture')))}
             </div>
           </div>
 
           {/* Metadata Footer */}
           <div className="mt-3 pt-2 border-t border-current/20 flex flex-wrap items-center justify-between gap-2 text-[11px] opacity-80">
-            <span>Area: {advisory.area || 'Coastal Waters'}</span>
-            <span>Source: {advisory.source || 'IMD / Disaster Management'}</span>
+            <span>{t('safety.area')}: {i18n.language === 'kn' ? 'ಕರಾವಳಿ ಸಾಗರ ವಲಯ' : (advisory.area || 'Coastal Waters')}</span>
+            <span>{t('safety.source')}: {i18n.language === 'kn' ? 'ಸೈಕ್ಲೋಸೇಫ್ ಕಮಾಂಡ್ ಸೆಂಟರ್' : (advisory.source || 'IMD / Disaster Management')}</span>
           </div>
         </div>
       </div>

@@ -86,11 +86,11 @@ const CitizenHome = ({ onNavigate }) => {
             <Volume2 size={30} className="animate-bounce shrink-0" />
             <div>
               <h3 className="text-sm sm:text-base font-black tracking-wide uppercase flex items-center gap-2">
-                <span>🚨 COASTAL LIGHTHOUSE SIREN ACTIVE</span>
-                <span className="px-2 py-0.5 rounded-sm bg-white text-red-700 text-[10px] font-black">RED ALERT</span>
+                <span>{t('siren.siren_banner_title')}</span>
+                <span className="px-2 py-0.5 rounded-sm bg-white text-red-700 text-[10px] font-black">{t('safety.badge_red')}</span>
               </h3>
               <p className="text-xs font-semibold opacity-95 mt-0.5">
-                Acoustic sirens and emergency beacon lights are sounding along coastal stations. All vessels return to harbor immediately!
+                {t('siren.siren_banner_desc')}
               </p>
             </div>
           </div>
@@ -98,7 +98,7 @@ const CitizenHome = ({ onNavigate }) => {
             onClick={() => onNavigate('/lighthouse')}
             className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white text-red-700 font-bold text-xs uppercase tracking-wider shrink-0 shadow-sm hover:bg-slate-100 transition-colors cursor-pointer text-center"
           >
-            Open Lighthouse Screen &rarr;
+            {t('siren.open_lighthouse')}
           </button>
         </div>
       )}
@@ -132,7 +132,7 @@ const CitizenHome = ({ onNavigate }) => {
             <span>{t('home.listen_advisory')}</span>
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Hands-free audio advisory in {i18n.language === 'kn' ? 'ಕನ್ನಡ (Kannada)' : 'English'} for fishermen on boats
+            {t('home.hands_free_sub')}
           </p>
         </div>
         <VoiceAlertButton textToRead={voiceText} />
@@ -154,7 +154,7 @@ const CitizenHome = ({ onNavigate }) => {
               {t('home.map_preview_title')}
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5 max-w-md">
-              View live cyclone trajectory, satellite imagery, coastal danger zones, and nearest harbors.
+              {t('home.map_preview_sub')}
             </p>
           </div>
         </div>
@@ -181,7 +181,7 @@ const CitizenHome = ({ onNavigate }) => {
             onClick={() => onNavigate('/citizen/emergency')}
             className="text-xs font-bold text-sky-500 hover:underline cursor-pointer"
           >
-            View All &rarr;
+            {t('home.view_all')}
           </button>
         </div>
         <EmergencyContactCard compact={true} />

@@ -78,7 +78,7 @@ const createCycloneIcon = (name, isSevere = true) => {
 };
 
 const CycloneMap = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isOnline } = useNetworkStatus();
   const { cyclones, metadata, loading, isCached, freshness } = useCycloneData();
   const [advisory, setAdvisory] = useState(null);
@@ -109,7 +109,7 @@ const CycloneMap = () => {
     mapCyclones.push({
       id: 'admin_broadcast_active',
       name: advisory.cyclone_name,
-      status: advisory.level === 'RED' ? 'Severe Cyclone (Live Broadcast)' : 'Cyclone Alert',
+      status: advisory.level === 'RED' ? (i18n.language === 'kn' ? t('safety.badge_red') : 'Severe Cyclone (Live Broadcast)') : (i18n.language === 'kn' ? t('safety.badge_yellow') : 'Cyclone Alert'),
       latitude: advisory.coordinates?.lat || 14.8,
       longitude: advisory.coordinates?.lng || 73.5,
       wind_speed: advisory.wind_speed_kmh,
@@ -152,20 +152,20 @@ const CycloneMap = () => {
         <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-            <span>Normal Marine Observation: Monitored coastal sectors are clear of active cyclones.</span>
+            <span>{t('map.clear_waters_banner')}</span>
           </div>
           <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-            Clear Waters
+            {t('map.clear_waters_tag')}
           </span>
         </div>
       ) : (
         <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-800 dark:text-red-300 text-xs font-bold flex items-center justify-between gap-2 animate-pulse">
           <div className="flex items-center gap-2">
             <AlertCircle size={16} className="text-red-500 shrink-0" />
-            <span>Active Warning: Tracking {mapCyclones[0].name} ({mapCyclones[0].wind_speed} km/h)</span>
+            <span>{t('map.active_warning_tracking')}: {mapCyclones[0].name} ({mapCyclones[0].wind_speed} km/h)</span>
           </div>
           <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-sm bg-red-600 text-white">
-            Live Threat
+            {t('map.live_threat')}
           </span>
         </div>
       )}
@@ -186,8 +186,8 @@ const CycloneMap = () => {
           <div className="absolute top-3 left-3 z-20 max-w-xs sm:max-w-sm p-2.5 rounded-xl bg-slate-900/90 text-amber-300 border border-amber-500/40 text-xs backdrop-blur-md shadow-lg flex items-start gap-2">
             <WifiOff size={16} className="shrink-0 mt-0.5 text-amber-400" />
             <div>
-              <span className="font-bold block">Offline Map Notice</span>
-              <span>Showing last cached cyclone positions. Previously loaded map areas remain visible; missing areas will load when online.</span>
+              <span className="font-bold block">{t('map.offline_map_title')}</span>
+              <span>{t('map.offline_map_desc')}</span>
             </div>
           </div>
         )}
@@ -265,14 +265,14 @@ const CycloneMap = () => {
                       </div>
 
                       <div className="space-y-1 text-xs text-slate-700">
-                        <p><span className="font-semibold">Coordinates:</span> {lat.toFixed(2)}°N, {lng.toFixed(2)}°E</p>
+                        <p><span className="font-semibold">{t('map.coordinates')}:</span> {lat.toFixed(2)}°N, {lng.toFixed(2)}°E</p>
                         {cyclone.wind_speed != null && (
-                          <p><span className="font-semibold">Wind:</span> {Math.round(cyclone.wind_speed)} km/h</p>
+                          <p><span className="font-semibold">{t('map.wind')}:</span> {Math.round(cyclone.wind_speed)} km/h</p>
                         )}
-                        <p><span className="font-semibold">Source:</span> {cyclone.source || metadata?.source || 'Official Feed'}</p>
+                        <p><span className="font-semibold">{t('status.source')}:</span> {cyclone.source || metadata?.source || 'IMD / GDACS'}</p>
                         {cyclone.last_updated && (
                           <p className="text-[10px] text-slate-500 pt-1">
-                            Observed: {new Date(cyclone.last_updated).toLocaleString()}
+                            {t('summary.observation_time')}: {new Date(cyclone.last_updated).toLocaleString(i18n.language === 'kn' ? 'kn-IN' : 'en-US')}
                           </p>
                         )}
                       </div>
@@ -289,16 +289,16 @@ const CycloneMap = () => {
       <div className="p-4 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400">
         <div className="font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-1.5">
           <Info size={14} className="text-sky-500" />
-          <span>Map Legend & Safety Rules</span>
+          <span>{t('map.legend_title')}</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] leading-relaxed">
           <div className="flex items-center gap-2">
             <span className="w-3.5 h-3.5 rounded-full bg-red-600 border border-white inline-block shrink-0" />
-            <span><strong>Red Center:</strong> Observed Cyclone Eye position.</span>
+            <span>{t('map.legend_red_center')}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-4 h-1 border-t-2 border-dashed border-red-500 inline-block shrink-0" />
-            <span><strong>Dashed Perimeter:</strong> Estimated 100km rough gale sea zone.</span>
+            <span>{t('map.legend_dashed')}</span>
           </div>
           <div className="col-span-1 sm:col-span-2 text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
             {t('map.legend.distinction_note')}

@@ -8,10 +8,12 @@ import {
   ExternalLink,
   BellRing
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { fetchOfficialAdvisories } from '../services/citizenApi';
 import sirenService from '../services/sirenService';
 
 const EmergencySirenOverlay = ({ onNavigateToLighthouse }) => {
+  const { t, i18n } = useTranslation();
   const [sirenActive, setSirenActive] = useState(false);
   const [cycloneName, setCycloneName] = useState('Severe Cyclonic Storm');
   const [warningMessage, setWarningMessage] = useState('');
@@ -121,19 +123,19 @@ const EmergencySirenOverlay = ({ onNavigateToLighthouse }) => {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white text-red-700 shadow-xs">
-                RED ALERT
+                {t('safety.badge_red')}
               </span>
               <span className="text-xs font-black uppercase tracking-widest text-red-100 flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                COASTAL SIREN ACTIVE ON THIS PHONE
+                {t('siren.active_phone')}
               </span>
             </div>
             
             <h2 className="text-sm sm:text-base font-black tracking-tight leading-tight mt-0.5 truncate text-white">
-              {cycloneName}: Immediate Coastal Evacuation Warning
+              {cycloneName}: {t('siren.warning_title')}
             </h2>
             <p className="text-[11px] sm:text-xs text-red-100/90 font-medium truncate max-w-lg mt-0.5">
-              {warningMessage || 'Emergency foghorn siren triggered by Admin Command Center. All vessels return to harbor immediately!'}
+              {i18n.language === 'kn' ? t('siren.warning_desc') : (warningMessage || 'Emergency foghorn siren triggered by Admin Command Center. All vessels return to harbor immediately!')}
             </p>
           </div>
         </div>
@@ -149,17 +151,17 @@ const EmergencySirenOverlay = ({ onNavigateToLighthouse }) => {
                 ? 'bg-white text-red-700 hover:bg-slate-100'
                 : 'bg-black/30 hover:bg-black/50 text-white border border-white/30'
             }`}
-            title={isLocallyMuted ? 'Resume Siren on this phone' : 'Mute sound on this phone'}
+            title={isLocallyMuted ? t('siren.unmute_phone') : t('siren.mute_phone')}
           >
             {isLocallyMuted ? (
               <>
                 <Volume2 size={16} />
-                <span>Unmute Siren</span>
+                <span>{t('siren.unmute_phone')}</span>
               </>
             ) : (
               <>
                 <VolumeX size={16} />
-                <span>Mute on Phone</span>
+                <span>{t('siren.mute_phone')}</span>
               </>
             )}
           </button>
@@ -171,7 +173,7 @@ const EmergencySirenOverlay = ({ onNavigateToLighthouse }) => {
               className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md animate-pulse active:scale-95"
             >
               <BellRing size={16} />
-              <span>Tap to Blast</span>
+              <span>{t('siren.tap_to_blast')}</span>
             </button>
           )}
 
@@ -182,7 +184,7 @@ const EmergencySirenOverlay = ({ onNavigateToLighthouse }) => {
               className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition-all cursor-pointer border border-white/30"
               title="Open full rotating lighthouse beacon screen"
             >
-              <span>Lighthouse Beacon</span>
+              <span>{t('siren.lighthouse_beacon')}</span>
               <ExternalLink size={13} />
             </button>
           )}

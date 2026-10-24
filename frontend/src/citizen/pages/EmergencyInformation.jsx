@@ -48,13 +48,13 @@ const EmergencyInformation = () => {
       {/* 2. Offline Available Notice */}
       <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 dark:text-emerald-200 text-xs flex items-center gap-2 font-medium">
         <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
-        <span>This emergency guide and direct-call numbers remain fully accessible even when offline or disconnected.</span>
+        <span>{t('emergency.offline_available_notice')}</span>
       </div>
 
       {/* 3. Verified Emergency Directory */}
       <section aria-label="Official Coastal Emergency Helplines">
         <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-          Verified Maritime & Disaster Helplines:
+          {t('emergency.verified_helplines')}
         </h2>
         <EmergencyContactCard compact={false} />
       </section>
@@ -72,7 +72,7 @@ const EmergencyInformation = () => {
           <div className="p-4 sm:p-5 rounded-2xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/30">
             <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-2 mb-3">
               <CheckCircle2 size={18} className="text-emerald-500" />
-              <span>What to DO (Safety Actions)</span>
+              <span>{t('emergency.dos_title')}</span>
             </h3>
             <ul className="space-y-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
               {dos.map((item, idx) => (
@@ -88,7 +88,7 @@ const EmergencyInformation = () => {
           <div className="p-4 sm:p-5 rounded-2xl bg-red-500/5 dark:bg-red-950/20 border border-red-500/30">
             <h3 className="text-sm font-bold text-red-800 dark:text-red-300 uppercase tracking-wider flex items-center gap-2 mb-3">
               <XCircle size={18} className="text-red-500" />
-              <span>What NOT to DO (Danger Warnings)</span>
+              <span>{t('emergency.donts_title')}</span>
             </h3>
             <ul className="space-y-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
               {donts.map((item, idx) => (
@@ -107,10 +107,10 @@ const EmergencyInformation = () => {
       <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
         <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <Home size={18} className="text-sky-500" />
-          <span>Multipurpose Cyclone Shelters (MPCS)</span>
+          <span>{t('emergency.shelters_title')}</span>
         </h3>
         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-          Permanent coastal cyclone shelters are operated by District Disaster Management Authorities (DDMA) across coastal taluks. Contact your village administrative officer (VAO) or call <strong>1077</strong> to locate the nearest designated shelter point during evacuation orders.
+          {t('emergency.shelters_desc')}
         </p>
       </div>
 

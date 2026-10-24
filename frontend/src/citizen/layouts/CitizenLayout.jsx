@@ -102,10 +102,10 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
             <button
               onClick={() => onNavigate('/lighthouse')}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 text-xs font-bold transition-all cursor-pointer"
-              title="Open Coastal Lighthouse Siren Station (Mobile Terminal)"
+              title={t('app.lighthouse')}
             >
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="hidden xs:inline">Lighthouse</span>
+              <span className="hidden xs:inline">{t('app.lighthouse')}</span>
             </button>
 
             {/* Switch to Admin Portal Button */}
@@ -116,7 +116,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
                 title={t('app.switch_to_admin')}
               >
                 <Layers size={14} />
-                <span>Admin View</span>
+                <span>{t('app.admin_view')}</span>
               </button>
             )}
           </div>
