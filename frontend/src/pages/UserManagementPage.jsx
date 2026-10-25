@@ -354,16 +354,16 @@ const UserManagementPage = () => {
           <button
             type="button"
             onClick={() => setActiveSection('all')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeSection === 'all'
-                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
+                ? 'bg-slate-900 text-white dark:bg-slate-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Users size={14} />
             <span>All Users</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-              activeSection === 'all' ? 'bg-white/20 dark:bg-slate-900/20' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+              activeSection === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
             }`}>
               {stats.total}
             </span>
