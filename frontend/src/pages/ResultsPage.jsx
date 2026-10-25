@@ -11,7 +11,9 @@ import {
   AlertTriangle,
   BarChart4,
   Activity,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Map,
+  Navigation
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -174,13 +176,35 @@ const ResultsPage = ({
             Detailed results from the analyzed satellite image.
           </p>
         </div>
-        <button
-          onClick={() => setActiveTab('analyze')}
-          className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold text-xs sm:text-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto"
-        >
-          <span>New Analysis</span>
-          <ArrowRight size={14} />
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {isCyclone && currentAnalysis?.latitude != null && (
+            <>
+              <button
+                onClick={() => setActiveTab('map')}
+                className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/20"
+              >
+                <Map size={14} />
+                <span>View on Live Map ({currentAnalysis.latitude}°N, {currentAnalysis.longitude}°E)</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('prediction')}
+                className="px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-md shadow-purple-500/20"
+              >
+                <Navigation size={14} />
+                <span>5-Day Track</span>
+              </button>
+            </>
+          )}
+
+          <button
+            onClick={() => setActiveTab('analyze')}
+            className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold text-xs sm:text-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <span>New Analysis</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Coastal Early Warning & Citizen Broadcast Controller */}

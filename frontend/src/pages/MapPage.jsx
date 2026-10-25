@@ -11,7 +11,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Custom cyclone icon using divIcon
+// Custom cyclone icon using divIcon (Live GDACS storms)
 const cycloneIcon = new L.divIcon({
   html: `<div style="background-color: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.8); display: flex; align-items: center; justify-content: center;"><div style="background-color: white; width: 4px; height: 4px; border-radius: 50%;"></div></div>`,
   className: 'custom-cyclone-marker',
@@ -20,9 +20,26 @@ const cycloneIcon = new L.divIcon({
   popupAnchor: [0, -10]
 });
 
+// High-visibility Animated Radar Marker for AI Detected Cyclone
+const aiCycloneIcon = new L.divIcon({
+  html: `
+    <div style="position: relative; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;">
+      <div style="position: absolute; width: 46px; height: 46px; border-radius: 50%; background: rgba(239, 68, 68, 0.35); border: 2px solid #ef4444; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+      <div style="position: absolute; width: 28px; height: 28px; border-radius: 50%; background: rgba(220, 38, 38, 0.55); animation: pulse 1.5s ease-in-out infinite;"></div>
+      <div style="width: 20px; height: 20px; border-radius: 50%; background: #dc2626; border: 3px solid #ffffff; box-shadow: 0 0 14px rgba(220,38,38,0.95); display: flex; align-items: center; justify-content: center; z-index: 10;">
+        <div style="width: 5px; height: 5px; border-radius: 50%; background: #ffffff;"></div>
+      </div>
+    </div>
+  `,
+  className: 'ai-cyclone-radar-marker',
+  iconSize: [46, 46],
+  iconAnchor: [23, 23],
+  popupAnchor: [0, -23]
+});
+
 const API_URL = getApiBaseUrl();
 
-const MapPage = () => {
+const MapPage = ({ currentAnalysis }) => {
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('Updating');
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -30,6 +47,47 @@ const MapPage = () => {
   const abortControllerRef = useRef(null);
   const isFetchingRef = useRef(false);
   const mapRef = useRef(null);
+
+  // Compute AI Detected Cyclone from currentAnalysis
+  const isAiCyclone = currentAnalysis?.detection?.is_cyclone === true && currentAnalysis?.latitude != null && currentAnalysis?.longitude != null;
+  const aiLat = isAiCyclone ? parseFloat(currentAnalysis.latitude) : null;
+  const aiLng = isAiCyclone ? parseFloat(currentAnalysis.longitude) : null;
+
+  const aiCyclone = isAiCyclone ? {
+    id: `ai-detected-${currentAnalysis.id || 'active'}`,
+    name: currentAnalysis.fileName 
+      ? `Cyclone ${currentAnalysis.fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ')}` 
+      : 'AI Detected Tropical Cyclone',
+    latitude: aiLat,
+    longitude: aiLng,
+    wind_speed: currentAnalysis.intensity?.wind_speed_kmh != null 
+      ? currentAnalysis.intensity.wind_speed_kmh 
+      : (currentAnalysis.intensity?.wind_speed_kt ? Math.round(currentAnalysis.intensity.wind_speed_kt * 1.852) : 120),
+    wind_kt: currentAnalysis.intensity?.wind_speed_kt || (currentAnalysis.intensity?.wind_speed_kmh ? Math.round(currentAnalysis.intensity.wind_speed_kmh / 1.852) : 65),
+    status: currentAnalysis.classification?.classification || currentAnalysis.intensity?.classification || 'Severe Cyclonic Storm',
+    category_desc: currentAnalysis.classification?.description || 'Detected via Satellite AI Analysis',
+    subbasin: currentAnalysis.subbasin || (aiLng >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea'),
+    isAiDetected: true,
+    imagePreview: currentAnalysis.imagePreview,
+    coordMethod: currentAnalysis.coordMethod || 'Auto-Extracted from Image',
+    last_updated: 'Current AI Analysis'
+  } : null;
+
+  // Auto-center map on AI Detected Cyclone
+  useEffect(() => {
+    if (aiCyclone && mapRef.current) {
+      const timer = setTimeout(() => {
+        try {
+          mapRef.current?.flyTo([aiCyclone.latitude, aiCyclone.longitude], 6, {
+            duration: 1.5
+          });
+        } catch (e) {
+          console.warn('Map flyTo notice:', e);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [aiCyclone?.latitude, aiCyclone?.longitude]);
 
   const fetchLiveCyclones = async () => {
     if (isFetchingRef.current) return;
@@ -52,7 +110,6 @@ const MapPage = () => {
       
       const jsonData = await response.json();
       
-      // Only update state if data changed (compare stringified data to avoid unnecessary renders)
       setData(prev => {
         if (JSON.stringify(prev) !== JSON.stringify(jsonData)) {
           return jsonData;
@@ -74,14 +131,8 @@ const MapPage = () => {
   };
 
   useEffect(() => {
-    // Initial fetch
     fetchLiveCyclones();
-    
-    // Polling every 1 second
-    const interval = setInterval(() => {
-      fetchLiveCyclones();
-    }, 1000);
-    
+    const interval = setInterval(fetchLiveCyclones, 5000);
     return () => {
       clearInterval(interval);
       if (abortControllerRef.current) {
@@ -177,6 +228,47 @@ const MapPage = () => {
                 />
               </LayersControl.BaseLayer>
             </LayersControl>
+            {/* AI Detected Cyclone from Satellite Analysis */}
+            {aiCyclone && (
+              <Marker 
+                key={aiCyclone.id} 
+                position={[aiCyclone.latitude, aiCyclone.longitude]}
+                icon={aiCycloneIcon}
+              >
+                <Popup className="custom-popup" autoPan={true}>
+                  <div className="p-1 min-w-[210px]">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white animate-pulse shadow-sm">
+                        AI DETECTED CYCLONE
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-2">{aiCyclone.name}</h4>
+                    <div className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                      <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                        <span className="font-semibold text-slate-500">Coordinates:</span>
+                        <span className="font-black text-red-500">{aiCyclone.latitude}°N, {aiCyclone.longitude}°E</span>
+                      </p>
+                      <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                        <span className="font-semibold text-slate-500">Basin:</span>
+                        <span className="font-bold">{aiCyclone.subbasin}</span>
+                      </p>
+                      <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                        <span className="font-semibold text-slate-500">Classification:</span>
+                        <span className="font-bold text-amber-500">{aiCyclone.status}</span>
+                      </p>
+                      <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                        <span className="font-semibold text-slate-500">Wind Speed:</span>
+                        <span className="font-bold text-red-600">{aiCyclone.wind_speed} km/h ({aiCyclone.wind_kt} kt)</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400 pt-1">
+                        Detection: {aiCyclone.coordMethod}
+                      </p>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
+
             {cyclones.map((cyclone) => (
               <Marker 
                 key={cyclone.id} 
@@ -217,8 +309,13 @@ const MapPage = () => {
             <div className="space-y-4">
               <div>
                 <span className="text-xs font-medium text-slate-500 block mb-1">Active Cyclones</span>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-200">
-                  {cyclones.length}
+                <div className="text-xl font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <span>{(aiCyclone ? 1 : 0) + cyclones.length}</span>
+                  {aiCyclone && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+                      1 AI Detected
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -227,7 +324,7 @@ const MapPage = () => {
                   <Clock size={12} /> Last Data Update
                 </span>
                 <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  {data?.updated_at ? new Date(data.updated_at).toLocaleString() : '-'}
+                  {aiCyclone ? 'Real-time AI Model & Live Feeds' : (data?.updated_at ? new Date(data.updated_at).toLocaleString() : '-')}
                 </div>
               </div>
 
@@ -236,7 +333,7 @@ const MapPage = () => {
                   <Database size={12} /> Data Source
                 </span>
                 <div className="text-sm font-medium text-slate-700 dark:text-slate-300 break-words">
-                  {data?.source || '-'}
+                  {aiCyclone ? 'CycloSafe AI Neural Network + GDACS' : (data?.source || '-')}
                 </div>
               </div>
 
@@ -251,29 +348,58 @@ const MapPage = () => {
           </div>
           
           <div className="bg-slate-100/50 dark:bg-slate-800/30 rounded-xl border border-slate-200/50 dark:border-slate-700/50 p-5 flex-1 overflow-hidden flex flex-col">
-            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 mb-3 uppercase tracking-wider text-slate-500">
-              Active Events
+            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 mb-3 uppercase tracking-wider text-slate-500 flex items-center justify-between">
+              <span>Active Events</span>
+              <span className="text-[10px] font-normal text-slate-400">{(aiCyclone ? 1 : 0) + cyclones.length} Monitored</span>
             </h3>
-            {cyclones.length === 0 ? (
-              <p className="text-sm text-slate-500 italic">Currently no active cyclone data available.</p>
-            ) : (
-              <div className="space-y-3 overflow-y-auto flex-1 pr-1 custom-scrollbar">
-                {cyclones.map(cyc => (
-                  <div key={cyc.id} className="bg-white dark:bg-[#1e293b] p-3 rounded-lg border border-slate-200/50 dark:border-slate-700/50 shadow-sm cursor-pointer hover:border-sky-300 transition-colors"
-                       onClick={() => {
-                         if (mapRef.current) {
-                           mapRef.current.flyTo([cyc.latitude, cyc.longitude], 6);
-                         }
-                       }}>
-                    <div className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">{cyc.name}</div>
-                    <div className="text-xs text-slate-500 flex justify-between">
-                      <span>{cyc.latitude}°, {cyc.longitude}°</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">{cyc.status}</span>
-                    </div>
+
+            <div className="space-y-3 overflow-y-auto flex-1 pr-1 custom-scrollbar">
+              {/* Highlight AI Detected Cyclone */}
+              {aiCyclone && (
+                <div 
+                  className="p-3 rounded-lg bg-red-500/10 border-2 border-red-500/40 shadow-sm cursor-pointer hover:border-red-400 transition-all select-none group"
+                  onClick={() => {
+                    if (mapRef.current) {
+                      mapRef.current.flyTo([aiCyclone.latitude, aiCyclone.longitude], 7);
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-600 text-white shadow-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                      AI DETECTED
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-400">
+                      FOCUS MAP &rarr;
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-1">{aiCyclone.name}</div>
+                  <div className="text-xs text-slate-500 flex justify-between font-semibold">
+                    <span className="text-red-500 font-bold">{aiCyclone.latitude}°N, {aiCyclone.longitude}°E</span>
+                    <span className="text-amber-500">{aiCyclone.status}</span>
+                  </div>
+                </div>
+              )}
+
+              {cyclones.map(cyc => (
+                <div key={cyc.id} className="bg-white dark:bg-[#1e293b] p-3 rounded-lg border border-slate-200/50 dark:border-slate-700/50 shadow-sm cursor-pointer hover:border-sky-300 transition-colors"
+                     onClick={() => {
+                       if (mapRef.current) {
+                         mapRef.current.flyTo([cyc.latitude, cyc.longitude], 6);
+                       }
+                     }}>
+                  <div className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">{cyc.name}</div>
+                  <div className="text-xs text-slate-500 flex justify-between">
+                    <span>{cyc.latitude}°, {cyc.longitude}°</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">{cyc.status}</span>
+                  </div>
+                </div>
+              ))}
+
+              {!aiCyclone && cyclones.length === 0 && (
+                <p className="text-sm text-slate-500 italic">Currently no active cyclone data available.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>

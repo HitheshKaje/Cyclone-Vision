@@ -21,7 +21,10 @@ import {
   Eye,
   Compass,
   MapPin,
-  Crosshair
+  Crosshair,
+  Map,
+  Navigation,
+  Radio
 } from 'lucide-react';
 
 import CoastalBroadcastControl from '../components/CoastalBroadcastControl';
@@ -58,7 +61,7 @@ const AnalyzePage = ({
   const [isExtractingCoords, setIsExtractingCoords] = useState(false);
 
   const extractCoordinatesFromImage = async (selectedFile) => {
-    if (!selectedFile) return;
+    if (!selectedFile) return { lat: '15.40', lon: '86.20', basin: 'Bay of Bengal', method: 'Default', hasRadius: false };
     setIsExtractingCoords(true);
     try {
       const apiBase = getApiBaseUrl();
@@ -71,22 +74,18 @@ const AnalyzePage = ({
       if (res.ok) {
         const data = await res.json();
         if (data.latitude != null && data.longitude != null) {
-          setLatitude(Number(data.latitude).toFixed(2));
-          setLongitude(Number(data.longitude).toFixed(2));
-          setCoordSubbasin(data.subbasin || (data.longitude >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea'));
-          setCoordMethod(data.detection_method || 'Auto-Extracted from Image');
-          setHasRadiusLines(Boolean(data.has_radius_lines));
+          const latStr = Number(data.latitude).toFixed(2);
+          const lonStr = Number(data.longitude).toFixed(2);
+          const basinStr = data.subbasin || (data.longitude >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea');
+          const methodStr = data.detection_method || 'Auto-Extracted from Image';
+          const hasR = Boolean(data.has_radius_lines);
+          setLatitude(latStr);
+          setLongitude(lonStr);
+          setCoordSubbasin(basinStr);
+          setCoordMethod(methodStr);
+          setHasRadiusLines(hasR);
           setCoordConfidence(data.confidence_percent || 90);
-          if (data.center_pixel && data.image_dimensions) {
-            const pctX = Math.round((data.center_pixel.x / data.image_dimensions.width) * 100);
-            const pctY = Math.round((data.center_pixel.y / data.image_dimensions.height) * 100);
-            setCenterMarker({ 
-              pctX: Math.max(8, Math.min(92, pctX)), 
-              pctY: Math.max(8, Math.min(92, pctY)) 
-            });
-          } else {
-            setCenterMarker({ pctX: 50, pctY: 50 });
-          }
+          return { lat: latStr, lon: lonStr, basin: basinStr, method: methodStr, hasRadius: hasR };
         }
       }
     } catch (err) {
@@ -94,6 +93,40 @@ const AnalyzePage = ({
     } finally {
       setIsExtractingCoords(false);
     }
+    return { lat: '15.40', lon: '86.20', basin: 'Bay of Bengal', method: 'Default Centroid', hasRadius: false };
+  };
+
+  const handleUpdateCoordinates = (newLat, newLon, presetName = null) => {
+    setLatitude(newLat);
+    setLongitude(newLon);
+    const num = parseFloat(newLon);
+    const subbasin = !isNaN(num) ? (num >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea') : coordSubbasin;
+    setCoordSubbasin(subbasin);
+    const methodStr = presetName ? `Preset: ${presetName}` : 'Custom Coordinates Confirmed';
+    setCoordMethod(methodStr);
+
+    // Synchronize with currentAnalysis state so Live Map & Broadcast update immediately
+    setCurrentAnalysis(prev => prev ? ({
+      ...prev,
+      latitude: parseFloat(newLat) || prev.latitude,
+      longitude: parseFloat(newLon) || prev.longitude,
+      subbasin: subbasin,
+      coordMethod: methodStr
+    }) : prev);
+
+    // Synchronize history
+    setAnalysisHistory(prev => prev.map(rec => {
+      if (rec.id === currentAnalysis?.id) {
+        return {
+          ...rec,
+          latitude: parseFloat(newLat) || rec.latitude,
+          longitude: parseFloat(newLon) || rec.longitude,
+          subbasin: subbasin,
+          coordMethod: methodStr
+        };
+      }
+      return rec;
+    }));
   };
 
   const loadSampleImage = async (url, filename) => {
@@ -124,9 +157,6 @@ const AnalyzePage = ({
       setPreviewUrl(e.target.result);
     };
     reader.readAsDataURL(selectedFile);
-
-    // Automatically extract latitude & longitude from radius lines / grid
-    extractCoordinatesFromImage(selectedFile);
   };
 
   const handleFileChange = (e) => {
@@ -227,10 +257,27 @@ const AnalyzePage = ({
 
       let intensityData = null;
       let classificationData = null;
+      let extractedCoords = null;
 
-      // Step 2 & 3: Run Objective 2 & 3 ONLY if Cyclone is detected
+      // Step 2 & 3: Run Objective 2 & 3 and Coordinate Extraction ONLY if Cyclone is detected
       if (detectData.is_cyclone) {
         setCurrentStage('Intensity');
+
+        // Cyclone confirmed! Now auto-extract coordinates from concentric radius lines / storm eye
+        try {
+          const autoCoords = await extractCoordinatesFromImage(file);
+          if (autoCoords) {
+            extractedCoords = autoCoords;
+            setLatitude(autoCoords.lat);
+            setLongitude(autoCoords.lon);
+            setCoordSubbasin(autoCoords.basin);
+            setCoordMethod(autoCoords.method);
+            setHasRadiusLines(Boolean(autoCoords.hasRadius));
+            setCoordConfidence(autoCoords.confidence || 92);
+          }
+        } catch (cErr) {
+          console.warn('Coordinate auto-extraction fallback:', cErr);
+        }
 
         const intensityFormData = new FormData();
         intensityFormData.append('image', file);
@@ -261,6 +308,10 @@ const AnalyzePage = ({
       setCurrentStage('Completed');
       setAnalysisStatus('completed');
 
+      const finalLat = extractedCoords ? parseFloat(extractedCoords.lat) : (detectData.is_cyclone ? (parseFloat(latitude) || 15.40) : null);
+      const finalLon = extractedCoords ? parseFloat(extractedCoords.lon) : (detectData.is_cyclone ? (parseFloat(longitude) || 86.20) : null);
+      const finalSubbasin = extractedCoords?.basin || (finalLon != null ? (finalLon >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea') : null);
+
       const analysisRecord = {
         id: Date.now().toString(),
         fileName: file.name,
@@ -269,12 +320,12 @@ const AnalyzePage = ({
         detection: detectData,
         intensity: intensityData,
         classification: classificationData,
-        latitude: parseFloat(latitude) || 15.40,
-        longitude: parseFloat(longitude) || 86.20,
-        subbasin: coordSubbasin || (parseFloat(longitude) >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea'),
-        hasRadiusLines: hasRadiusLines,
-        coordMethod: coordMethod || 'Auto-Extracted from Image',
-        coordConfidence: coordConfidence,
+        latitude: finalLat,
+        longitude: finalLon,
+        subbasin: finalSubbasin,
+        hasRadiusLines: extractedCoords?.hasRadius || false,
+        coordMethod: extractedCoords?.method || (detectData.is_cyclone ? 'Auto-Extracted from Image' : null),
+        coordConfidence: extractedCoords?.confidence || (detectData.is_cyclone ? 92 : null),
         timestamp: new Date().toLocaleString([], {
           year: 'numeric',
           month: 'short',
@@ -384,40 +435,15 @@ const AnalyzePage = ({
               ) : (
                 /* Preview Container */
                 <div className="space-y-4">
-                  {/* Image Preview with Interactive Pin Placement */}
+                  {/* Clean Image Preview (No pre-detection crosshairs or premature coordinate boxes) */}
                   <div 
-                    ref={imageContainerRef}
-                    onClick={handleImageClick}
-                    className="min-h-[300px] rounded-xl overflow-hidden relative border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 flex items-center justify-center p-2 cursor-crosshair group select-none"
-                    title="Click anywhere on the image to place the cyclone coordinate center"
+                    className="min-h-[300px] rounded-xl overflow-hidden relative border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 flex items-center justify-center p-2 select-none"
                   >
                     <img
                       src={previewUrl}
                       alt="Uploaded"
                       className="max-h-[400px] w-full object-contain pointer-events-none select-none"
                     />
-
-                    {/* Visual Retargeting Pin / Radius Lines Marker */}
-                    {centerMarker && (
-                      <div 
-                        className="absolute pointer-events-none transition-all duration-300 z-10"
-                        style={{
-                          left: `${centerMarker.pctX}%`,
-                          top: `${centerMarker.pctY}%`,
-                          transform: 'translate(-50%, -50%)'
-                        }}
-                      >
-                        <div className="relative flex items-center justify-center">
-                          <span className="animate-ping absolute inline-flex h-8 w-8 rounded-full bg-emerald-400 opacity-60"></span>
-                          <div className="w-6 h-6 rounded-full border-2 border-emerald-400 bg-emerald-500/40 flex items-center justify-center shadow-lg backdrop-blur-xs">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-300"></div>
-                          </div>
-                        </div>
-                        <div className="absolute top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900/90 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-500/40 shadow-md">
-                          {latitude}°N, {longitude}°E
-                        </div>
-                      </div>
-                    )}
 
                     {!isAnalyzing && (
                       <div className="absolute top-4 right-4 z-20">
@@ -434,158 +460,6 @@ const AnalyzePage = ({
                         </button>
                       </div>
                     )}
-                  </div>
-
-                  {/* Cyclone Location & Coordinates Panel */}
-                  <div className="rounded-xl border border-sky-500/30 bg-slate-50/70 dark:bg-slate-900/70 p-4 space-y-3.5 backdrop-blur-sm shadow-md">
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-200/60 dark:border-slate-800">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-sky-500/20 text-sky-400 shrink-0">
-                          <Compass size={18} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
-                            Cyclone Geographical Coordinates
-                            {isExtractingCoords ? (
-                              <span className="text-[11px] font-semibold text-sky-400 flex items-center gap-1">
-                                <Loader2 size={12} className="animate-spin" /> Scanning radius lines...
-                              </span>
-                            ) : hasRadiusLines ? (
-                              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                                <Sparkles size={11} /> Radius Lines Detected
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                                {coordMethod || 'Position Estimated'}
-                              </span>
-                            )}
-                          </h4>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            {hasRadiusLines 
-                              ? 'Concentric radius lines / graticule detected from satellite image. Coordinates extracted automatically.'
-                              : 'Auto-extracted coordinates. You can type custom values, pick a preset, or click on the image to reposition.'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Basin Badge */}
-                      <div className="self-start sm:self-center shrink-0">
-                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
-                          coordSubbasin === 'Bay of Bengal'
-                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                            : 'bg-teal-500/10 text-teal-400 border-teal-500/30'
-                        }`}>
-                          Basin: {coordSubbasin}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Coordinate Input Fields */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1">
-                            <MapPin size={13} className="text-emerald-500" /> Latitude (°N)
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-normal">North Indian Ocean (5° - 26°N)</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="5.0"
-                            max="30.0"
-                            value={latitude}
-                            onChange={(e) => {
-                              setLatitude(e.target.value);
-                              setCoordMethod('Custom Coordinates');
-                            }}
-                            disabled={isExtractingCoords || isAnalyzing}
-                            placeholder="e.g. 15.40"
-                            className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
-                            °N
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1">
-                            <MapPin size={13} className="text-sky-400" /> Longitude (°E)
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-normal">Arabian Sea / Bay of Bengal (62° - 94°E)</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="60.0"
-                            max="98.0"
-                            value={longitude}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setLongitude(val);
-                              const num = parseFloat(val);
-                              if (!isNaN(num)) {
-                                setCoordSubbasin(num >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea');
-                              }
-                              setCoordMethod('Custom Coordinates');
-                            }}
-                            disabled={isExtractingCoords || isAnalyzing}
-                            placeholder="e.g. 86.20"
-                            className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
-                            °E
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quick Location Presets */}
-                    <div className="pt-1">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                          Quick Basin Presets:
-                        </span>
-                        {centerMarker && (
-                          <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
-                            <Crosshair size={11} /> Retarget pin active on image preview
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          { name: 'Bay of Bengal (Central)', lat: '15.20', lon: '86.40', basin: 'Bay of Bengal', pctX: 76, pctY: 51 },
-                          { name: 'Odisha Coast', lat: '18.80', lon: '85.60', basin: 'Bay of Bengal', pctX: 73, pctY: 34 },
-                          { name: 'Arabian Sea (Central)', lat: '15.50', lon: '68.50', basin: 'Arabian Sea', pctX: 20, pctY: 50 },
-                          { name: 'Gujarat Coast', lat: '20.90', lon: '69.40', basin: 'Arabian Sea', pctX: 23, pctY: 24 }
-                        ].map((p, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              setLatitude(p.lat);
-                              setLongitude(p.lon);
-                              setCoordSubbasin(p.basin);
-                              setCoordMethod(`Preset: ${p.name}`);
-                              setHasRadiusLines(false);
-                              setCenterMarker({ pctX: p.pctX, pctY: p.pctY });
-                            }}
-                            className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer border ${
-                              latitude === p.lat && longitude === p.lon
-                                ? 'bg-sky-500 text-slate-900 font-bold border-sky-400 shadow-sm'
-                                : 'bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-400 hover:text-sky-400'
-                            }`}
-                          >
-                            {p.name} ({p.lat}°N, {p.lon}°E)
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </div>
 
                   <div className="flex gap-3">
@@ -723,35 +597,193 @@ const AnalyzePage = ({
                 </div>
               </div>
 
-              {/* Completed Callout */}
+              {/* Post-Detection Section */}
               {isCompleted && (
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 pt-3">
-                  <div className="flex items-center gap-2.5">
-                    <CheckCircle2 size={20} className="text-emerald-500 shrink-0" />
-                    <div>
-                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
-                        Analysis completed successfully
-                      </p>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                        Detailed predictions are ready for inspection across all objectives.
-                      </p>
+                <div className="space-y-4 pt-1">
+                  {currentAnalysis?.detection?.is_cyclone ? (
+                    /* Cyclone Confirmed: Show Geographical Coordinates Confirmation & Direct Navigation */
+                    <div className="rounded-2xl border-2 border-emerald-500/40 bg-gradient-to-b from-slate-900/90 to-[#0b1329] p-5 space-y-4 shadow-xl text-white">
+                      {/* Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-700/60">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30">
+                            <Compass size={22} className="animate-pulse" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-base font-black tracking-tight text-white">
+                                Cyclone Detected — Geographical Coordinates & Location
+                              </h3>
+                              {hasRadiusLines ? (
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1 shadow-sm">
+                                  <Sparkles size={11} /> Radius Lines Auto-Extracted
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                                  {coordMethod || 'Location Auto-Detected'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-300 mt-0.5">
+                              {hasRadiusLines
+                                ? 'Concentric radius range rings & storm eye detected. Coordinates extracted from satellite image.'
+                                : 'Coordinates auto-calculated from satellite vortex center. You can verify or fine-tune before viewing on the Live Map or alerting citizens.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Basin Badge */}
+                        <div className="shrink-0 self-start sm:self-center">
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                            coordSubbasin === 'Bay of Bengal'
+                              ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                              : 'bg-teal-500/20 text-teal-300 border-teal-500/40'
+                          }`}>
+                            Basin: {coordSubbasin || 'North Indian Ocean'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Coordinate Inputs (Editable after detection) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-200 mb-1 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <MapPin size={14} className="text-emerald-400" /> Latitude (°N)
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">North Indian Ocean (5° - 26°N)</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="5.0"
+                              max="30.0"
+                              value={latitude}
+                              onChange={(e) => handleUpdateCoordinates(e.target.value, longitude)}
+                              placeholder="e.g. 15.40"
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors"
+                            />
+                            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">
+                              °N
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-200 mb-1 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <MapPin size={14} className="text-sky-400" /> Longitude (°E)
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">Arabian Sea / Bay of Bengal (62° - 94°E)</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="60.0"
+                              max="98.0"
+                              value={longitude}
+                              onChange={(e) => handleUpdateCoordinates(latitude, e.target.value)}
+                              placeholder="e.g. 86.20"
+                              className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition-colors"
+                            />
+                            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">
+                              °E
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Location Presets */}
+                      <div className="pt-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                          Quick Presets:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            { name: 'Bay of Bengal (Central)', lat: '15.20', lon: '86.40' },
+                            { name: 'Odisha Coast', lat: '18.80', lon: '85.60' },
+                            { name: 'Arabian Sea (Central)', lat: '15.50', lon: '68.50' },
+                            { name: 'Gujarat Coast', lat: '20.90', lon: '69.40' }
+                          ].map((p, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleUpdateCoordinates(p.lat, p.lon, p.name)}
+                              className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer border ${
+                                latitude === p.lat && longitude === p.lon
+                                  ? 'bg-emerald-500 text-slate-900 font-black border-emerald-400 shadow-md'
+                                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-emerald-400 hover:text-emerald-300'
+                              }`}
+                            >
+                              {p.name} ({p.lat}°N, {p.lon}°E)
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Direct Action Hub */}
+                      <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('map')}
+                          className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-600/30 transition-all cursor-pointer active:scale-95"
+                        >
+                          <Map size={17} />
+                          <span>View on Live Cyclone Map ({latitude}°N, {longitude}°E)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('prediction')}
+                          className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer active:scale-95"
+                        >
+                          <Navigation size={17} />
+                          <span>5-Day Track Prediction</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('results')}
+                          className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0"
+                        >
+                          <span>Full Report</span>
+                          <ArrowRight size={15} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* Clear Weather / No Cyclone */
+                    <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <CheckCircle2 size={20} className="text-emerald-500 shrink-0" />
+                        <div>
+                          <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                            Clear Weather / Normal Sea Observed
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            No tropical cyclonic system detected. Coastal maritime operations are safe.
+                          </p>
+                        </div>
+                      </div>
 
-                  <button
-                    onClick={() => setActiveTab('results')}
-                    className="px-5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold text-xs sm:text-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20 shrink-0"
-                  >
-                    <span>View Report</span>
-                    <ArrowRight size={16} />
-                  </button>
-                </div>
-              )}
+                      <button
+                        onClick={() => setActiveTab('results')}
+                        className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                      >
+                        <span>View Report</span>
+                        <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  )}
 
-              {/* Coastal Early Warning & Siren Broadcast Control */}
-              {isCompleted && currentAnalysis && (
-                <div className="pt-2">
-                  <CoastalBroadcastControl currentAnalysis={currentAnalysis} />
+                  {/* Coastal Early Warning & Citizen Siren Broadcast Control */}
+                  {currentAnalysis && (
+                    <div className="pt-2">
+                      <CoastalBroadcastControl currentAnalysis={currentAnalysis} />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

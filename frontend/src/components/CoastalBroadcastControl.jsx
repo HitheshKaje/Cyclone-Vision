@@ -48,6 +48,10 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
   const confidence = currentAnalysis?.detection?.confidence_percent || 95.0;
   const fileName = currentAnalysis?.fileName || 'Satellite_Observation_Scan';
 
+  const cycloneLat = currentAnalysis?.latitude != null ? parseFloat(currentAnalysis.latitude) : 15.4;
+  const cycloneLng = currentAnalysis?.longitude != null ? parseFloat(currentAnalysis.longitude) : 86.2;
+  const subbasin = currentAnalysis?.subbasin || (cycloneLng >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea');
+
   const cycloneName = `Cyclone ${fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ')}`;
 
   // Handle publishing analysis to citizen portal
@@ -67,15 +71,16 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
       siren_active: isCyclone ? includeSirenOnPublish : false,
       area: selectedArea,
       message: isCyclone
-        ? `AI detection confirmed ${classification} cyclonic system with peak sustained winds of ${windKmh} km/h (${windKt} kt). High sea swells and severe coastal winds expected.`
+        ? `AI detection confirmed ${classification} cyclonic disturbance centered at ${cycloneLat.toFixed(2)}°N, ${cycloneLng.toFixed(2)}°E (${subbasin}) with peak sustained winds of ${windKmh} km/h (${windKt} kt). High sea swells and severe coastal winds expected.`
         : 'Satellite analysis confirmed clear coastal waters. Normal operations permitted.',
       fishermen_directive: isCyclone
         ? (level === 'RED' 
             ? 'RED ALERT: Strict ban on all fishing vessels. Boats at sea must return to harbor immediately.' 
             : 'CAUTION: Fishermen in deep sea waters advised to exercise vigilance and stay near port.')
         : 'Regular fishing operations permitted. Check standard harbor flags.',
-      lat: 14.8,
-      lng: 73.8
+      lat: cycloneLat,
+      lng: cycloneLng,
+      subbasin: subbasin
     };
 
     const res = await publishCitizenBroadcast(payload);
@@ -234,10 +239,14 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
         <span className="font-bold uppercase tracking-wider text-slate-400 block mb-1.5 text-[10px]">
           Data to be published from current image analysis:
         </span>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-200 font-medium">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-200 font-medium">
           <div>
             <span className="text-slate-400 block text-[11px]">Detection:</span>
             <span className="font-bold text-white">{isCyclone ? 'CYCLONE DETECTED' : 'NO CYCLONE'}</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[11px]">Location Coordinates:</span>
+            <span className="font-black text-sky-400">{cycloneLat.toFixed(2)}°N, {cycloneLng.toFixed(2)}°E</span>
           </div>
           <div>
             <span className="text-slate-400 block text-[11px]">Intensity:</span>
