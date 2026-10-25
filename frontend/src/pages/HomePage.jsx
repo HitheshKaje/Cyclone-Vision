@@ -29,7 +29,7 @@ const HomePage = ({
     <div className="space-y-8 pb-10">
       
       {/* 1. Welcome Header */}
-      <div className="relative overflow-hidden rounded-2xl p-8 mt-2 border border-slate-200 dark:border-slate-800 bg-gradient-to-r from-sky-50 via-white to-emerald-50 dark:from-[#0f172a] dark:to-[#1e293b] shadow-xs">
+      <div className="relative overflow-hidden rounded-2xl p-8 mt-2 border border-slate-200 dark:border-slate-800 bg-gradient-to-r from-sky-50 via-white to-emerald-50 dark:from-[#0f172a] dark:via-slate-900 dark:to-[#1e293b] shadow-xs">
         {/* Subtle background glow */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-[100px] pointer-events-none" />
         

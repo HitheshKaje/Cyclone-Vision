@@ -605,7 +605,7 @@ const LogsPage = ({ currentAnalysis, analysisHistory = [], setActiveTab }) => {
               </button>
               <button
                 onClick={() => setSelectedPayload(null)}
-                className="px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold rounded-xl text-xs hover:opacity-90 cursor-pointer"
+                className="px-4 py-2 bg-slate-900 dark:bg-slate-800 text-white font-bold rounded-xl text-xs hover:opacity-90 cursor-pointer border border-transparent dark:border-slate-700"
               >
                 Close
               </button>
