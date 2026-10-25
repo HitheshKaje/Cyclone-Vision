@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   TrendingUp, Navigation, Compass, AlertTriangle, 
   Clock, Shield, Activity, RefreshCw, Info, CheckCircle2,
-  Calendar, Layers, MapPin, BarChart3
+  Calendar, Layers, MapPin, BarChart3, Map, Eye, Waves
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -71,6 +71,7 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
   const [error, setError] = useState(null);
   const [comparativeMetrics, setComparativeMetrics] = useState(null);
   const [showMetricsModal, setShowMetricsModal] = useState(false);
+  const [activeMapLayer, setActiveMapLayer] = useState('satellite'); // Default to satellite view or standard
 
   const API_URL = getApiBaseUrl();
 
@@ -351,6 +352,52 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
 
         {/* Map Container */}
         <div className="h-[480px] sm:h-[540px] w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative z-0 shadow-inner">
+          
+          {/* Floating Map Layer Switcher: Street / Satellite / Ocean */}
+          <div className="absolute top-3 right-3 z-[400] flex items-center p-1 rounded-xl bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-slate-700 shadow-md backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => setActiveMapLayer('standard')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeMapLayer === 'standard'
+                  ? 'bg-sky-500 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title="Standard Street / Topo Map"
+            >
+              <Map size={14} />
+              <span>Street Map</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMapLayer('satellite')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeMapLayer === 'satellite'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title="Esri High-Resolution Satellite Imagery"
+            >
+              <Eye size={14} />
+              <span>🛰️ Satellite View</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMapLayer('ocean')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeMapLayer === 'ocean'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title="Ocean / Maritime Nautical View"
+            >
+              <Waves size={14} />
+              <span>Ocean / Maritime</span>
+            </button>
+          </div>
+
           <MapContainer
             center={currentPos}
             zoom={5}
@@ -359,10 +406,33 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
           >
             <ChangeView center={currentPos} zoom={5} />
 
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
+            {/* Base Tile Layer based on active selection */}
+            {activeMapLayer === 'standard' && (
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+            )}
+
+            {activeMapLayer === 'satellite' && (
+              <>
+                <TileLayer
+                  attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                />
+                <TileLayer
+                  attribution='Labels &copy; Esri &mdash; National Geographic, Esri, DeLorme, NAVTEQ, NOAA'
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+                />
+              </>
+            )}
+
+            {activeMapLayer === 'ocean' && (
+              <TileLayer
+                attribution='Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, NAVTEQ, and Esri'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
+              />
+            )}
 
             {/* A. Past Observed Track Polyline (Solid Cyan) */}
             {observedTrackCoords.length > 1 && (
