@@ -1,0 +1,135 @@
+{
+  "title": "CycloSafe Track Prediction Comparative Study",
+  "dataset": "NOAA IBTrACS v04r01 (North Indian Ocean Basin)",
+  "training_environment": "Local CPU (Optimized)",
+  "training_time_seconds": 70.76,
+  "test_sequences": 1162,
+  "comparative_metrics": {
+    "kinematic_baseline": {
+      "24h": {
+        "forecast_horizon_hours": 24,
+        "mean_distance_error_km": 148.1,
+        "median_distance_error_km": 117.9,
+        "p90_distance_error_km": 300.5,
+        "mae_lat_deg": 0.71,
+        "mae_lon_deg": 1.04
+      },
+      "48h": {
+        "forecast_horizon_hours": 48,
+        "mean_distance_error_km": 363.0,
+        "median_distance_error_km": 305.5,
+        "p90_distance_error_km": 693.4,
+        "mae_lat_deg": 1.67,
+        "mae_lon_deg": 2.65
+      },
+      "72h": {
+        "forecast_horizon_hours": 72,
+        "mean_distance_error_km": 604.5,
+        "median_distance_error_km": 520.4,
+        "p90_distance_error_km": 1092.4,
+        "mae_lat_deg": 2.79,
+        "mae_lon_deg": 4.43
+      },
+      "96h": {
+        "forecast_horizon_hours": 96,
+        "mean_distance_error_km": 860.6,
+        "median_distance_error_km": 751.6,
+        "p90_distance_error_km": 1564.6,
+        "mae_lat_deg": 4.0,
+        "mae_lon_deg": 6.3
+      },
+      "120h": {
+        "forecast_horizon_hours": 120,
+        "mean_distance_error_km": 1122.4,
+        "median_distance_error_km": 969.9,
+        "p90_distance_error_km": 2046.0,
+        "mae_lat_deg": 5.29,
+        "mae_lon_deg": 8.2
+      }
+    },
+    "gru": {
+      "24h": {
+        "forecast_horizon_hours": 24,
+        "mean_distance_error_km": 141.5,
+        "median_distance_error_km": 116.6,
+        "p90_distance_error_km": 269.5,
+        "mae_lat_deg": 0.69,
+        "mae_lon_deg": 0.98
+      },
+      "48h": {
+        "forecast_horizon_hours": 48,
+        "mean_distance_error_km": 269.4,
+        "median_distance_error_km": 233.2,
+        "p90_distance_error_km": 505.8,
+        "mae_lat_deg": 1.25,
+        "mae_lon_deg": 1.93
+      },
+      "72h": {
+        "forecast_horizon_hours": 72,
+        "mean_distance_error_km": 363.6,
+        "median_distance_error_km": 312.4,
+        "p90_distance_error_km": 645.8,
+        "mae_lat_deg": 1.69,
+        "mae_lon_deg": 2.61
+      },
+      "96h": {
+        "forecast_horizon_hours": 96,
+        "mean_distance_error_km": 423.8,
+        "median_distance_error_km": 361.3,
+        "p90_distance_error_km": 791.7,
+        "mae_lat_deg": 2.0,
+        "mae_lon_deg": 3.01
+      },
+      "120h": {
+        "forecast_horizon_hours": 120,
+        "mean_distance_error_km": 462.2,
+        "median_distance_error_km": 382.2,
+        "p90_distance_error_km": 872.3,
+        "mae_lat_deg": 2.2,
+        "mae_lon_deg": 3.26
+      }
+    },
+    "bilstm": {
+      "24h": {
+        "forecast_horizon_hours": 24,
+        "mean_distance_error_km": 135.1,
+        "median_distance_error_km": 111.2,
+        "p90_distance_error_km": 257.9,
+        "mae_lat_deg": 0.62,
+        "mae_lon_deg": 0.98
+      },
+      "48h": {
+        "forecast_horizon_hours": 48,
+        "mean_distance_error_km": 264.3,
+        "median_distance_error_km": 226.0,
+        "p90_distance_error_km": 493.6,
+        "mae_lat_deg": 1.2,
+        "mae_lon_deg": 1.93
+      },
+      "72h": {
+        "forecast_horizon_hours": 72,
+        "mean_distance_error_km": 356.9,
+        "median_distance_error_km": 319.9,
+        "p90_distance_error_km": 660.3,
+        "mae_lat_deg": 1.63,
+        "mae_lon_deg": 2.6
+      },
+      "96h": {
+        "forecast_horizon_hours": 96,
+        "mean_distance_error_km": 420.4,
+        "median_distance_error_km": 371.8,
+        "p90_distance_error_km": 777.7,
+        "mae_lat_deg": 1.91,
+        "mae_lon_deg": 3.07
+      },
+      "120h": {
+        "forecast_horizon_hours": 120,
+        "mean_distance_error_km": 454.8,
+        "median_distance_error_km": 385.4,
+        "p90_distance_error_km": 843.3,
+        "mae_lat_deg": 2.09,
+        "mae_lon_deg": 3.31
+      }
+    }
+  }
+}

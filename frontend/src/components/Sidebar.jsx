@@ -19,7 +19,7 @@ const navItems = [
   { id: 'results', label: 'Results', icon: BarChart3 },
   { id: 'map', label: 'Cyclone Map', icon: Map },
   { id: 'history', label: 'History', icon: History },
-  { id: 'prediction', label: '7 Days Prediction', icon: TrendingUp },
+  { id: 'prediction', label: '5-Day Track Prediction', icon: TrendingUp },
 ];
 
 const managementItems = [
