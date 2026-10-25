@@ -6,6 +6,8 @@ import MapPage from './MapPage';
 import HistoryPage from './HistoryPage';
 import SettingsPage from './SettingsPage';
 import SevenDaysPrediction from './SevenDaysPrediction';
+import LogsPage from './LogsPage';
+import UserManagementPage from './UserManagementPage';
 
 const Dashboard = ({
   activeTab = 'home',
@@ -78,6 +80,20 @@ const Dashboard = ({
       {/* 7. 7 DAYS PREDICTION TAB */}
       {activeTab === 'prediction' && (
         <SevenDaysPrediction currentAnalysis={currentAnalysis} />
+      )}
+
+      {/* 8. SYSTEM LOGS TAB */}
+      {activeTab === 'logs' && (
+        <LogsPage 
+          currentAnalysis={currentAnalysis} 
+          analysisHistory={analysisHistory} 
+          setActiveTab={setActiveTab}
+        />
+      )}
+
+      {/* 9. USER MANAGEMENT TAB */}
+      {activeTab === 'users' && (
+        <UserManagementPage />
       )}
     </div>
   );

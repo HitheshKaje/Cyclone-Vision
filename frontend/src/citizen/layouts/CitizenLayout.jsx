@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   Home, 
@@ -9,12 +9,17 @@ import {
   Globe, 
   Layers, 
   Wifi, 
-  WifiOff 
+  WifiOff,
+  UserPlus,
+  UserCheck,
+  Anchor,
+  User
 } from 'lucide-react';
 import cycloneLogo from '../../assets/cyclone-logo.png';
 import { changeLanguage } from '../i18n/config';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import EmergencySirenOverlay from '../components/EmergencySirenOverlay';
+import CitizenAuthModal from '../components/CitizenAuthModal';
 
 const navItems = [
   { id: 'home', path: '/citizen', labelKey: 'nav.home', icon: Home },
@@ -27,6 +32,23 @@ const navItems = [
 const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitchToAdmin }) => {
   const { t, i18n } = useTranslation();
   const { isOnline, isBackendReachable } = useNetworkStatus();
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem('cyclosafe_current_citizen_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const handleUserRegistered = (e) => {
+      if (e.detail) setCurrentUser(e.detail);
+    };
+    window.addEventListener('cyclosafe_user_registered', handleUserRegistered);
+    return () => window.removeEventListener('cyclosafe_user_registered', handleUserRegistered);
+  }, []);
 
   const handleLanguageChange = (e) => {
     changeLanguage(e.target.value);
@@ -99,6 +121,33 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
                   <option value="kn">ಕನ್ನಡ (Kannada)</option>
                 </select>
               </div>
+
+              {/* User Profile / Register Button */}
+              {currentUser ? (
+                <button
+                  type="button"
+                  onClick={() => setIsAuthOpen(true)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                    currentUser.user_type === 'fisherman'
+                      ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30'
+                      : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                  }`}
+                  title={currentUser.user_type === 'fisherman' ? `Fisherman: ${currentUser.vessel_name || currentUser.name}` : `Citizen: ${currentUser.name}`}
+                >
+                  {currentUser.user_type === 'fisherman' ? <Anchor size={13} /> : <User size={13} />}
+                  <span className="max-w-[100px] truncate">{currentUser.name}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsAuthOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  title="Register as Fisherman or Citizen to receive direct emergency warnings"
+                >
+                  <UserPlus size={13} />
+                  <span>{i18n.language === 'kn' ? 'ನೋಂದಣಿ' : 'Register'}</span>
+                </button>
+              )}
 
               {/* Lighthouse Station Screen Button */}
               <button
@@ -206,6 +255,13 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
           })}
         </div>
       </nav>
+
+      {/* Coastal Citizen & Fisherman Authentication & Registration Modal */}
+      <CitizenAuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onUserAuthenticated={(user) => setCurrentUser(user)}
+      />
     </div>
   );
 };

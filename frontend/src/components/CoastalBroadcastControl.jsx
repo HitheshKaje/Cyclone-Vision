@@ -17,6 +17,7 @@ import {
   clearCitizenBroadcast,
   fetchOfficialAdvisories
 } from '../citizen/services/citizenApi';
+import { addSystemLog } from '../utils/auditLogger';
 
 const CoastalBroadcastControl = ({ currentAnalysis }) => {
   const [broadcastState, setBroadcastState] = useState(null);
@@ -90,6 +91,13 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
       setBroadcastState(res.data.broadcast);
       setSuccessMessage('Successfully broadcast to Citizen Dashboard and Lighthouse network!');
       setTimeout(() => setSuccessMessage(null), 5000);
+      addSystemLog({
+        module: 'Broadcast-Service',
+        level: payload.level === 'RED' ? 'WARNING' : 'INFO',
+        event: `Coastal Emergency Alert Dispatched: ${payload.level} ALERT`,
+        details: `Sector: ${payload.area} | Cyclone: ${payload.cyclone_name} | Lat: ${payload.lat}°N, Lon: ${payload.lng}°E | Siren: ${payload.siren_active ? 'ENABLED' : 'DISABLED'}`,
+        payload: payload
+      });
     }
   };
 
@@ -104,6 +112,13 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
       setBroadcastState(prev => ({ ...prev, siren_active: nextState }));
       setSuccessMessage(nextState ? 'Lighthouse Siren ACTIVATED!' : 'Lighthouse Siren SILENCED.');
       setTimeout(() => setSuccessMessage(null), 4000);
+      addSystemLog({
+        module: 'Broadcast-Service',
+        level: nextState ? 'WARNING' : 'INFO',
+        event: nextState ? 'Coastal Lighthouse Siren ACTIVATED' : 'Coastal Lighthouse Siren SILENCED',
+        details: nextState ? 'Audible acoustic warning siren triggered on coastal beacons' : 'Coastal sirens silenced back to standby',
+        payload: { siren_active: nextState }
+      });
     }
   };
 
@@ -117,6 +132,13 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
       setBroadcastState(res.data.broadcast);
       setSuccessMessage('All coastal warnings cleared. Normal status restored.');
       setTimeout(() => setSuccessMessage(null), 4000);
+      addSystemLog({
+        module: 'Broadcast-Service',
+        level: 'SUCCESS',
+        event: 'Coastal Advisory Cleared (All-Clear Restored)',
+        details: 'Admin reset coastal advisory to normal maritime status',
+        payload: { status: 'NORMAL' }
+      });
     }
   };
 

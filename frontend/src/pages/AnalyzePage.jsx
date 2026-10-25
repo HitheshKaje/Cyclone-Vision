@@ -29,6 +29,7 @@ import {
 
 import CoastalBroadcastControl from '../components/CoastalBroadcastControl';
 import { getApiBaseUrl } from '../utils/apiConfig';
+import { logAnalysisEvent } from '../utils/auditLogger';
 const API_BASE = getApiBaseUrl();
 
 const AnalyzePage = ({
@@ -338,6 +339,7 @@ const AnalyzePage = ({
 
       setCurrentAnalysis(analysisRecord);
       setAnalysisHistory((prev) => [analysisRecord, ...prev]);
+      logAnalysisEvent(analysisRecord);
 
     } catch (err) {
       console.error('Analysis error:', err);

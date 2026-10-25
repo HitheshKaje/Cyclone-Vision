@@ -246,3 +246,144 @@ async def clear_citizen_broadcast():
         "message": "Broadcast cleared. Normal conditions restored.",
         "broadcast": ACTIVE_BROADCAST
     }
+
+
+# ==============================================================================
+# Dynamic User & Fisherman Management Registry
+# ==============================================================================
+
+class UserRegisterPayload(BaseModel):
+    name: str
+    phone: str
+    user_type: str = "citizen"  # "fisherman" or "citizen"
+    vessel_name: Optional[str] = None
+    vessel_reg: Optional[str] = None
+    vessel_type: Optional[str] = None
+    port: Optional[str] = None
+    district: Optional[str] = None
+    ward: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    alerts_enabled: Optional[bool] = True
+    status: Optional[str] = None
+
+
+# Dynamic User & Fisherman Management Registry (Starts empty - populated only by genuine user registrations)
+REGISTERED_USERS: List[Dict[str, Any]] = []
+
+
+@router.get("/citizen/users")
+async def get_registered_users(user_type: Optional[str] = None):
+    """
+    Returns registered fishermen and coastal citizens for the Admin Panel.
+    """
+    if user_type:
+        filtered = [u for u in REGISTERED_USERS if u.get("user_type") == user_type.lower()]
+        return {"status": "success", "count": len(filtered), "users": filtered}
+    return {
+        "status": "success",
+        "count": len(REGISTERED_USERS),
+        "fishermen_count": len([u for u in REGISTERED_USERS if u.get("user_type") == "fisherman"]),
+        "citizens_count": len([u for u in REGISTERED_USERS if u.get("user_type") == "citizen"]),
+        "users": REGISTERED_USERS
+    }
+
+
+@router.post("/citizen/users/register")
+async def register_user(payload: UserRegisterPayload):
+    """
+    Called when a user registers or logs in on the Citizen / User portal.
+    Instantly registers them into the active community directory for the Admin panel.
+    """
+    global REGISTERED_USERS
+    u_type = (payload.user_type or "citizen").lower()
+    prefix = "USR-F" if u_type == "fisherman" else "USR-C"
+    
+    # Check if user with phone already exists
+    existing = next((u for u in REGISTERED_USERS if u.get("phone") == payload.phone), None)
+    if existing:
+        existing.update({
+            "name": payload.name,
+            "user_type": u_type,
+            "vessel_name": payload.vessel_name or existing.get("vessel_name"),
+            "vessel_reg": payload.vessel_reg or existing.get("vessel_reg"),
+            "vessel_type": payload.vessel_type or existing.get("vessel_type"),
+            "port": payload.port or existing.get("port"),
+            "district": payload.district or existing.get("district"),
+            "ward": payload.ward or existing.get("ward"),
+            "emergency_contact": payload.emergency_contact or existing.get("emergency_contact"),
+            "status": payload.status or existing.get("status", "ACTIVE")
+        })
+        return {
+            "status": "success",
+            "message": f"Welcome back, {existing['name']}! Session active.",
+            "user": existing
+        }
+
+    new_id = f"{prefix}-{len(REGISTERED_USERS) + 101}"
+    default_status = "IN_HARBOR" if u_type == "fisherman" else "ACTIVE"
+
+    new_user = {
+        "id": new_id,
+        "name": payload.name,
+        "phone": payload.phone,
+        "user_type": u_type,
+        "vessel_name": payload.vessel_name,
+        "vessel_reg": payload.vessel_reg,
+        "vessel_type": payload.vessel_type,
+        "port": payload.port,
+        "district": payload.district,
+        "ward": payload.ward,
+        "emergency_contact": payload.emergency_contact,
+        "alerts_enabled": payload.alerts_enabled if payload.alerts_enabled is not None else True,
+        "status": payload.status or default_status,
+        "registered_at": datetime.utcnow().isoformat() + "Z"
+    }
+    REGISTERED_USERS.insert(0, new_user)
+    return {
+        "status": "success",
+        "message": f"{u_type.capitalize()} registered successfully.",
+        "user": new_user
+    }
+
+
+@router.delete("/citizen/users/{user_id}")
+async def delete_user(user_id: str):
+    """
+    Admin removes a registered user from the directory.
+    """
+    global REGISTERED_USERS
+    before_len = len(REGISTERED_USERS)
+    REGISTERED_USERS = [u for u in REGISTERED_USERS if u.get("id") != user_id]
+    if len(REGISTERED_USERS) < before_len:
+        return {"status": "success", "message": f"User {user_id} removed from system registry."}
+    return {"status": "error", "message": f"User {user_id} not found."}
+
+
+@router.patch("/citizen/users/{user_id}/status")
+async def update_user_status(user_id: str, payload: Dict[str, Any]):
+    """
+    Admin updates a user's operational status (e.g., AT_SEA, IN_HARBOR, ACTIVE, EVACUATED).
+    """
+    global REGISTERED_USERS
+    user = next((u for u in REGISTERED_USERS if u.get("id") == user_id), None)
+    if not user:
+        return {"status": "error", "message": f"User {user_id} not found."}
+    
+    if "status" in payload:
+        user["status"] = payload["status"]
+    if "alerts_enabled" in payload:
+        user["alerts_enabled"] = payload["alerts_enabled"]
+        
+    return {"status": "success", "message": "User status updated.", "user": user}
+
+
+@router.post("/citizen/users/clear")
+async def clear_registered_users():
+    """
+    Clears all registered users from the directory.
+    """
+    global REGISTERED_USERS
+    REGISTERED_USERS = []
+    return {"status": "success", "message": "All registered users cleared."}
+
+
