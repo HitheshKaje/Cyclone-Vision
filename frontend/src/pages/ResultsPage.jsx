@@ -213,7 +213,7 @@ const ResultsPage = ({
             <div className="space-y-2 pt-2 border-t border-slate-200/50 dark:border-slate-700/30">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
                 <Info size={14} className="text-emerald-400" />
-                <span>Image Information</span>
+                <span>Image Information & Coordinates</span>
               </div>
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/30">
@@ -228,6 +228,28 @@ const ResultsPage = ({
                     {timestamp}
                   </span>
                 </div>
+                {currentAnalysis?.latitude != null && (
+                  <>
+                    <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/30">
+                      <span className="text-slate-500">Coordinates</span>
+                      <span className="font-bold text-sky-400">
+                        {currentAnalysis.latitude}°N, {currentAnalysis.longitude}°E
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/30">
+                      <span className="text-slate-500">Basin Location</span>
+                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                        {currentAnalysis.subbasin || 'North Indian Ocean'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/30">
+                      <span className="text-slate-500">Coordinate Method</span>
+                      <span className="font-medium text-emerald-400 text-[11px] truncate max-w-[180px]">
+                        {currentAnalysis.coordMethod || 'Auto-Extracted from Image'}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between py-1">
                   <span className="text-slate-500">Input Resolution</span>
                   <span className="font-medium text-slate-800 dark:text-slate-200">
@@ -235,6 +257,19 @@ const ResultsPage = ({
                   </span>
                 </div>
               </div>
+
+              {/* 5-Day Track Prediction Link */}
+              {isCyclone && (
+                <div className="pt-2">
+                  <button
+                    onClick={() => setActiveTab('prediction')}
+                    className="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-md shadow-sky-500/20 cursor-pointer"
+                  >
+                    <span>Forecast Track on 5-Day Map</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

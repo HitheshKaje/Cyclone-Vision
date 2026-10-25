@@ -16,6 +16,14 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   useEffect(() => {
+    // Auto-migrate any legacy port 8000 to active backend port 8001
+    try {
+      const stored = localStorage.getItem('API_BASE_URL');
+      if (stored && stored.includes(':8000')) {
+        localStorage.setItem('API_BASE_URL', stored.replace(':8000', ':8001'));
+      }
+    } catch (_) {}
+
     const handlePopState = () => {
       setCurrentPath(window.location.pathname);
     };

@@ -77,7 +77,7 @@ const Dashboard = ({
 
       {/* 7. 7 DAYS PREDICTION TAB */}
       {activeTab === 'prediction' && (
-        <SevenDaysPrediction />
+        <SevenDaysPrediction currentAnalysis={currentAnalysis} />
       )}
     </div>
   );

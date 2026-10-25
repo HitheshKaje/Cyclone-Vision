@@ -167,7 +167,7 @@ const SystemSection = () => {
                 value={apiUrl}
                 onChange={(e) => setApiUrl(e.target.value)}
                 className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
-                placeholder="http://127.0.0.1:8000"
+                placeholder="http://127.0.0.1:8001"
               />
               <button 
                 onClick={handleSaveApi}
