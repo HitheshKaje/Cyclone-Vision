@@ -195,8 +195,8 @@ const SatelliteUpload = ({
             onClick={() => fileInputRef.current?.click()}
             className={`flex-1 min-h-[260px] sm:min-h-[300px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-6 text-center transition-colors cursor-pointer ${
               isDragging
-                ? 'border-sky-500 bg-emerald-500/100/10'
-                : 'border-slate-300 bg-slate-100/60 dark:bg-slate-800/60 hover:bg-slate-800/60 hover:border-slate-400'
+                ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/20'
+                : 'border-slate-300 dark:border-slate-700 bg-slate-100/60 dark:bg-slate-800/60 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 hover:border-slate-400 dark:hover:border-slate-500'
             }`}
           >
             <input

@@ -28,8 +28,8 @@ const HomePage = ({
   return (
     <div className="space-y-8 pb-10">
       
-      {/* 1. Welcome Header (Inspired by mockup) */}
-      <div className="relative overflow-hidden rounded-2xl app-card border-none p-8 mt-2 bg-gradient-to-r from-[#0f172a] to-[#1e293b]">
+      {/* 1. Welcome Header */}
+      <div className="relative overflow-hidden rounded-2xl p-8 mt-2 border border-slate-200 dark:border-slate-800 bg-gradient-to-r from-sky-50 via-white to-emerald-50 dark:from-[#0f172a] dark:to-[#1e293b] shadow-xs">
         {/* Subtle background glow */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/10 rounded-full blur-[100px] pointer-events-none" />
         
@@ -38,7 +38,7 @@ const HomePage = ({
             <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Welcome back, Hithesh!
             </h1>
-            <p className="text-sky-400 text-sm md:text-base font-medium">
+            <p className="text-sky-600 dark:text-sky-400 text-sm md:text-base font-semibold">
               Real-time insights for a safer coastal community
             </p>
           </div>

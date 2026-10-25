@@ -124,26 +124,26 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
   const isSirenBlasting = broadcastState?.siren_active === true;
 
   return (
-    <div className="w-full app-card p-5 sm:p-6 border-2 border-sky-500/30 bg-gradient-to-br from-slate-900/90 via-slate-900 to-[#0c1427] text-white shadow-xl relative overflow-hidden rounded-2xl">
+    <div className="w-full app-card p-5 sm:p-6 border-2 border-sky-500/20 dark:border-sky-500/30 bg-white/95 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900 dark:to-[#0c1427] text-slate-900 dark:text-white shadow-xl relative overflow-hidden rounded-2xl">
       
       {/* Decorative top pulse */}
       <div className={`absolute top-0 left-0 right-0 h-1.5 transition-colors ${
-        isSirenBlasting ? 'bg-red-500 animate-pulse' : isLiveActive ? 'bg-amber-500' : 'bg-slate-700'
+        isSirenBlasting ? 'bg-red-500 animate-pulse' : isLiveActive ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-700'
       }`} />
 
       {/* Card Header with Status Badge */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-700/60">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-200 dark:border-slate-700/60">
         <div className="flex items-center gap-2.5">
           <div className={`p-2.5 rounded-xl ${
-            isSirenBlasting ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-sky-500/20 text-sky-400'
+            isSirenBlasting ? 'bg-red-500/20 text-red-500 dark:text-red-400 animate-pulse' : 'bg-sky-500/15 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400'
           }`}>
             <Radio size={22} className={isLiveActive ? 'animate-pulse' : ''} />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
               <span>Coastal Early Warning & Citizen Broadcast</span>
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Publish AI findings to citizen apps & trigger audible sirens on their mobile phones
             </p>
           </div>
@@ -152,13 +152,13 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
         {/* Live Network Status Badge */}
         <div className="flex items-center gap-2">
           {isLiveActive ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/40">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-500/40">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
               LIVE BROADCAST ACTIVE
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-slate-800 text-slate-400 border border-slate-700">
-              <span className="w-2 h-2 rounded-full bg-slate-500" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700">
+              <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500" />
               NO ACTIVE BROADCAST
             </span>
           )}
@@ -174,7 +174,7 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
 
       {/* Success Notification Banner */}
       {successMessage && (
-        <div className="mb-4 p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+        <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
           <CheckCircle2 size={16} />
           <span>{successMessage}</span>
         </div>
@@ -183,51 +183,51 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
       {/* Target Sector & Station Settings */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
         <div>
-          <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+          <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block mb-1">
             Target Maritime Sector
           </label>
           <select
             value={selectedArea}
             onChange={(e) => setSelectedArea(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-slate-800/90 border border-slate-700 text-xs font-semibold text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 cursor-pointer"
+            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 shadow-xs cursor-pointer"
           >
-            <option value="Karnataka Coastal Maritime Zone (Mangalore - Malpe - Karwar)">
+            <option value="Karnataka Coastal Maritime Zone (Mangalore - Malpe - Karwar)" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
               Karnataka Coast (Mangalore - Malpe - Karwar)
             </option>
-            <option value="Kerala Coastal Waters (Kochi - Kozhikode)">
+            <option value="Kerala Coastal Waters (Kochi - Kozhikode)" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
               Kerala Coastal Waters (Kochi - Kozhikode)
             </option>
-            <option value="Odisha & Bengal Coast (Puri - Paradip)">
+            <option value="Odisha & Bengal Coast (Puri - Paradip)" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
               Odisha & Bengal Coast (Puri - Paradip)
             </option>
-            <option value="Tamil Nadu & Andhra Coast (Chennai - Visakhapatnam)">
+            <option value="Tamil Nadu & Andhra Coast (Chennai - Visakhapatnam)" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
               Tamil Nadu & Andhra Coast (Chennai - Visakhapatnam)
             </option>
-            <option value="Pan-India All Coastal Sectors">
+            <option value="Pan-India All Coastal Sectors" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
               All Coastal Sectors (Pan-India)
             </option>
           </select>
         </div>
 
         <div>
-          <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+          <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block mb-1">
             Target Lighthouse Station Beacon
           </label>
           <select
             value={targetStation}
             onChange={(e) => setTargetStation(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-slate-800/90 border border-slate-700 text-xs font-semibold text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 cursor-pointer"
+            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 shadow-xs cursor-pointer"
           >
-            <option value="Kaup Coastal Lighthouse Station #04">
+            <option value="Kaup Coastal Lighthouse Station #04" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
               Kaup Lighthouse Station #04 (Udupi Coast)
             </option>
-            <option value="Mangalore Port Light Beacon #01">
+            <option value="Mangalore Port Light Beacon #01" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
               Mangalore Port Light Beacon #01
             </option>
-            <option value="Karwar Head Lighthouse #07">
+            <option value="Karwar Head Lighthouse #07" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
               Karwar Head Lighthouse #07
             </option>
-            <option value="Visakhapatnam Dolphin Nose Light">
+            <option value="Visakhapatnam Dolphin Nose Light" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
               Visakhapatnam Dolphin Nose Light
             </option>
           </select>
@@ -235,30 +235,30 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
       </div>
 
       {/* Analysis Preview to be Broadcasted */}
-      <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs mb-5">
-        <span className="font-bold uppercase tracking-wider text-slate-400 block mb-1.5 text-[10px]">
+      <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs mb-5">
+        <span className="font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-1.5 text-[10px]">
           Data to be published from current image analysis:
         </span>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-200 font-medium">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-800 dark:text-slate-200 font-medium">
           <div>
-            <span className="text-slate-400 block text-[11px]">Detection:</span>
-            <span className="font-bold text-white">{isCyclone ? 'CYCLONE DETECTED' : 'NO CYCLONE'}</span>
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Detection:</span>
+            <span className="font-bold text-slate-900 dark:text-white">{isCyclone ? 'CYCLONE DETECTED' : 'NO CYCLONE'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[11px]">Location Coordinates:</span>
-            <span className="font-black text-sky-400">{cycloneLat.toFixed(2)}°N, {cycloneLng.toFixed(2)}°E</span>
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Location Coordinates:</span>
+            <span className="font-black text-sky-600 dark:text-sky-400">{cycloneLat.toFixed(2)}°N, {cycloneLng.toFixed(2)}°E</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[11px]">Intensity:</span>
-            <span className="font-bold text-amber-400">{classification}</span>
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Intensity:</span>
+            <span className="font-bold text-amber-600 dark:text-amber-400">{classification}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[11px]">Wind Speed:</span>
-            <span className="font-bold text-white">{windKmh} km/h ({windKt} kt)</span>
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Wind Speed:</span>
+            <span className="font-bold text-slate-900 dark:text-white">{windKmh} km/h ({windKt} kt)</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[11px]">AI Confidence:</span>
-            <span className="font-bold text-emerald-400">{confidence}%</span>
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px]">AI Confidence:</span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">{confidence}%</span>
           </div>
         </div>
       </div>
@@ -268,12 +268,12 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
         
         {/* Left Options: Siren Toggle checkbox before publishing */}
         {isCyclone && (
-          <label className="flex items-center gap-2 text-xs font-bold text-slate-300 cursor-pointer select-none">
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={includeSirenOnPublish}
               onChange={(e) => setIncludeSirenOnPublish(e.target.checked)}
-              className="w-4 h-4 rounded-sm border-slate-700 bg-slate-800 text-red-500 focus:ring-red-500 cursor-pointer"
+              className="w-4 h-4 rounded-sm border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-red-500 focus:ring-red-500 cursor-pointer"
             />
             <span>Include Audible Siren alarm on citizens' phones with broadcast</span>
           </label>
@@ -334,7 +334,7 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
             <button
               onClick={handleClearBroadcast}
               disabled={isSubmitting}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer"
               title="Clear active alert and restore normal status"
             >
               <RotateCcw size={14} />

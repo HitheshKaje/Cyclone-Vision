@@ -13,7 +13,36 @@ function App() {
   const [analysisHistory, setAnalysisHistory] = useState([]);
   const [analysisStatus, setAnalysisStatus] = useState('idle');
   const [currentStage, setCurrentStage] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  // Default theme is LIGHT mode (false). If user toggles to dark, persist in localStorage.
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedTheme = localStorage.getItem('theme') || localStorage.getItem('cyclosafe_theme');
+      if (savedTheme !== null) {
+        return savedTheme === 'dark';
+      }
+    } catch (_) {}
+    return false; // Default to LIGHT mode
+  });
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('theme', next ? 'dark' : 'light');
+        localStorage.setItem('cyclosafe_theme', next ? 'dark' : 'light');
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    // Sync dark class on documentElement
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     // Auto-migrate any legacy port 8000 to active backend port 8001
@@ -43,7 +72,7 @@ function App() {
   if (currentPath.startsWith('/citizen') || currentPath === '/lighthouse') {
     return (
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-300 font-semibold text-sm">
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold text-sm">
           Loading CycloSafe...
         </div>
       }>
@@ -62,7 +91,7 @@ function App() {
       activeTab={activeTab} 
       setActiveTab={setActiveTab}
       isDarkMode={isDarkMode}
-      toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+      toggleDarkMode={toggleDarkMode}
       onNavigateToCitizen={() => navigateTo('/citizen')}
       onNavigateToLighthouse={() => navigateTo('/lighthouse')}
     >

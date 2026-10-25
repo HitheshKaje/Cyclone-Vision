@@ -602,29 +602,29 @@ const AnalyzePage = ({
                 <div className="space-y-4 pt-1">
                   {currentAnalysis?.detection?.is_cyclone ? (
                     /* Cyclone Confirmed: Show Geographical Coordinates Confirmation & Direct Navigation */
-                    <div className="rounded-2xl border-2 border-emerald-500/40 bg-gradient-to-b from-slate-900/90 to-[#0b1329] p-5 space-y-4 shadow-xl text-white">
+                    <div className="rounded-2xl border-2 border-emerald-500/40 bg-white dark:bg-gradient-to-b dark:from-slate-900/90 dark:to-[#0b1329] p-5 space-y-4 shadow-xl text-slate-900 dark:text-white">
                       {/* Header */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-700/60">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-200 dark:border-slate-700/60">
                         <div className="flex items-center gap-2.5">
-                          <div className="p-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30">
+                          <div className="p-2 rounded-xl bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/30">
                             <Compass size={22} className="animate-pulse" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="text-base font-black tracking-tight text-white">
+                              <h3 className="text-base font-black tracking-tight text-slate-900 dark:text-white">
                                 Cyclone Detected — Geographical Coordinates & Location
                               </h3>
                               {hasRadiusLines ? (
-                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1 shadow-sm">
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 flex items-center gap-1 shadow-xs">
                                   <Sparkles size={11} /> Radius Lines Auto-Extracted
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30">
                                   {coordMethod || 'Location Auto-Detected'}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-slate-300 mt-0.5">
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                               {hasRadiusLines
                                 ? 'Concentric radius range rings & storm eye detected. Coordinates extracted from satellite image.'
                                 : 'Coordinates auto-calculated from satellite vortex center. You can verify or fine-tune before viewing on the Live Map or alerting citizens.'}
@@ -636,8 +636,8 @@ const AnalyzePage = ({
                         <div className="shrink-0 self-start sm:self-center">
                           <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
                             coordSubbasin === 'Bay of Bengal'
-                              ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                              : 'bg-teal-500/20 text-teal-300 border-teal-500/40'
+                              ? 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border-blue-500/30'
+                              : 'bg-teal-500/10 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300 border-teal-500/30'
                           }`}>
                             Basin: {coordSubbasin || 'North Indian Ocean'}
                           </span>
@@ -647,11 +647,11 @@ const AnalyzePage = ({
                       {/* Coordinate Inputs (Editable after detection) */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         <div>
-                          <label className="block text-xs font-bold text-slate-200 mb-1 flex items-center justify-between">
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1 flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                              <MapPin size={14} className="text-emerald-400" /> Latitude (°N)
+                              <MapPin size={14} className="text-emerald-500 dark:text-emerald-400" /> Latitude (°N)
                             </span>
-                            <span className="text-[10px] text-slate-400 font-medium">North Indian Ocean (5° - 26°N)</span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">North Indian Ocean (5° - 26°N)</span>
                           </label>
                           <div className="relative">
                             <input
@@ -662,7 +662,7 @@ const AnalyzePage = ({
                               value={latitude}
                               onChange={(e) => handleUpdateCoordinates(e.target.value, longitude)}
                               placeholder="e.g. 15.40"
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-colors"
+                              className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 transition-colors"
                             />
                             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">
                               °N
@@ -671,11 +671,11 @@ const AnalyzePage = ({
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold text-slate-200 mb-1 flex items-center justify-between">
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1 flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
-                              <MapPin size={14} className="text-sky-400" /> Longitude (°E)
+                              <MapPin size={14} className="text-sky-500 dark:text-sky-400" /> Longitude (°E)
                             </span>
-                            <span className="text-[10px] text-slate-400 font-medium">Arabian Sea / Bay of Bengal (62° - 94°E)</span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Arabian Sea / Bay of Bengal (62° - 94°E)</span>
                           </label>
                           <div className="relative">
                             <input
@@ -686,7 +686,7 @@ const AnalyzePage = ({
                               value={longitude}
                               onChange={(e) => handleUpdateCoordinates(latitude, e.target.value)}
                               placeholder="e.g. 86.20"
-                              className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition-colors"
+                              className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 dark:text-white focus:outline-hidden focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 transition-colors"
                             />
                             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">
                               °E
@@ -697,7 +697,7 @@ const AnalyzePage = ({
 
                       {/* Quick Location Presets */}
                       <div className="pt-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
                           Quick Presets:
                         </span>
                         <div className="flex flex-wrap gap-1.5">
@@ -714,7 +714,7 @@ const AnalyzePage = ({
                               className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer border ${
                                 latitude === p.lat && longitude === p.lon
                                   ? 'bg-emerald-500 text-slate-900 font-black border-emerald-400 shadow-md'
-                                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-emerald-400 hover:text-emerald-300'
+                                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
                               }`}
                             >
                               {p.name} ({p.lat}°N, {p.lon}°E)
@@ -746,7 +746,7 @@ const AnalyzePage = ({
                         <button
                           type="button"
                           onClick={() => setActiveTab('results')}
-                          className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0"
+                          className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0"
                         >
                           <span>Full Report</span>
                           <ArrowRight size={15} />

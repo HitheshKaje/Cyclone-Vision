@@ -73,7 +73,7 @@ const HistoryPage = ({
                   const classification = item.classification?.classification || item.intensity?.classification;
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-800/80 transition-colors">
+                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors">
                       <td className="py-3 px-3 text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
                         {item.timestamp}
                       </td>
