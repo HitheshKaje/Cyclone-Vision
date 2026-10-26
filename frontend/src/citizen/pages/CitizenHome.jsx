@@ -3,11 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { 
   Map as MapIcon, 
   ArrowRight, 
-  ShieldAlert, 
-  AlertTriangle, 
+  ShieldCheck, 
   Volume2, 
-  PhoneCall,
-  Wind
+  CheckCircle2,
+  PhoneCall
 } from 'lucide-react';
 import { useCycloneData } from '../hooks/useCycloneData';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
@@ -17,21 +16,22 @@ import LastUpdatedIndicator from '../components/LastUpdatedIndicator';
 import SafetyStatusCard from '../components/SafetyStatusCard';
 import CycloneSummaryCard from '../components/CycloneSummaryCard';
 import VoiceAlertButton from '../components/VoiceAlertButton';
-import EmergencyContactCard from '../components/EmergencyContactCard';
 
 const CitizenHome = ({ onNavigate }) => {
   const { t, i18n } = useTranslation();
   const { isOnline } = useNetworkStatus();
-  const { cyclones, metadata, loading, isCached, freshness, refresh } = useCycloneData();
+  const { metadata, loading, isCached, freshness, refresh } = useCycloneData();
   const [advisory, setAdvisory] = useState({
     available: false,
+    active: false,
     level: null,
     title: '',
     message: '',
     fishermen_directive: '',
     area: '',
     source: '',
-    issued_at: null
+    issued_at: null,
+    coordinates: null
   });
 
   useEffect(() => {
@@ -55,13 +55,15 @@ const CitizenHome = ({ onNavigate }) => {
     };
   }, []);
 
-  // Derive active cyclone strictly from live Admin broadcast (no static/unrelated data)
-  const activeCyclone = (advisory?.active && advisory?.cyclone_name)
+  const isAlertActive = Boolean(advisory?.active && advisory?.cyclone_name);
+
+  // Derive active cyclone strictly from live Admin broadcast without hardcoded fallback coordinates
+  const activeCyclone = isAlertActive
     ? {
         name: advisory.cyclone_name,
         status: advisory.level === 'RED' ? 'Severe Cyclone (Live Broadcast)' : 'Cyclone Alert',
-        latitude: advisory.coordinates?.lat || 14.8,
-        longitude: advisory.coordinates?.lng || 73.5,
+        latitude: advisory.coordinates?.lat ?? null,
+        longitude: advisory.coordinates?.lng ?? null,
         wind_speed: advisory.wind_speed_kmh,
         last_updated: advisory.issued_at,
         description: advisory.message,
@@ -69,11 +71,9 @@ const CitizenHome = ({ onNavigate }) => {
       }
     : null;
 
-  // Text for voice alert
-  const voiceText = advisory?.available
-    ? `${advisory.title}. ${advisory.message}. Fishermen advisory: ${advisory.fishermen_directive}`
-    : activeCyclone
-    ? `Active cyclone ${activeCyclone.name}. Maximum wind speed ${Math.round(activeCyclone.wind_speed || 0)} kilometers per hour.`
+  // Text for voice alert - only speaks active live warnings
+  const voiceText = isAlertActive
+    ? `${advisory.title || 'Cyclone Alert'}. ${advisory.message || ''}. Fishermen advisory: ${advisory.fishermen_directive || ''}`
     : t('safety.status_unavailable');
 
   return (
@@ -119,73 +119,94 @@ const CitizenHome = ({ onNavigate }) => {
         loading={loading}
       />
 
-      {/* 3. Coastal Safety Indicator (Strict official status) */}
-      <section aria-label="Marine Safety Advisory">
-        <SafetyStatusCard advisory={advisory} />
-      </section>
+      {/* DYNAMIC SECTIONS: Rendered only when an active cyclone alert is live */}
+      {isAlertActive ? (
+        <>
+          {/* Active Coastal Safety Warning Indicator */}
+          <section aria-label="Marine Safety Advisory">
+            <SafetyStatusCard advisory={advisory} />
+          </section>
 
-      {/* 4. Voice Advisory Broadcast Button (Hands-free for fishermen) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Volume2 size={18} className="text-emerald-500" />
-            <span>{t('home.listen_advisory')}</span>
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {t('home.hands_free_sub')}
-          </p>
-        </div>
-        <VoiceAlertButton textToRead={voiceText} />
-      </div>
+          {/* Voice Advisory Broadcast Button (Hands-free for fishermen) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Volume2 size={18} className="text-emerald-500" />
+                <span>{t('home.listen_advisory')}</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {t('home.hands_free_sub')}
+              </p>
+            </div>
+            <VoiceAlertButton textToRead={voiceText} />
+          </div>
 
-      {/* 5. Active Cyclone Information */}
-      <section aria-label="Active Cyclone Overview">
-        <CycloneSummaryCard cyclone={activeCyclone} isCached={isCached} />
-      </section>
+          {/* Active Cyclone Telemetry Information */}
+          {activeCyclone && (
+            <section aria-label="Active Cyclone Overview">
+              <CycloneSummaryCard cyclone={activeCyclone} isCached={isCached} />
+            </section>
+          )}
 
-      {/* 6. Quick Map Preview & Navigation */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-sky-500/10 via-white to-emerald-500/10 dark:from-sky-950/40 dark:via-slate-800 dark:to-emerald-950/40 border border-sky-500/20 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="p-3 rounded-xl bg-sky-500 text-white shadow-xs">
-            <MapIcon size={24} />
+          {/* Map Quick Action for Active Threat */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-red-500/10 via-white to-amber-500/10 dark:from-red-950/40 dark:via-slate-800 dark:to-amber-950/40 border border-red-500/20 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="p-3 rounded-xl bg-red-500 text-white shadow-xs">
+                <MapIcon size={24} />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+                  {t('home.map_preview_title')}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5 max-w-md">
+                  {t('home.map_preview_sub')}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onNavigate('/citizen/map')}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
+            >
+              <span>{t('home.open_full_map')}</span>
+              <ArrowRight size={18} />
+            </button>
+          </div>
+        </>
+      ) : (
+        /* Normal Conditions / No Active Alert Dynamic Banner */
+        <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/15 text-emerald-500 mx-auto flex items-center justify-center">
+            <CheckCircle2 size={26} />
           </div>
           <div>
             <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
-              {t('home.map_preview_title')}
+              {i18n.language === 'kn' ? 'ಯಾವುದೇ ಸಕ್ರಿಯ ಚಂಡಮಾರುತ ಎಚ್ಚರಿಕೆ ಇಲ್ಲ' : 'No Active Cyclone Advisory'}
             </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5 max-w-md">
-              {t('home.map_preview_sub')}
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-md mx-auto">
+              {i18n.language === 'kn' 
+                ? 'ಕರಾವಳಿ ಮತ್ತು ಸಾಗರ ವಲಯಗಳಲ್ಲಿ ಪರಿಸ್ಥಿತಿ ಸಹಜವಾಗಿದೆ. ಅಧಿಕೃತ ಎಚ್ಚರಿಕೆ ಪ್ರಸಾರವಾದಾಗ ಇಲ್ಲಿ ನೇರವಾಗಿ ಪ್ರದರ್ಶಿಸಲಾಗುತ್ತದೆ.'
+                : 'Monitored coastal maritime sectors report normal conditions. Official warnings will appear here dynamically when broadcasted by the early warning center.'}
             </p>
           </div>
-        </div>
-
-        <button
-          onClick={() => onNavigate('/citizen/map')}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
-        >
-          <span>{t('home.open_full_map')}</span>
-          <ArrowRight size={18} />
-        </button>
-      </div>
-
-      {/* 7. Quick Emergency Helplines */}
-      <section aria-label="Emergency Helplines" className="pt-2">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <PhoneCall size={18} className="text-red-500" />
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              {t('home.quick_emergency')}
-            </h3>
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => onNavigate('/citizen/map')}
+              className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <MapIcon size={14} />
+              <span>{t('home.open_full_map')}</span>
+            </button>
+            <button
+              onClick={() => onNavigate('/citizen/emergency')}
+              className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-semibold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <PhoneCall size={14} />
+              <span>{t('home.quick_emergency')}</span>
+            </button>
           </div>
-          <button
-            onClick={() => onNavigate('/citizen/emergency')}
-            className="text-xs font-bold text-sky-500 hover:underline cursor-pointer"
-          >
-            {t('home.view_all')}
-          </button>
         </div>
-        <EmergencyContactCard compact={true} />
-      </section>
+      )}
 
     </div>
   );

@@ -30,7 +30,7 @@ ACTIVE_BROADCAST = {
     "area": "West & East Coast Maritime Zones",
     "source": "CycloSafe Early Warning Command Center",
     "issued_at": datetime.utcnow().isoformat() + "Z",
-    "coordinates": {"lat": 14.8, "lng": 73.5}
+    "coordinates": None
 }
 
 class BroadcastPayload(BaseModel):
@@ -44,8 +44,8 @@ class BroadcastPayload(BaseModel):
     message: Optional[str] = None
     fishermen_directive: Optional[str] = None
     area: Optional[str] = "Karnataka & Central West Coast"
-    lat: Optional[float] = 14.8
-    lng: Optional[float] = 73.5
+    lat: Optional[float] = None
+    lng: Optional[float] = None
 
 class SirenTogglePayload(BaseModel):
     siren_active: bool
@@ -195,7 +195,7 @@ async def publish_citizen_broadcast(payload: BroadcastPayload):
         "area": payload.area or "Central West & Southwest Coastal Maritime Zone",
         "source": "CycloSafe Early Warning Command Center (Live Admin Broadcast)",
         "issued_at": datetime.utcnow().isoformat() + "Z",
-        "coordinates": {"lat": payload.lat or 14.8, "lng": payload.lng or 73.5}
+        "coordinates": {"lat": payload.lat, "lng": payload.lng} if (payload.lat is not None and payload.lng is not None) else None
     }
     return {
         "success": True,
@@ -239,7 +239,7 @@ async def clear_citizen_broadcast():
         "area": "Coastal Maritime Zones",
         "source": "CycloSafe Early Warning Command Center",
         "issued_at": datetime.utcnow().isoformat() + "Z",
-        "coordinates": {"lat": 14.8, "lng": 73.5}
+        "coordinates": None
     }
     return {
         "success": True,

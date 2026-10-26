@@ -105,13 +105,13 @@ const CycloneMap = () => {
 
   // Strict dynamic list: If Admin has active broadcast, display that detected cyclone
   const mapCyclones = [];
-  if (advisory?.active && advisory?.cyclone_name) {
+  if (advisory?.active && advisory?.cyclone_name && advisory?.coordinates?.lat != null && advisory?.coordinates?.lng != null) {
     mapCyclones.push({
       id: 'admin_broadcast_active',
       name: advisory.cyclone_name,
       status: advisory.level === 'RED' ? (i18n.language === 'kn' ? t('safety.badge_red') : 'Severe Cyclone (Live Broadcast)') : (i18n.language === 'kn' ? t('safety.badge_yellow') : 'Cyclone Alert'),
-      latitude: advisory.coordinates?.lat || 14.8,
-      longitude: advisory.coordinates?.lng || 73.5,
+      latitude: advisory.coordinates.lat,
+      longitude: advisory.coordinates.lng,
       wind_speed: advisory.wind_speed_kmh,
       last_updated: advisory.issued_at,
       description: advisory.message,
@@ -120,7 +120,7 @@ const CycloneMap = () => {
   }
 
   // Map center: Default to detected cyclone coords if active, else Indian Coastal Region
-  const defaultCenter = advisory?.active && advisory?.coordinates?.lat
+  const defaultCenter = (advisory?.active && advisory?.coordinates?.lat != null && advisory?.coordinates?.lng != null)
     ? [advisory.coordinates.lat, advisory.coordinates.lng]
     : [16.5, 82.5];
   const defaultZoom = advisory?.active ? 6 : 5;
