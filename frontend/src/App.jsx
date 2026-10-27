@@ -3,6 +3,7 @@ import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import AuthPage from './pages/AuthPage';
 import { getAdminAuth, logoutAdmin } from './utils/authService';
+import { fetchAnalysisHistory } from './utils/analysisApi';
 
 const CitizenApp = lazy(() => import('./citizen/CitizenApp'));
 
@@ -62,6 +63,23 @@ function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Dynamically load analysis records directly from MongoDB on mount
+  useEffect(() => {
+    let isMounted = true;
+    const loadMongoRecords = async () => {
+      try {
+        const res = await fetchAnalysisHistory(200);
+        if (isMounted && res.success && Array.isArray(res.records)) {
+          setAnalysisHistory(res.records);
+        }
+      } catch (err) {
+        console.warn('[App] MongoDB analysis load error:', err);
+      }
+    };
+    loadMongoRecords();
+    return () => { isMounted = false; };
   }, []);
 
   const navigateTo = (path) => {
@@ -175,6 +193,7 @@ function App() {
         setAnalysisStatus={setAnalysisStatus}
         currentStage={currentStage}
         setCurrentStage={setCurrentStage}
+        adminUser={adminUser}
       />
     </MainLayout>
   );

@@ -124,10 +124,9 @@ const ResultsPage = ({
 
   // --- Dynamic Aggregated Stats for Graphs ---
   // 1. Model Performance (Pseudo-dynamic based on avg confidence)
-  const scansWithConfidence = analysisHistory.filter(h => h.detection?.confidence_percent != null);
   const avgConf = scansWithConfidence.length > 0 
     ? scansWithConfidence.reduce((acc, curr) => acc + curr.detection.confidence_percent, 0) / scansWithConfidence.length
-    : 84.75;
+    : (currentAnalysis?.detection?.confidence_percent || 0.0);
   
   const performanceData = [
     { metric: 'Accuracy', value: Number(avgConf.toFixed(2)), fill: '#0ea5e9' },

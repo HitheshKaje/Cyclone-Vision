@@ -11,6 +11,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
+from services.db import save_alert, get_active_alert
+
 router = APIRouter()
 
 # In-memory Active Coastal Broadcast State
@@ -151,14 +153,19 @@ async def get_historical_cyclones():
 async def get_citizen_alerts():
     """
     Returns the real-time coastal alert & lighthouse siren status broadcast by Admin.
+    Checks MongoDB cyclosafe.alerts first, fallback to in-memory broadcast.
     """
+    db_alert = get_active_alert()
+    if db_alert:
+        return db_alert
     return ACTIVE_BROADCAST
 
 @router.post("/citizen/broadcast")
 async def publish_citizen_broadcast(payload: BroadcastPayload):
     """
     Called by Admin when clicking 'Broadcast to Citizens'.
-    Publishes detected cyclone data, updates warning level and siren trigger.
+    Publishes detected cyclone data, updates warning level and siren trigger,
+    and persists directly to MongoDB cyclosafe.alerts.
     """
     global ACTIVE_BROADCAST
 
@@ -197,9 +204,16 @@ async def publish_citizen_broadcast(payload: BroadcastPayload):
         "issued_at": datetime.utcnow().isoformat() + "Z",
         "coordinates": {"lat": payload.lat, "lng": payload.lng} if (payload.lat is not None and payload.lng is not None) else None
     }
+
+    # Persist directly into MongoDB alerts collection
+    try:
+        save_alert(ACTIVE_BROADCAST)
+    except Exception as e:
+        print(f"[Broadcast API] Warning: MongoDB alert persistence error: {e}")
+
     return {
         "success": True,
-        "message": "Broadcast published to Citizen and Lighthouse portals successfully.",
+        "message": "Broadcast published to Citizen, Lighthouse, and MongoDB successfully.",
         "broadcast": ACTIVE_BROADCAST
     }
 

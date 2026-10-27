@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 import { getApiBaseUrl } from '../utils/apiConfig';
+import { saveAnalysisRecord } from '../utils/analysisApi';
 const API_BASE = getApiBaseUrl();
 
 const SatelliteUpload = ({
@@ -153,6 +154,11 @@ const SatelliteUpload = ({
           second: '2-digit'
         })
       };
+
+      // Persist directly to MongoDB
+      saveAnalysisRecord(analysisRecord).catch(err => {
+        console.warn('[SatelliteUpload] MongoDB persistence error:', err);
+      });
 
       if (onAnalysisSuccess) {
         onAnalysisSuccess(analysisRecord);

@@ -30,6 +30,7 @@ import {
 import CoastalBroadcastControl from '../components/CoastalBroadcastControl';
 import { getApiBaseUrl } from '../utils/apiConfig';
 import { logAnalysisEvent } from '../utils/auditLogger';
+import { saveAnalysisRecord, deleteAnalysisRecord } from '../utils/analysisApi';
 const API_BASE = getApiBaseUrl();
 
 const AnalyzePage = ({
@@ -225,6 +226,9 @@ const AnalyzePage = ({
 
   const handleDeleteHistory = (id) => {
     setAnalysisHistory(prev => prev.filter(h => h.id !== id));
+    deleteAnalysisRecord(id).catch(err => {
+      console.warn('[AnalyzePage] MongoDB deletion error:', err);
+    });
   };
 
   const handleViewHistory = (record) => {
@@ -340,6 +344,11 @@ const AnalyzePage = ({
       setCurrentAnalysis(analysisRecord);
       setAnalysisHistory((prev) => [analysisRecord, ...prev]);
       logAnalysisEvent(analysisRecord);
+
+      // Persist directly to MongoDB
+      saveAnalysisRecord(analysisRecord).catch(err => {
+        console.warn('[AnalyzePage] MongoDB persistence error:', err);
+      });
 
     } catch (err) {
       console.error('Analysis error:', err);

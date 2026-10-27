@@ -19,7 +19,8 @@ const Dashboard = ({
   analysisStatus,
   setAnalysisStatus,
   currentStage,
-  setCurrentStage
+  setCurrentStage,
+  adminUser
 }) => {
   return (
     <div>
@@ -29,6 +30,7 @@ const Dashboard = ({
           setActiveTab={setActiveTab}
           currentAnalysis={currentAnalysis}
           analysisHistory={analysisHistory}
+          adminUser={adminUser}
         />
       )}
 
@@ -67,6 +69,7 @@ const Dashboard = ({
       {activeTab === 'history' && (
         <HistoryPage 
           analysisHistory={analysisHistory}
+          setAnalysisHistory={setAnalysisHistory}
           setCurrentAnalysis={setCurrentAnalysis}
           setActiveTab={setActiveTab}
         />
