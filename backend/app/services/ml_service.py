@@ -262,9 +262,10 @@ class MLService:
         """
         Validates whether an input image conforms to Earth meteorological satellite domains.
         Rejects non-satellite imagery:
-          1. Studio Portraits / Passport Photos (Artificial solid saturated backdrops, human skin tones).
-          2. Household / Everyday objects (Coffee cups, tea mugs, tables, indoor photos).
-          3. Outer space / Astronomical scenes (black holes, galaxies, nebulae, deep space voids).
+          1. Human Portraits / Selfies / People (human skin chrominance blobs, facial regions).
+          2. Non-meteorological Saturated Graphics (artwork, cartoons, vibrant ocean whirlpool illustrations).
+          3. Outer space / Astronomical scenes (black holes, star fields, cosmic voids).
+          4. Household / Everyday objects (Coffee cups, tables, indoor rooms).
         """
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
         hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
@@ -273,28 +274,21 @@ class MLService:
         
         h_chan, s_chan, v_chan = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
 
-        # 1. Human Portrait / Face / Selfie Detection (YCbCr Chrominance Skin Model with Connected Component Analysis)
-        # Real satellite imagery of Earth oceans/clouds has virtually 0% human skin (<0.7%).
-        # Weather satellite maps with political boundaries/deserts may have small fragmented yellow/tan lines,
-        # but human portraits/selfies contain a large contiguous solid facial skin blob.
+        # 1. Human Portrait / Face / Selfie Detection (YCbCr + HSV Chrominance Skin Model)
         ycbcr = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)
         cr = ycbcr[:, :, 1]
         cb = ycbcr[:, :, 2]
-        # Standard Kovac/Chai-Ngan human skin chrominance
-        skin_mask = (cb >= 77) & (cb <= 127) & (cr >= 133) & (cr <= 173)
+        skin_mask = (cb >= 77) & (cb <= 127) & (cr >= 133) & (cr <= 173) & (v_chan >= 40)
         skin_frac = float(np.mean(skin_mask))
         
-        # Face patch in upper-central quadrant (where human faces are in portraits/selfies)
-        face_patch = skin_mask[int(h * 0.15):int(h * 0.60), int(w * 0.25):int(w * 0.75)]
+        face_patch = skin_mask[int(h * 0.10):int(h * 0.65), int(w * 0.20):int(w * 0.80)]
         face_skin_frac = float(np.mean(face_patch))
 
-        # Connected component blob size: Human face forms a large contiguous solid region (>2.5% of the image)
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(skin_mask.astype(np.uint8), connectivity=8)
         max_blob_area = int(np.max(stats[1:, cv2.CC_STAT_AREA])) if num_labels > 1 else 0
         max_blob_ratio = float(max_blob_area / total_pixels) if total_pixels > 0 else 0.0
         
-        # Flag as human portrait if there is a large solid skin blob AND substantial skin concentration
-        if max_blob_ratio > 0.025 and (skin_frac > 0.06 or face_skin_frac > 0.18):
+        if max_blob_ratio > 0.015 and (skin_frac > 0.04 or face_skin_frac > 0.08):
             return False, "Human portrait / non-meteorological photo detected (facial skin features present). Please upload Earth meteorological satellite imagery."
 
         # Check B: Vivid artificial studio backdrop (e.g. solid saturated blue/cyan/white/red)
@@ -306,64 +300,45 @@ class MLService:
         corner_diff = float(np.mean(np.abs(np.mean(top_left, axis=(0, 1)) - np.mean(top_right, axis=(0, 1)))))
         sat_corner = float(np.mean(hsv[:corner_h, :corner_w, 1]))
 
-        # Studio backdrops are flat uniform color with vivid artificial saturation (S > 70)
-        # Real satellite clouds and oceans have low saturation or fractal atmospheric gradients
         if std_tl < 15.0 and std_tr < 15.0 and corner_diff < 18.0 and sat_corner > 70.0:
             return False, "Artificial studio backdrop detected (uniform portrait / studio background). Please upload Earth meteorological satellite imagery."
 
-        # 2. Check for Household / Everyday Photography (Coffee/Tea mugs, wooden tables, rooms)
-        # Real satellite imagery of Earth ocean/clouds has virtually 0% warm brown/table/coffee wood hues.
-        # Warm wood, coffee liquid, ceramic, skin, living room hues: H 8-28, S > 50, V > 40
+        # 2. Check for Non-Meteorological Highly Saturated Graphics / Artwork / Concept Art
+        mean_sat = float(np.mean(s_chan))
+        if mean_sat > 55.0:
+            return False, f"High-saturation non-satellite graphic or illustration detected (color saturation {mean_sat:.1f}% exceeds satellite baseline). Please upload weather satellite imagery."
+
+        # 3. Check for Household / Everyday Photography (warm wood, tables, indoor objects)
         warm_mask = (h_chan >= 8) & (h_chan <= 28) & (s_chan > 50) & (v_chan > 40)
         warm_ratio = float(np.mean(warm_mask))
         if warm_ratio > 0.22:
             return False, "Non-satellite image detected (household object / everyday scene). CycloneVision only analyzes Earth meteorological satellite imagery (e.g. INSAT-3D, NOAA, GOES)."
 
-        # 3. Check for Outer Space / Astronomical Scene (Black hole, galaxy, deep space void)
+        # 4. Check for Outer Space / Astronomical Scene (Black hole, cosmic void, star fields)
         dark_mask = (gray < 30).astype(np.uint8)
         dark_ratio = float(np.sum(dark_mask) / total_pixels)
         
-        # Quadrant check: Satellite swaths only have black borders on 1 or 2 edges.
-        # Deep space scenes surround the object across all 4 quadrants.
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        high_freq = cv2.subtract(gray, blurred)
+        
+        # Central singularity / black hole check
+        center_patch = gray[int(h * 0.30):int(h * 0.70), int(w * 0.30):int(w * 0.70)]
+        center_dark_frac = float(np.mean(center_patch < 40))
+        star_candidates = int(np.sum((high_freq > 20) & (gray < 70)))
+        
+        if center_dark_frac > 0.20 and star_candidates > 300:
+            return False, "Astronomical scene detected (cosmic black hole / star field void). Please upload Earth meteorological satellite imagery."
+
         h_half, w_half = h // 2, w // 2
         q1 = np.mean(dark_mask[:h_half, :w_half])
         q2 = np.mean(dark_mask[:h_half, w_half:])
         q3 = np.mean(dark_mask[h_half:, :w_half])
         q4 = np.mean(dark_mask[h_half:, w_half:])
         quadrants_dark = sum(q > 0.18 for q in [q1, q2, q3, q4])
-        
-        # Star field check: high-frequency pinpoint bright spots in dark background
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        high_freq = cv2.subtract(gray, blurred)
-        star_candidates = int(np.sum((high_freq > 30) & (dark_mask == 1)))
-        
-        # High saturation glow check (astronomical plasma / artificial neon accretion rings)
-        high_sat_in_space = (s_chan > 100) & (gray > 40)
-        sat_glow_ratio = float(np.sum(high_sat_in_space) / max(1, np.sum(gray > 40)))
-        
-        # Astronomical criteria:
-        # A. Broad deep space void across 3+ quadrants (deep space background surrounds the celestial object)
+
         if dark_ratio > 0.45 and quadrants_dark >= 3:
             return False, "Outer space / astronomical scene detected (deep space void across multiple quadrants). Please upload Earth meteorological satellite imagery."
 
-        # B. Deep space void with star field
-        if dark_ratio > 0.30 and quadrants_dark >= 3 and star_candidates > 30:
-            return False, "Outer space / astronomical scene detected (cosmic background with starfield). Please upload Earth meteorological satellite imagery."
-            
-        # C. Deep space void with colorful plasma accretion disc
-        if dark_ratio > 0.35 and quadrants_dark >= 3 and sat_glow_ratio > 0.35:
-            return False, "Astronomical scene detected (cosmic accretion disc against space void). Please upload Earth meteorological satellite imagery."
-
-        # D. Central celestial black hole (pitch black central singularity surrounded by lensing/milky way)
-        center_h_min, center_h_max = int(h * 0.35), int(h * 0.65)
-        center_w_min, center_w_max = int(w * 0.35), int(w * 0.65)
-        center_patch = gray[center_h_min:center_h_max, center_w_min:center_w_max]
-        outer_mean = (float(np.mean(gray[:int(h * 0.25), :])) + float(np.mean(gray[int(h * 0.75):, :]))) / 2.0
-        center_dark_frac = float(np.mean(center_patch < 20))
-        total_pinpoints = int(np.sum(high_freq > 25))
-        if center_dark_frac > 0.30 and outer_mean > 50.0 and total_pinpoints > 80:
-            return False, "Astronomical scene detected (central cosmic black hole / celestial void). Please upload Earth meteorological satellite imagery."
-            
         return True, "Valid Earth satellite domain."
 
     def run_detection(self, img_bgr: np.ndarray) -> Tuple[Dict[str, Any], float, float]:

@@ -30,9 +30,33 @@ async def detect_cyclone(image: UploadFile = File(...)):
         image_bytes = await image.read()
         mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
 
+        # 0. Strict Domain Gate: Must be a genuine Earth meteorological satellite image
+        img_bgr = ml_service.decode_image_bytes(image_bytes)
+        is_valid_domain, domain_reason = ml_service.validate_satellite_domain(img_bgr)
+        if not is_valid_domain:
+            t_total = time.perf_counter() - t_start
+            logger.info(f"[Detect API] Domain Gate Rejected: {domain_reason}")
+            return {
+                "success": True,
+                "prediction": "Invalid Satellite Image",
+                "status": "INVALID IMAGE (NOT A SATELLITE IMAGE)",
+                "status_label": "Invalid Satellite Image",
+                "is_cyclone": False,
+                "is_valid_satellite": False,
+                "confidence": 0.0,
+                "confidence_percent": 0.0,
+                "validation_message": domain_reason,
+                "description": domain_reason,
+                "source": "Satellite Domain Ingestion Gate",
+                "inference_time_ms": round(t_total * 1000, 1)
+            }
+
         # 1. Primary Engine: High-Accuracy Google Gemini Vision AI
         try:
             result = cloud_vision_service.detect_with_gemini(image_bytes, mime_type=mime_type)
+            # If Gemini also detected non-satellite, preserve is_valid_satellite
+            if result.get("is_valid_satellite") is False:
+                return result
             t_total = time.perf_counter() - t_start
             logger.info(f"[Detect API] Powered by {result.get('source')} in {t_total:.2f}s")
             return result
@@ -40,7 +64,6 @@ async def detect_cyclone(image: UploadFile = File(...)):
             logger.warning(f"[Detect API] Gemini engine exception ({g_err}), utilizing fallback model.")
 
         # 2. Fallback Engine: Local ML Model
-        img_bgr = ml_service.decode_image_bytes(image_bytes)
         result, t_prep, t_infer = ml_service.run_detection(img_bgr)
         return result
 
