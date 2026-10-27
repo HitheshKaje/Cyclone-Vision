@@ -466,6 +466,9 @@ class MLService:
             "wind_speed_kt": classification_result["wind_speed_kt"],
             "wind_speed_kmh": classification_result["wind_speed_kmh"],
             "classification": classification_result["classification"],
+            "category": classification_result.get("category", classification_result["classification"]),
+            "category_code": classification_result.get("category_code", ""),
+            "wmo_range": classification_result.get("wmo_range", ""),
             "description": classification_result["description"],
             "model": f"EfficientNetB0 ({os.path.basename(INTENSITY_MODEL_PATH)})",
             "model_file": os.path.basename(INTENSITY_MODEL_PATH)

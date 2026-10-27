@@ -18,6 +18,9 @@ class ClassificationResponse(BaseModel):
     wind_speed_kt: float
     wind_speed_kmh: float
     classification: str
+    category: Optional[str] = None
+    category_code: Optional[str] = None
+    wmo_range: Optional[str] = None
     description: str
 
 @router.post("/classify", response_model=ClassificationResponse)

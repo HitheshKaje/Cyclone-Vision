@@ -5,8 +5,11 @@ import {
   ArrowRight, 
   ShieldCheck, 
   Volume2, 
-  CheckCircle2,
-  PhoneCall
+  CheckCircle2, 
+  PhoneCall,
+  User,
+  Anchor,
+  LogIn
 } from 'lucide-react';
 import { useCycloneData } from '../hooks/useCycloneData';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
@@ -207,6 +210,44 @@ const CitizenHome = ({ onNavigate }) => {
           </div>
         </div>
       )}
+
+      {/* Community Profile & User Login Card */}
+      {(() => {
+        let currentUser = null;
+        try {
+          currentUser = JSON.parse(localStorage.getItem('cyclosafe_current_citizen_user'));
+        } catch (_) {}
+
+        return (
+          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-500 border border-sky-500/25 flex items-center justify-center shrink-0">
+                {currentUser?.user_type === 'fisherman' ? <Anchor size={20} /> : <User size={20} />}
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                  {currentUser 
+                    ? `${currentUser.name} (${currentUser.user_type === 'fisherman' ? 'Fisherman' : 'Coastal Citizen'})`
+                    : (i18n.language === 'kn' ? 'ಕರಾವಳಿ ನಾಗರಿಕ ಮತ್ತು ಮೀನುಗಾರರ ಲಾಗಿನ್' : 'Coastal Community Safety Registry')}
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                  {currentUser 
+                    ? `Status: ${currentUser.status || 'Active'} • Connected to MongoDB`
+                    : (i18n.language === 'kn' ? 'ನೇರ ಚಂಡಮಾರುತ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಪಡೆಯಲು ಮೊಬೈಲ್ ಅಥವಾ ಇಮೇಲ್ ಮೂಲಕ ಲಾಗಿನ್ ಮಾಡಿ' : 'Sign in or register with Mobile Number or Email for direct cyclone warnings')}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onNavigate('/login')}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <LogIn size={13} />
+              <span>{currentUser ? 'Switch User / Login' : (i18n.language === 'kn' ? 'ಬಳಕೆದಾರ ಲಾಗಿನ್' : 'User Login / Register')}</span>
+            </button>
+          </div>
+        );
+      })()}
 
     </div>
   );

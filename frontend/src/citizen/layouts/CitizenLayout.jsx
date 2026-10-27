@@ -7,19 +7,19 @@ import {
   CloudSun, 
   PhoneCall, 
   Globe, 
-  Layers, 
   Wifi, 
   WifiOff,
   UserPlus,
-  UserCheck,
   Anchor,
-  User
+  User,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 import cycloneLogo from '../../assets/cyclone-logo.png';
 import { changeLanguage } from '../i18n/config';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import EmergencySirenOverlay from '../components/EmergencySirenOverlay';
-import CitizenAuthModal from '../components/CitizenAuthModal';
+import { logoutUser } from '../../utils/authService';
 
 const navItems = [
   { id: 'home', path: '/citizen', labelKey: 'nav.home', icon: Home },
@@ -29,10 +29,9 @@ const navItems = [
   { id: 'emergency', path: '/citizen/emergency', labelKey: 'nav.emergency', icon: PhoneCall, highlight: true },
 ];
 
-const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitchToAdmin }) => {
+const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
   const { t, i18n } = useTranslation();
   const { isOnline, isBackendReachable } = useNetworkStatus();
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const raw = localStorage.getItem('cyclosafe_current_citizen_user');
@@ -46,9 +45,22 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
     const handleUserRegistered = (e) => {
       if (e.detail) setCurrentUser(e.detail);
     };
+    const handleUserLoggedOut = () => {
+      setCurrentUser(null);
+    };
+
     window.addEventListener('cyclosafe_user_registered', handleUserRegistered);
-    return () => window.removeEventListener('cyclosafe_user_registered', handleUserRegistered);
+    window.addEventListener('cyclosafe_user_logged_out', handleUserLoggedOut);
+    return () => {
+      window.removeEventListener('cyclosafe_user_registered', handleUserRegistered);
+      window.removeEventListener('cyclosafe_user_logged_out', handleUserLoggedOut);
+    };
   }, []);
+
+  const handleLogout = () => {
+    logoutUser();
+    setCurrentUser(null);
+  };
 
   const handleLanguageChange = (e) => {
     changeLanguage(e.target.value);
@@ -122,30 +134,39 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
                 </select>
               </div>
 
-              {/* User Profile / Register Button */}
+              {/* User Profile & Authentication Buttons */}
               {currentUser ? (
-                <button
-                  type="button"
-                  onClick={() => setIsAuthOpen(true)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                    currentUser.user_type === 'fisherman'
-                      ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30'
-                      : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                  }`}
-                  title={currentUser.user_type === 'fisherman' ? `Fisherman: ${currentUser.vessel_name || currentUser.name}` : `Citizen: ${currentUser.name}`}
-                >
-                  {currentUser.user_type === 'fisherman' ? <Anchor size={13} /> : <User size={13} />}
-                  <span className="max-w-[100px] truncate">{currentUser.name}</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border ${
+                      currentUser.user_type === 'fisherman'
+                        ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30'
+                        : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                    }`}
+                    title={currentUser.user_type === 'fisherman' ? `Fisherman: ${currentUser.vessel_name || currentUser.name}` : `Citizen: ${currentUser.name}`}
+                  >
+                    {currentUser.user_type === 'fisherman' ? <Anchor size={13} /> : <User size={13} />}
+                    <span className="max-w-[100px] truncate">{currentUser.name}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="p-1.5 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                    title="Sign Out"
+                  >
+                    <LogOut size={14} />
+                  </button>
+                </div>
               ) : (
                 <button
                   type="button"
-                  onClick={() => setIsAuthOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-                  title="Register as Fisherman or Citizen to receive direct emergency warnings"
+                  onClick={() => onNavigate('/login')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  title="Sign In or Register with Mobile or Email"
                 >
-                  <UserPlus size={13} />
-                  <span>{i18n.language === 'kn' ? 'ನೋಂದಣಿ' : 'Register'}</span>
+                  <LogIn size={13} />
+                  <span>{i18n.language === 'kn' ? 'ಬಳಕೆದಾರ ಲಾಗಿನ್' : 'User Login'}</span>
                 </button>
               )}
 
@@ -158,18 +179,6 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 <span className="hidden xs:inline">{t('app.lighthouse')}</span>
               </button>
-
-              {/* Switch to Admin Portal Button */}
-              {onSwitchToAdmin && (
-                <button
-                  onClick={onSwitchToAdmin}
-                  className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
-                  title={t('app.switch_to_admin')}
-                >
-                  <Layers size={14} />
-                  <span>{t('app.admin_view')}</span>
-                </button>
-              )}
             </div>
           </div>
         </header>
@@ -205,13 +214,29 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
               })}
             </div>
 
-            {onSwitchToAdmin && (
+            {/* User Login / Profile status in desktop nav */}
+            {currentUser ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  User: <strong className="text-slate-800 dark:text-slate-200">{currentUser.name}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="text-xs text-rose-500 hover:text-rose-600 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <LogOut size={12} />
+                  <span>Logout</span>
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={onSwitchToAdmin}
-                className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 font-semibold cursor-pointer flex items-center gap-1 hover:underline"
+                type="button"
+                onClick={() => onNavigate('/login')}
+                className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700 font-bold hover:underline cursor-pointer flex items-center gap-1.5"
               >
-                <span>{t('app.switch_to_admin')}</span>
-                <span>&rarr;</span>
+                <LogIn size={13} />
+                <span>User Login / Register &rarr;</span>
               </button>
             )}
           </div>
@@ -255,13 +280,6 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate, onSwitc
           })}
         </div>
       </nav>
-
-      {/* Coastal Citizen & Fisherman Authentication & Registration Modal */}
-      <CitizenAuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        onUserAuthenticated={(user) => setCurrentUser(user)}
-      />
     </div>
   );
 };

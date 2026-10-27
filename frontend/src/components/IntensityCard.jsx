@@ -112,28 +112,54 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
               </div>
             </div>
 
-            {/* Clean Horizontal Wind Scale */}
-            <div className="space-y-1">
-              <div className="relative h-2.5 w-full bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden">
-                {/* 34 kt marker (24.3%) and 64 kt marker (45.7%) */}
-                <div className="absolute top-0 bottom-0 left-[24.3%] w-[1px] bg-slate-300 z-10" />
-                <div className="absolute top-0 bottom-0 left-[45.7%] w-[1px] bg-slate-300 z-10" />
+            {/* High-Contrast Horizontal Wind Scale */}
+            <div className="space-y-2 pt-1">
+              {/* Category Threshold Indicators (34kt and 64kt) */}
+              <div className="relative h-4 w-full text-[10px] font-bold">
+                <span 
+                  className="absolute -translate-x-1/2 text-amber-700 dark:text-amber-400 font-bold flex flex-col items-center" 
+                  style={{ left: '24.3%' }}
+                >
+                  <span>34 kt</span>
+                </span>
+                <span 
+                  className="absolute -translate-x-1/2 text-red-700 dark:text-red-400 font-bold flex flex-col items-center" 
+                  style={{ left: '45.7%' }}
+                >
+                  <span>64 kt</span>
+                </span>
+              </div>
+
+              {/* Main Bar Track */}
+              <div className="relative h-3.5 w-full bg-slate-200 dark:bg-slate-700/70 rounded-full overflow-hidden shadow-inner border border-slate-300/60 dark:border-slate-600/60">
+                {/* Zone Underlay Colors */}
+                <div className="absolute inset-0 flex">
+                  <div className="h-full bg-emerald-500/15 dark:bg-emerald-500/20" style={{ width: '24.3%' }} />
+                  <div className="h-full bg-amber-500/20 dark:bg-amber-500/20" style={{ width: '21.4%' }} />
+                  <div className="h-full bg-red-500/20 dark:bg-red-500/20 flex-1" />
+                </div>
+
+                {/* Vertical Boundary Markers at 34 kt and 64 kt */}
+                <div className="absolute top-0 bottom-0 w-[1.5px] bg-amber-600/80 dark:bg-amber-400 z-10" style={{ left: '24.3%' }} />
+                <div className="absolute top-0 bottom-0 w-[1.5px] bg-red-600/80 dark:bg-red-400 z-10" style={{ left: '45.7%' }} />
+
                 <div 
-                  className={`h-full transition-all duration-700 rounded-full ${
+                  className={`h-full transition-all duration-700 rounded-full shadow-md ${
                     currentClass === 'SEVERE'
-                      ? 'bg-red-500/100'
+                      ? 'bg-gradient-to-r from-orange-500 to-red-600'
                       : currentClass === 'MEDIUM'
-                      ? 'bg-amber-500/100'
-                      : 'bg-emerald-500/100'
+                      ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600'
+                      : 'bg-gradient-to-r from-emerald-400 to-emerald-600'
                   }`}
                   style={{ width: `${scalePercent}%` }}
                 />
               </div>
 
-              <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-400 font-medium px-0.5">
+              <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-300 font-semibold px-0.5">
                 <span>0 kt</span>
-                <span>34 kt</span>
-                <span>64 kt</span>
+                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                  TD &lt; 34 kt &bull; TS 34–63 kt &bull; TC &ge; 64 kt
+                </span>
                 <span>140 kt</span>
               </div>
             </div>
@@ -150,22 +176,22 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
       <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/30">
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/50 dark:border-slate-700/30">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-emerald-500/100/10 text-emerald-400">
+            <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
               <Gauge size={18} />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cyclone Classification</h3>
-              <span className="text-[11px] text-slate-600 dark:text-slate-400">Objective 3</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">Objective 3</span>
             </div>
           </div>
 
           {currentClass && (
-            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-xs ${
               currentClass === 'SEVERE'
-                ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40'
                 : currentClass === 'MEDIUM'
-                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40'
+                : 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40'
             }`}>
               {currentClass}
             </span>
@@ -175,7 +201,7 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
         {currentClass ? (
           <div className="space-y-3">
             {classDescription && (
-              <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
                 {classDescription}
               </p>
             )}
@@ -183,33 +209,45 @@ const IntensityCard = ({ intensity, classification, isCyclone, isAnalysisComplet
             {/* Strict 3-Tier Classification Table / Badge System */}
             <div className="grid grid-cols-3 gap-2 text-center">
               {/* Tier 1: LOW (< 34 kt) */}
-              <div className={`p-2.5 rounded-lg border text-xs transition-colors ${
+              <div className={`p-2.5 rounded-xl border text-xs transition-all ${
                 currentClass === 'LOW'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold ring-1 ring-emerald-300'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50 text-slate-600 dark:text-slate-400 font-medium'
+                  ? 'bg-emerald-50 border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-500/60 ring-2 ring-emerald-400/40 shadow-sm'
+                  : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60'
               }`}>
-                <p className="font-bold text-[11px]">LOW</p>
-                <p className="text-[10px] mt-0.5">&lt; 34 kt</p>
+                <p className={`font-bold text-[11px] ${
+                  currentClass === 'LOW' ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'
+                }`}>
+                  LOW
+                </p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">&lt; 34 kt (TD)</p>
               </div>
 
               {/* Tier 2: MEDIUM (>= 34 kt and < 64 kt) */}
-              <div className={`p-2.5 rounded-lg border text-xs transition-colors ${
+              <div className={`p-2.5 rounded-xl border text-xs transition-all ${
                 currentClass === 'MEDIUM'
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 font-bold ring-1 ring-amber-300'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50 text-slate-600 dark:text-slate-400 font-medium'
+                  ? 'bg-amber-50 border-amber-400 dark:bg-amber-950/40 dark:border-amber-500/60 ring-2 ring-amber-400/50 shadow-sm'
+                  : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60'
               }`}>
-                <p className="font-bold text-[11px]">MEDIUM</p>
-                <p className="text-[10px] mt-0.5">&ge; 34 to &lt; 64 kt</p>
+                <p className={`font-bold text-[11px] ${
+                  currentClass === 'MEDIUM' ? 'text-amber-900 dark:text-amber-200' : 'text-slate-700 dark:text-slate-300'
+                }`}>
+                  MEDIUM
+                </p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">34–63 kt (TS)</p>
               </div>
 
               {/* Tier 3: SEVERE (>= 64 kt) */}
-              <div className={`p-2.5 rounded-lg border text-xs transition-colors ${
+              <div className={`p-2.5 rounded-xl border text-xs transition-all ${
                 currentClass === 'SEVERE'
-                  ? 'bg-red-500/10 border-red-500/30 text-red-400 font-bold ring-1 ring-red-300'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200/50 dark:border-slate-700/50 text-slate-600 dark:text-slate-400 font-medium'
+                  ? 'bg-red-50 border-red-400 dark:bg-red-950/40 dark:border-red-500/60 ring-2 ring-red-400/40 shadow-sm'
+                  : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60'
               }`}>
-                <p className="font-bold text-[11px]">SEVERE</p>
-                <p className="text-[10px] mt-0.5">&ge; 64 kt</p>
+                <p className={`font-bold text-[11px] ${
+                  currentClass === 'SEVERE' ? 'text-red-800 dark:text-red-300' : 'text-slate-700 dark:text-slate-300'
+                }`}>
+                  SEVERE
+                </p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">&ge; 64 kt (TC)</p>
               </div>
             </div>
           </div>

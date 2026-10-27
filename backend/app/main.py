@@ -18,7 +18,8 @@ if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
 from services.ml_service import ml_service
-from routes import detection, intensity, classification, live_map, citizen, track
+from services.db import init_db, get_db
+from routes import detection, intensity, classification, live_map, citizen, track, auth
 
 
 @asynccontextmanager
@@ -28,7 +29,9 @@ async def lifespan(app: FastAPI):
     Loads all models (Detection, Intensity, Classification) once at application startup.
     Pre-warms the models so user requests never suffer from cold-start or disk-loading delays.
     Models stay resident in memory across requests.
+    Initializes MongoDB connection and seeds admin user.
     """
+    init_db()
     ml_service.load_all_models()
     yield
     # Cleanup logic if needed at shutdown
@@ -58,6 +61,7 @@ app.add_middleware(
 )
 
 # Include existing routes
+app.include_router(auth.router, prefix="/api")
 app.include_router(detection.router, prefix="/api")
 app.include_router(intensity.router, prefix="/api")
 app.include_router(classification.router, prefix="/api")
@@ -123,7 +127,7 @@ def get_system_status():
     return {
         "status": {
             "api": "Online",
-            "database": "Offline (No DB configured)",
+            "database": "Online (MongoDB: cyclosafe)" if get_db() is not None else "Offline (MongoDB unavailable)",
             "model": "Online" if ml_service.is_loaded else "Offline"
         },
         "model_version": "EfficientNetB0-CycloSafe (Active)",

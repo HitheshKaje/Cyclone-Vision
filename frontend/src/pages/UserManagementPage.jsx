@@ -356,7 +356,7 @@ const UserManagementPage = () => {
             onClick={() => setActiveSection('all')}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeSection === 'all'
-                ? 'bg-slate-900 text-white dark:bg-slate-700 dark:text-white shadow-xs'
+                ? 'bg-blue-600 text-white shadow-sm dark:bg-blue-600 dark:text-white'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -442,13 +442,10 @@ const UserManagementPage = () => {
               Fishermen and coastal citizens will appear here automatically in their respective sections when they register or log in on the Citizen Portal.
             </p>
           </div>
-          <a
-            href="/citizen"
-            className="mt-2 px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer inline-flex"
-          >
-            <span>Open Citizen Portal to Register</span>
-            <ChevronRight size={14} />
-          </a>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Live MongoDB synchronization active</span>
+          </div>
         </div>
       ) : (
         <>

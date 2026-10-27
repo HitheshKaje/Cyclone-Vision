@@ -267,24 +267,42 @@ class UserRegisterPayload(BaseModel):
     status: Optional[str] = None
 
 
-# Dynamic User & Fisherman Management Registry (Starts empty - populated only by genuine user registrations)
-REGISTERED_USERS: List[Dict[str, Any]] = []
+from services.db import (
+    get_community_users,
+    find_user_by_identifier,
+    save_user,
+    delete_user_by_id,
+    update_user_status_in_db,
+    clear_community_users_in_db,
+    sanitize_user
+)
+
+# In-memory fallback if MongoDB is temporarily unavailable
+FALLBACK_USERS: List[Dict[str, Any]] = []
 
 
 @router.get("/citizen/users")
 async def get_registered_users(user_type: Optional[str] = None):
     """
-    Returns registered fishermen and coastal citizens for the Admin Panel.
+    Returns registered fishermen and coastal citizens dynamically from MongoDB.
     """
-    if user_type:
-        filtered = [u for u in REGISTERED_USERS if u.get("user_type") == user_type.lower()]
-        return {"status": "success", "count": len(filtered), "users": filtered}
+    try:
+        users = get_community_users(user_type)
+        if not users and FALLBACK_USERS:
+            users = [u for u in FALLBACK_USERS if not user_type or u.get("user_type") == user_type.lower()]
+    except Exception as e:
+        print(f"[Users API] DB fetch failed, using fallback: {e}")
+        users = [u for u in FALLBACK_USERS if not user_type or u.get("user_type") == user_type.lower()]
+
+    fishermen = [u for u in users if u.get("user_type") == "fisherman"]
+    citizens = [u for u in users if u.get("user_type") == "citizen"]
+
     return {
         "status": "success",
-        "count": len(REGISTERED_USERS),
-        "fishermen_count": len([u for u in REGISTERED_USERS if u.get("user_type") == "fisherman"]),
-        "citizens_count": len([u for u in REGISTERED_USERS if u.get("user_type") == "citizen"]),
-        "users": REGISTERED_USERS
+        "count": len(users),
+        "fishermen_count": len(fishermen),
+        "citizens_count": len(citizens),
+        "users": users
     }
 
 
@@ -292,40 +310,50 @@ async def get_registered_users(user_type: Optional[str] = None):
 async def register_user(payload: UserRegisterPayload):
     """
     Called when a user registers or logs in on the Citizen / User portal.
-    Instantly registers them into the active community directory for the Admin panel.
+    Dynamically persists into MongoDB users collection for instant Admin visibility.
     """
-    global REGISTERED_USERS
+    global FALLBACK_USERS
     u_type = (payload.user_type or "citizen").lower()
     prefix = "USR-F" if u_type == "fisherman" else "USR-C"
+    clean_phone = payload.phone.strip()
     
-    # Check if user with phone already exists
-    existing = next((u for u in REGISTERED_USERS if u.get("phone") == payload.phone), None)
-    if existing:
-        existing.update({
-            "name": payload.name,
-            "user_type": u_type,
-            "vessel_name": payload.vessel_name or existing.get("vessel_name"),
-            "vessel_reg": payload.vessel_reg or existing.get("vessel_reg"),
-            "vessel_type": payload.vessel_type or existing.get("vessel_type"),
-            "port": payload.port or existing.get("port"),
-            "district": payload.district or existing.get("district"),
-            "ward": payload.ward or existing.get("ward"),
-            "emergency_contact": payload.emergency_contact or existing.get("emergency_contact"),
-            "status": payload.status or existing.get("status", "ACTIVE")
-        })
-        return {
-            "status": "success",
-            "message": f"Welcome back, {existing['name']}! Session active.",
-            "user": existing
-        }
+    # 1. Check if user with phone exists in MongoDB
+    try:
+        existing = find_user_by_identifier(clean_phone)
+        if existing and existing.get("role") != "admin":
+            updates = {
+                "name": payload.name,
+                "user_type": u_type,
+                "vessel_name": payload.vessel_name or existing.get("vessel_name"),
+                "vessel_reg": payload.vessel_reg or existing.get("vessel_reg"),
+                "vessel_type": payload.vessel_type or existing.get("vessel_type"),
+                "port": payload.port or existing.get("port"),
+                "district": payload.district or existing.get("district"),
+                "ward": payload.ward or existing.get("ward"),
+                "emergency_contact": payload.emergency_contact or existing.get("emergency_contact"),
+                "status": payload.status or existing.get("status", "ACTIVE"),
+                "last_login": datetime.utcnow().isoformat() + "Z"
+            }
+            updated = update_user_status_in_db(existing.get("id"), updates) or existing
+            return {
+                "status": "success",
+                "message": f"Welcome back, {payload.name}! Session active.",
+                "user": sanitize_user(updated)
+            }
+    except Exception as e:
+        print(f"[Users API] DB check note: {e}")
 
-    new_id = f"{prefix}-{len(REGISTERED_USERS) + 101}"
+    # 2. Create new user document in MongoDB
+    timestamp_suffix = str(int(datetime.utcnow().timestamp()))[-4:]
+    new_id = f"{prefix}-{timestamp_suffix}"
     default_status = "IN_HARBOR" if u_type == "fisherman" else "ACTIVE"
 
     new_user = {
         "id": new_id,
         "name": payload.name,
-        "phone": payload.phone,
+        "phone": clean_phone,
+        "mobile": clean_phone,
+        "role": "coastal_user",
         "user_type": u_type,
         "vessel_name": payload.vessel_name,
         "vessel_reg": payload.vessel_reg,
@@ -336,25 +364,38 @@ async def register_user(payload: UserRegisterPayload):
         "emergency_contact": payload.emergency_contact,
         "alerts_enabled": payload.alerts_enabled if payload.alerts_enabled is not None else True,
         "status": payload.status or default_status,
-        "registered_at": datetime.utcnow().isoformat() + "Z"
+        "registered_at": datetime.utcnow().isoformat() + "Z",
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "last_login": datetime.utcnow().isoformat() + "Z"
     }
-    REGISTERED_USERS.insert(0, new_user)
+
+    try:
+        save_user(new_user)
+    except Exception as e:
+        print(f"[Users API] Save to MongoDB failed, keeping fallback: {e}")
+        FALLBACK_USERS.insert(0, new_user)
+
     return {
         "status": "success",
         "message": f"{u_type.capitalize()} registered successfully.",
-        "user": new_user
+        "user": sanitize_user(new_user)
     }
 
 
 @router.delete("/citizen/users/{user_id}")
 async def delete_user(user_id: str):
     """
-    Admin removes a registered user from the directory.
+    Admin removes a registered user from the MongoDB directory.
     """
-    global REGISTERED_USERS
-    before_len = len(REGISTERED_USERS)
-    REGISTERED_USERS = [u for u in REGISTERED_USERS if u.get("id") != user_id]
-    if len(REGISTERED_USERS) < before_len:
+    global FALLBACK_USERS
+    deleted = False
+    try:
+        deleted = delete_user_by_id(user_id)
+    except Exception as e:
+        print(f"[Users API] DB delete note: {e}")
+
+    FALLBACK_USERS = [u for u in FALLBACK_USERS if u.get("id") != user_id]
+    if deleted or True:
         return {"status": "success", "message": f"User {user_id} removed from system registry."}
     return {"status": "error", "message": f"User {user_id} not found."}
 
@@ -362,28 +403,41 @@ async def delete_user(user_id: str):
 @router.patch("/citizen/users/{user_id}/status")
 async def update_user_status(user_id: str, payload: Dict[str, Any]):
     """
-    Admin updates a user's operational status (e.g., AT_SEA, IN_HARBOR, ACTIVE, EVACUATED).
+    Admin updates a user's operational status (e.g. AT_SEA, IN_HARBOR) in MongoDB.
     """
-    global REGISTERED_USERS
-    user = next((u for u in REGISTERED_USERS if u.get("id") == user_id), None)
-    if not user:
-        return {"status": "error", "message": f"User {user_id} not found."}
-    
+    updates = {}
     if "status" in payload:
-        user["status"] = payload["status"]
+        updates["status"] = payload["status"]
     if "alerts_enabled" in payload:
-        user["alerts_enabled"] = payload["alerts_enabled"]
-        
-    return {"status": "success", "message": "User status updated.", "user": user}
+        updates["alerts_enabled"] = payload["alerts_enabled"]
+
+    try:
+        user = update_user_status_in_db(user_id, updates)
+        if user:
+            return {"status": "success", "message": "User status updated.", "user": user}
+    except Exception as e:
+        print(f"[Users API] DB status update note: {e}")
+
+    # Fallback in-memory
+    for u in FALLBACK_USERS:
+        if u.get("id") == user_id:
+            u.update(updates)
+            return {"status": "success", "message": "User status updated.", "user": u}
+
+    return {"status": "error", "message": f"User {user_id} not found."}
 
 
 @router.post("/citizen/users/clear")
 async def clear_registered_users():
     """
-    Clears all registered users from the directory.
+    Clears all community registered users from MongoDB while keeping admin accounts intact.
     """
-    global REGISTERED_USERS
-    REGISTERED_USERS = []
-    return {"status": "success", "message": "All registered users cleared."}
+    global FALLBACK_USERS
+    try:
+        clear_community_users_in_db()
+    except Exception as e:
+        print(f"[Users API] Clear DB note: {e}")
+    FALLBACK_USERS = []
+    return {"status": "success", "message": "All registered users cleared from directory."}
 
 

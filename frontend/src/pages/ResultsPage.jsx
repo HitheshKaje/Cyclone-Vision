@@ -512,52 +512,56 @@ const ResultsPage = ({
                   </span>
                 </div>
 
-                {/* Dynamic Recharts BarChart Gauge */}
-                <div className="space-y-1 mt-2">
-                  <div className="h-20 w-full relative -ml-2">
-                    <svg style={{ height: 0, width: 0, position: 'absolute' }}>
-                      <defs>
-                        <linearGradient id="gradSevere" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#fca5a5" />
-                          <stop offset="100%" stopColor="#ef4444" />
-                        </linearGradient>
-                        <linearGradient id="gradMedium" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#fcd34d" />
-                          <stop offset="100%" stopColor="#f59e0b" />
-                        </linearGradient>
-                        <linearGradient id="gradLow" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#6ee7b7" />
-                          <stop offset="100%" stopColor="#10b981" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart layout="vertical" data={intensityData} margin={{ top: 15, right: 15, bottom: 5, left: 15 }}>
-                        <XAxis type="number" domain={[0, 140]} hide />
-                        <YAxis dataKey="name" type="category" hide />
-                        
-                        <ReferenceLine x={34} stroke="#f59e0b" strokeDasharray="3 3" label={{ position: 'top', value: '34kt', fill: '#f59e0b', fontSize: 10, fontWeight: 600 }} />
-                        <ReferenceLine x={64} stroke="#ef4444" strokeDasharray="3 3" label={{ position: 'top', value: '64kt', fill: '#ef4444', fontSize: 10, fontWeight: 600 }} />
-                        
-                        <RechartsTooltip 
-                          cursor={{ fill: 'transparent' }} 
-                          formatter={(value) => [`${value} kt`, 'Estimated Wind Speed']}
-                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                        />
-                        
-                        <Bar 
-                          dataKey="value" 
-                          barSize={16}
-                          radius={[4, 4, 4, 4]}
-                          fill={`url(#${gradientId})`}
-                          background={{ fill: '#1e293b', radius: 4 }}
-                          isAnimationActive={true}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
+                {/* High-Contrast Theme-Aware Intensity Scale */}
+                <div className="space-y-3 pt-1">
+                  {/* Category Threshold Indicators (34kt and 64kt) */}
+                  <div className="relative h-4 w-full text-[11px] font-bold">
+                    <span 
+                      className="absolute -translate-x-1/2 text-amber-700 dark:text-amber-400 font-bold flex flex-col items-center" 
+                      style={{ left: '24.3%' }}
+                    >
+                      <span>34 kt</span>
+                    </span>
+                    <span 
+                      className="absolute -translate-x-1/2 text-red-700 dark:text-red-400 font-bold flex flex-col items-center" 
+                      style={{ left: '45.7%' }}
+                    >
+                      <span>64 kt</span>
+                    </span>
                   </div>
-                  <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-400 font-medium px-2 pb-1">
+
+                  {/* Main Bar Track */}
+                  <div className="relative h-4 w-full bg-slate-200 dark:bg-slate-700/70 rounded-full overflow-hidden shadow-inner border border-slate-300/60 dark:border-slate-600/60">
+                    {/* Zone Underlay Colors (Subtle background tints for TD, TS, TC) */}
+                    <div className="absolute inset-0 flex">
+                      <div className="h-full bg-emerald-500/15 dark:bg-emerald-500/20" style={{ width: '24.3%' }} />
+                      <div className="h-full bg-amber-500/20 dark:bg-amber-500/20" style={{ width: '21.4%' }} />
+                      <div className="h-full bg-red-500/20 dark:bg-red-500/20 flex-1" />
+                    </div>
+
+                    {/* Vertical Boundary Markers at 34 kt and 64 kt */}
+                    <div className="absolute top-0 bottom-0 w-[2px] bg-amber-600/80 dark:bg-amber-400 z-10" style={{ left: '24.3%' }} />
+                    <div className="absolute top-0 bottom-0 w-[2px] bg-red-600/80 dark:bg-red-400 z-10" style={{ left: '45.7%' }} />
+
+                    {/* Active Wind Speed Fill */}
+                    <div 
+                      className={`h-full rounded-full transition-all duration-700 shadow-md ${
+                        calculatedClassification === 'SEVERE'
+                          ? 'bg-gradient-to-r from-orange-500 to-red-600'
+                          : calculatedClassification === 'MEDIUM'
+                          ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600'
+                          : 'bg-gradient-to-r from-emerald-400 to-emerald-600'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, ((windKt || 0) / 140) * 100))}%` }}
+                    />
+                  </div>
+
+                  {/* Scale Labels & Legend */}
+                  <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600 dark:text-slate-300 px-0.5">
                     <span>0 kt</span>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      TD &lt; 34 kt &bull; TS 34–63 kt &bull; TC &ge; 64 kt
+                    </span>
                     <span>140 kt</span>
                   </div>
                 </div>
@@ -569,24 +573,24 @@ const ResultsPage = ({
           <div className="app-card p-5 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200/50 dark:border-slate-700/30">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-400">
+                <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   <Gauge size={18} />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                     Classification
                   </h3>
-                  <span className="text-[11px] text-slate-600 dark:text-slate-400">Objective 3</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">Objective 3</span>
                 </div>
               </div>
 
               {calculatedClassification && calculatedClassification !== 'Not Applicable' && (
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-xs ${
                   calculatedClassification === 'SEVERE'
-                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                    ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40'
                     : calculatedClassification === 'MEDIUM'
-                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40'
                 }`}>
                   {calculatedClassification}
                 </span>
@@ -595,7 +599,7 @@ const ResultsPage = ({
 
             {!isValidSatellite ? (
               <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center space-y-1">
-                <p className="text-sm font-bold text-amber-500 dark:text-amber-400">
+                <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
                   Classification: Not Applicable
                 </p>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
@@ -617,38 +621,56 @@ const ResultsPage = ({
                 {/* 3-Tier Classification Cards */}
                 <div className="grid grid-cols-3 gap-2.5 text-center">
                   {/* LOW (< 34 kt) */}
-                  <div className={`p-3 rounded-xl border text-xs transition-colors ${
+                  <div className={`p-3 rounded-xl border text-xs transition-all ${
                     calculatedClassification === 'LOW'
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold ring-2 ring-emerald-300 shadow-xs'
-                      : 'bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-700/50 text-slate-600 dark:text-slate-400'
+                      ? 'bg-emerald-50 border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-500/60 ring-2 ring-emerald-400/40 shadow-sm'
+                      : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60'
                   }`}>
-                    <p className="font-bold text-xs">LOW</p>
-                    <p className="text-[10px] mt-0.5">&lt; 34 kt</p>
+                    <p className={`font-bold text-xs ${
+                      calculatedClassification === 'LOW'
+                        ? 'text-emerald-800 dark:text-emerald-300'
+                        : 'text-slate-700 dark:text-slate-300'
+                    }`}>
+                      LOW
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">&lt; 34 kt (TD)</p>
                   </div>
 
                   {/* MEDIUM (34–63 kt) */}
-                  <div className={`p-3 rounded-xl border text-xs transition-colors ${
+                  <div className={`p-3 rounded-xl border text-xs transition-all ${
                     calculatedClassification === 'MEDIUM'
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 font-bold ring-2 ring-amber-300 shadow-xs'
-                      : 'bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-700/50 text-slate-600 dark:text-slate-400'
+                      ? 'bg-amber-50 border-amber-400 dark:bg-amber-950/40 dark:border-amber-500/60 ring-2 ring-amber-400/50 shadow-sm'
+                      : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60'
                   }`}>
-                    <p className="font-bold text-xs">MEDIUM</p>
-                    <p className="text-[10px] mt-0.5">34–63 kt</p>
+                    <p className={`font-bold text-xs ${
+                      calculatedClassification === 'MEDIUM'
+                        ? 'text-amber-900 dark:text-amber-200'
+                        : 'text-slate-700 dark:text-slate-300'
+                    }`}>
+                      MEDIUM
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">34–63 kt (TS)</p>
                   </div>
 
                   {/* SEVERE (>= 64 kt) */}
-                  <div className={`p-3 rounded-xl border text-xs transition-colors ${
+                  <div className={`p-3 rounded-xl border text-xs transition-all ${
                     calculatedClassification === 'SEVERE'
-                      ? 'bg-red-500/10 border-red-500/30 text-red-400 font-bold ring-2 ring-red-300 shadow-xs'
-                      : 'bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-700/50 text-slate-600 dark:text-slate-400'
+                      ? 'bg-red-50 border-red-400 dark:bg-red-950/40 dark:border-red-500/60 ring-2 ring-red-400/40 shadow-sm'
+                      : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60'
                   }`}>
-                    <p className="font-bold text-xs">SEVERE</p>
-                    <p className="text-[10px] mt-0.5">&ge; 64 kt</p>
+                    <p className={`font-bold text-xs ${
+                      calculatedClassification === 'SEVERE'
+                        ? 'text-red-800 dark:text-red-300'
+                        : 'text-slate-700 dark:text-slate-300'
+                    }`}>
+                      SEVERE
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">&ge; 64 kt (TC)</p>
                   </div>
                 </div>
 
                 {classification?.description && (
-                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium pt-1">
+                  <p className="text-xs text-slate-700 dark:text-slate-300 font-medium pt-1">
                     {classification.description}
                   </p>
                 )}

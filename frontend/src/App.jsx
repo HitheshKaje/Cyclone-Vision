@@ -1,6 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
+import AuthPage from './pages/AuthPage';
+import { getAdminAuth, logoutAdmin } from './utils/authService';
 
 const CitizenApp = lazy(() => import('./citizen/CitizenApp'));
 
@@ -13,7 +15,9 @@ function App() {
   const [analysisHistory, setAnalysisHistory] = useState([]);
   const [analysisStatus, setAnalysisStatus] = useState('idle');
   const [currentStage, setCurrentStage] = useState(null);
-  // Default theme is LIGHT mode (false). If user toggles to dark, persist in localStorage.
+  const [adminUser, setAdminUser] = useState(() => getAdminAuth());
+
+  // Theme state
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedTheme = localStorage.getItem('theme') || localStorage.getItem('cyclosafe_theme');
@@ -21,7 +25,7 @@ function App() {
         return savedTheme === 'dark';
       }
     } catch (_) {}
-    return false; // Default to LIGHT mode
+    return false;
   });
 
   const toggleDarkMode = () => {
@@ -36,7 +40,6 @@ function App() {
   };
 
   useEffect(() => {
-    // Sync dark class on documentElement
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -45,7 +48,6 @@ function App() {
   }, [isDarkMode]);
 
   useEffect(() => {
-    // Auto-migrate any legacy port 8000 to active backend port 8001
     try {
       const stored = localStorage.getItem('API_BASE_URL');
       if (stored && stored.includes(':8000')) {
@@ -55,6 +57,7 @@ function App() {
 
     const handlePopState = () => {
       setCurrentPath(window.location.pathname);
+      setAdminUser(getAdminAuth());
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -65,10 +68,58 @@ function App() {
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', path);
       setCurrentPath(path);
+      setAdminUser(getAdminAuth());
     }
   };
 
-  // If path is for the Citizen Portal (/citizen, /citizen/map, etc.) or dedicated Lighthouse Station (/lighthouse)
+  const handleAdminLogout = () => {
+    logoutAdmin();
+    setAdminUser(null);
+    navigateTo('/admin/login');
+  };
+
+  // 1. ROUTE: Admin Dedicated Login Page (/admin/login)
+  if (currentPath === '/admin/login') {
+    return (
+      <AuthPage
+        initialRole="admin"
+        initialMode="login"
+        onAdminSuccess={() => {
+          setAdminUser(getAdminAuth());
+          navigateTo('/admin');
+        }}
+        onUserSuccess={() => {
+          navigateTo('/citizen');
+        }}
+        onNavigate={navigateTo}
+      />
+    );
+  }
+
+  // 2. ROUTE: User & Citizen / Fisherman Login & Register (/login, /register, /user/login)
+  if (
+    currentPath === '/login' || 
+    currentPath === '/register' || 
+    currentPath === '/user/login' ||
+    currentPath === '/citizen/login'
+  ) {
+    return (
+      <AuthPage
+        initialRole="user"
+        initialMode={currentPath === '/login' ? 'login' : 'register'}
+        onAdminSuccess={() => {
+          setAdminUser(getAdminAuth());
+          navigateTo('/admin');
+        }}
+        onUserSuccess={() => {
+          navigateTo('/citizen');
+        }}
+        onNavigate={navigateTo}
+      />
+    );
+  }
+
+  // 3. ROUTE: Citizen Coastal Safety Portal (/citizen, /citizen/map, etc.) & Lighthouse Terminal
   if (currentPath.startsWith('/citizen') || currentPath === '/lighthouse') {
     return (
       <Suspense fallback={
@@ -79,21 +130,39 @@ function App() {
         <CitizenApp
           currentPath={currentPath}
           onNavigate={navigateTo}
-          onSwitchToAdmin={() => navigateTo('/')}
         />
       </Suspense>
     );
   }
 
-  // Otherwise, render existing Admin Dashboard completely untouched
+  // 4. ROUTE: Protected Admin Command Center (/admin, /, or other admin routes)
+  // Enforces authentication: If unauthenticated, render AuthPage in Admin mode
+  if (!adminUser) {
+    return (
+      <AuthPage
+        initialRole="admin"
+        initialMode="login"
+        onAdminSuccess={() => {
+          setAdminUser(getAdminAuth());
+          navigateTo('/admin');
+        }}
+        onUserSuccess={() => {
+          navigateTo('/citizen');
+        }}
+        onNavigate={navigateTo}
+      />
+    );
+  }
+
+  // Render Admin Dashboard for authenticated administrators
   return (
     <MainLayout 
       activeTab={activeTab} 
       setActiveTab={setActiveTab}
       isDarkMode={isDarkMode}
       toggleDarkMode={toggleDarkMode}
-      onNavigateToCitizen={() => navigateTo('/citizen')}
-      onNavigateToLighthouse={() => navigateTo('/lighthouse')}
+      onLogout={handleAdminLogout}
+      adminUser={adminUser}
     >
       <Dashboard 
         activeTab={activeTab} 
@@ -112,4 +181,3 @@ function App() {
 }
 
 export default App;
-

@@ -61,18 +61,30 @@ class CycloneClassifier:
 
         if vmax < self.low_max:
             classification = "LOW"
+            category = "Tropical Depression (TD)"
+            category_code = "TD"
+            wmo_range = "Vmax < 34 kt (31-61 km/h)"
             description = "Low-intensity tropical disturbance / depression"
         elif vmax < self.medium_max:
             classification = "MEDIUM"
+            category = "Tropical Storm (TS)"
+            category_code = "TS"
+            wmo_range = "34 kt <= Vmax < 64 kt (62-118 km/h)"
             description = "Moderate-intensity cyclonic storm"
         else:
             classification = "SEVERE"
+            category = "Tropical Cyclone (TC)"
+            category_code = "TC"
+            wmo_range = "Vmax >= 64 kt (>= 119 km/h)"
             description = "High-intensity severe tropical cyclone"
 
         return {
             "wind_speed_kt": wind_speed_kt_rounded,
             "wind_speed_kmh": wind_speed_kmh,
             "classification": classification,
+            "category": category,
+            "category_code": category_code,
+            "wmo_range": wmo_range,
             "description": description
         }
 

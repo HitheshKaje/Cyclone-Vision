@@ -22,7 +22,7 @@ const PageLoader = () => {
   );
 };
 
-const CitizenApp = ({ currentPath, onNavigate, onSwitchToAdmin }) => {
+const CitizenApp = ({ currentPath, onNavigate }) => {
   // Dedicated fullscreen Coastal Lighthouse Terminal (for user's secondary mobile phone)
   if (currentPath === '/lighthouse' || currentPath === '/citizen/lighthouse') {
     return (
@@ -68,7 +68,6 @@ const CitizenApp = ({ currentPath, onNavigate, onSwitchToAdmin }) => {
     <CitizenLayout
       currentPath={currentPath}
       onNavigate={onNavigate}
-      onSwitchToAdmin={onSwitchToAdmin}
     >
       {renderCitizenPage()}
     </CitizenLayout>

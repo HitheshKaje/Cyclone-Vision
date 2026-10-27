@@ -2,8 +2,10 @@ import os
 import sys
 import time
 import logging
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from typing import Optional
+from fastapi import APIRouter, File, UploadFile, HTTPException, Query, Header
 from services.ml_service import ml_service
+from services.cloud_vision_service import cloud_vision_service
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
@@ -17,11 +19,47 @@ def get_intensity_model():
         ml_service.load_all_models()
     return ml_service.intensity_model
 
+@router.post("/intensity/cloud")
+async def estimate_cyclone_intensity_cloud(
+    image: UploadFile = File(...),
+    api_key: Optional[str] = Query(None, description="Optional Google Gemini API Key"),
+    x_gemini_api_key: Optional[str] = Header(None, alias="X-Gemini-API-Key")
+):
+    """
+    API-Only Intensity Estimation & 3-Tier WMO Classification:
+    Uses External Cloud Vision API (Google Gemini 1.5 Flash Vision) without needing
+    any local .keras or TensorFlow model files.
+    """
+    if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file format. Please upload a valid satellite image (JPG, PNG, TIFF)."
+        )
+
+    try:
+        import asyncio
+        image_bytes = await image.read()
+        mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
+        effective_key = api_key or x_gemini_api_key
+
+        return await asyncio.to_thread(
+            cloud_vision_service.estimate_with_gemini,
+            image_bytes=image_bytes,
+            mime_type=mime_type,
+            api_key=effective_key
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cloud API intensity estimation error: {str(e)}")
+
 @router.post("/intensity")
-async def estimate_cyclone_intensity(image: UploadFile = File(...)):
+async def estimate_cyclone_intensity(
+    image: UploadFile = File(...),
+    use_cloud: bool = Query(False, description="Set to true to use Cloud Vision API instead of local model"),
+    api_key: Optional[str] = Query(None, description="Optional Gemini API key when use_cloud=true")
+):
     """
     Estimate maximum sustained wind speed (Vmax in knots) and classify intensity (LOW, MEDIUM, SEVERE).
-    Uses the in-memory cached model loaded at startup with zero disk I/O.
+    Supports both local ML model and Cloud Vision API (zero local model).
     """
     # 1. Validate file format
     if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
@@ -30,14 +68,22 @@ async def estimate_cyclone_intensity(image: UploadFile = File(...)):
             detail="Unsupported file format. Please upload a valid satellite image (JPG, PNG, TIFF)."
         )
 
-    t_start = time.perf_counter()
-
     try:
-        # 2. Read image directly in memory (zero disk I/O)
-        t0 = time.perf_counter()
         image_bytes = await image.read()
+
+        # If Cloud API mode is requested:
+        if use_cloud:
+            import asyncio
+            mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
+            return await asyncio.to_thread(
+                cloud_vision_service.estimate_with_gemini,
+                image_bytes=image_bytes,
+                mime_type=mime_type,
+                api_key=api_key
+            )
+
+        # 2. Read image directly in memory (zero disk I/O)
         img_bgr = ml_service.decode_image_bytes(image_bytes)
-        t_read = time.perf_counter() - t0
 
         # 3. Run Objective 2 intensity estimation & Objective 3 rule-based classification
         try:
@@ -52,6 +98,9 @@ async def estimate_cyclone_intensity(image: UploadFile = File(...)):
                 "wind_speed_kt": 45.0,
                 "wind_speed_kmh": 83.3,
                 "classification": classification_result["classification"],
+                "category": classification_result.get("category", "Tropical Storm (TS)"),
+                "category_code": classification_result.get("category_code", "TS"),
+                "wmo_range": classification_result.get("wmo_range", "34 kt <= Vmax < 64 kt (62-118 km/h)"),
                 "description": classification_result["description"],
                 "model": "EfficientNetB0-TCIR-Intensity (Safe Fallback)"
             }
