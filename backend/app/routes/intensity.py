@@ -27,7 +27,7 @@ async def estimate_cyclone_intensity_cloud(
 ):
     """
     API-Only Intensity Estimation & 3-Tier WMO Classification:
-    Uses External Cloud Vision API (Google Gemini 1.5 Flash Vision) without needing
+    Uses External Cloud Vision API (Google Gemini 2.5 Flash Vision) without needing
     any local .keras or TensorFlow model files.
     """
     if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
@@ -54,12 +54,12 @@ async def estimate_cyclone_intensity_cloud(
 @router.post("/intensity")
 async def estimate_cyclone_intensity(
     image: UploadFile = File(...),
-    use_cloud: bool = Query(False, description="Set to true to use Cloud Vision API instead of local model"),
-    api_key: Optional[str] = Query(None, description="Optional Gemini API key when use_cloud=true")
+    api_key: Optional[str] = Query(None, description="Optional Gemini API key")
 ):
     """
     Estimate maximum sustained wind speed (Vmax in knots) and classify intensity (LOW, MEDIUM, SEVERE).
-    Supports both local ML model and Cloud Vision API (zero local model).
+    Primary Engine: Google Gemini 2.5 Flash Vision AI.
+    Fallback Engine: Local ML model.
     """
     # 1. Validate file format
     if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
@@ -70,22 +70,23 @@ async def estimate_cyclone_intensity(
 
     try:
         image_bytes = await image.read()
+        mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
 
-        # If Cloud API mode is requested:
-        if use_cloud:
+        # 1. Primary Engine: Google Gemini 2.5 Flash Vision API
+        try:
             import asyncio
-            mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
-            return await asyncio.to_thread(
+            result = await asyncio.to_thread(
                 cloud_vision_service.estimate_with_gemini,
                 image_bytes=image_bytes,
                 mime_type=mime_type,
                 api_key=api_key
             )
+            return result
+        except Exception as g_err:
+            logger.warning(f"[Intensity API] Gemini engine notice ({g_err}), utilizing fallback model.")
 
-        # 2. Read image directly in memory (zero disk I/O)
+        # 2. Fallback Engine: Local ML Model
         img_bgr = ml_service.decode_image_bytes(image_bytes)
-
-        # 3. Run Objective 2 intensity estimation & Objective 3 rule-based classification
         try:
             result, t_prep, t_infer, t_class = ml_service.run_intensity_and_classification(img_bgr)
             return result

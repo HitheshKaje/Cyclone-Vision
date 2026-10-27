@@ -521,44 +521,48 @@ const AnalyzePage = ({
                 {/* Step 1: Cyclone Detection */}
                 <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 transition-colors ${
                   isCompleted || currentStage === 'Intensity' || currentStage === 'Classification'
-                    ? 'bg-emerald-500/10/60 border-emerald-500/20/70 text-slate-800 dark:text-slate-200'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-slate-800 dark:text-slate-200'
                     : currentStage === 'Detection'
-                    ? 'bg-emerald-500/100/10/70 border-sky-200 text-slate-800 dark:text-slate-200 ring-1 ring-sky-200'
-                    : 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-700/50/70 text-slate-500'
+                    ? 'bg-sky-500/10 border-sky-300 text-slate-800 dark:text-slate-200 ring-1 ring-sky-300'
+                    : 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
                 }`}>
                   {isCompleted || currentStage === 'Intensity' || currentStage === 'Classification' ? (
                     <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                   ) : currentStage === 'Detection' ? (
-                    <Loader2 size={18} className="animate-spin text-emerald-400 shrink-0" />
+                    <Loader2 size={18} className="animate-spin text-emerald-500 shrink-0" />
                   ) : (
                     <Target size={18} className="text-slate-600 dark:text-slate-400 shrink-0" />
                   )}
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-slate-100">1. Cyclone Detection</p>
                     <p className="text-[10px] text-slate-500">
-                      {currentStage === 'Detection' ? 'Processing...' : isCompleted ? 'Completed' : 'Pending'}
+                      {currentStage === 'Detection' 
+                        ? 'Processing...' 
+                        : (isCompleted || currentStage === 'Intensity' || currentStage === 'Classification') 
+                        ? 'Completed' 
+                        : 'Pending'}
                     </p>
                   </div>
                 </div>
 
                 {/* Step 2: Intensity Estimation */}
                 <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 transition-colors ${
-                  isCompleted
+                  isCompleted || currentStage === 'Classification'
                     ? currentAnalysis?.detection?.is_cyclone === false
-                      ? 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-700/50/70 text-slate-500'
-                      : 'bg-emerald-500/10/60 border-emerald-500/20/70 text-slate-800 dark:text-slate-200'
+                      ? 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
+                      : 'bg-emerald-500/10 border-emerald-500/20 text-slate-800 dark:text-slate-200'
                     : currentStage === 'Intensity'
-                    ? 'bg-emerald-500/100/10/70 border-sky-200 text-slate-800 dark:text-slate-200 ring-1 ring-sky-200'
-                    : 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-700/50/70 text-slate-500'
+                    ? 'bg-sky-500/10 border-sky-300 text-slate-800 dark:text-slate-200 ring-1 ring-sky-300'
+                    : 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
                 }`}>
-                  {isCompleted ? (
+                  {isCompleted || currentStage === 'Classification' ? (
                     currentAnalysis?.detection?.is_cyclone === false ? (
                       <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 text-[10px] font-bold flex items-center justify-center shrink-0">—</span>
                     ) : (
                       <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                     )
                   ) : currentStage === 'Intensity' ? (
-                    <Loader2 size={18} className="animate-spin text-emerald-400 shrink-0" />
+                    <Loader2 size={18} className="animate-spin text-emerald-500 shrink-0" />
                   ) : (
                     <Wind size={18} className="text-slate-600 dark:text-slate-400 shrink-0" />
                   )}
@@ -567,7 +571,7 @@ const AnalyzePage = ({
                     <p className="text-[10px] text-slate-500">
                       {currentStage === 'Intensity'
                         ? 'Estimating...'
-                        : isCompleted
+                        : (isCompleted || currentStage === 'Classification')
                         ? (currentAnalysis?.detection?.is_cyclone === false ? 'Skipped (No Cyclone)' : 'Completed')
                         : 'Pending'}
                     </p>
@@ -578,11 +582,11 @@ const AnalyzePage = ({
                 <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 transition-colors ${
                   isCompleted
                     ? currentAnalysis?.detection?.is_cyclone === false
-                      ? 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-700/50/70 text-slate-500'
-                      : 'bg-emerald-500/10/60 border-emerald-500/20/70 text-slate-800 dark:text-slate-200'
+                      ? 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
+                      : 'bg-emerald-500/10 border-emerald-500/20 text-slate-800 dark:text-slate-200'
                     : currentStage === 'Classification'
-                    ? 'bg-emerald-500/100/10/70 border-sky-200 text-slate-800 dark:text-slate-200 ring-1 ring-sky-200'
-                    : 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-700/50/70 text-slate-500'
+                    ? 'bg-sky-500/10 border-sky-300 text-slate-800 dark:text-slate-200 ring-1 ring-sky-300'
+                    : 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
                 }`}>
                   {isCompleted ? (
                     currentAnalysis?.detection?.is_cyclone === false ? (
@@ -591,7 +595,7 @@ const AnalyzePage = ({
                       <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                     )
                   ) : currentStage === 'Classification' ? (
-                    <Loader2 size={18} className="animate-spin text-emerald-400 shrink-0" />
+                    <Loader2 size={18} className="animate-spin text-emerald-500 shrink-0" />
                   ) : (
                     <Gauge size={18} className="text-slate-600 dark:text-slate-400 shrink-0" />
                   )}

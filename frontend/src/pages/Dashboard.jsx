@@ -8,6 +8,7 @@ import SettingsPage from './SettingsPage';
 import SevenDaysPrediction from './SevenDaysPrediction';
 import LogsPage from './LogsPage';
 import UserManagementPage from './UserManagementPage';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const Dashboard = ({
   activeTab = 'home',
@@ -23,7 +24,8 @@ const Dashboard = ({
   adminUser
 }) => {
   return (
-    <div>
+    <ErrorBoundary fallbackAction={() => setActiveTab('home')}>
+      <div>
       {/* 1. HOME TAB */}
       {activeTab === 'home' && (
         <HomePage 
@@ -98,7 +100,8 @@ const Dashboard = ({
       {activeTab === 'users' && (
         <UserManagementPage />
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };
 

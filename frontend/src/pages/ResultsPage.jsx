@@ -124,6 +124,7 @@ const ResultsPage = ({
 
   // --- Dynamic Aggregated Stats for Graphs ---
   // 1. Model Performance (Pseudo-dynamic based on avg confidence)
+  const scansWithConfidence = (analysisHistory || []).filter(h => h?.detection?.confidence_percent != null);
   const avgConf = scansWithConfidence.length > 0 
     ? scansWithConfidence.reduce((acc, curr) => acc + curr.detection.confidence_percent, 0) / scansWithConfidence.length
     : (currentAnalysis?.detection?.confidence_percent || 0.0);

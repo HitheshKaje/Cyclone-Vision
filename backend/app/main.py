@@ -18,6 +18,7 @@ if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
 from services.ml_service import ml_service
+from services.cloud_vision_service import cloud_vision_service
 from services.db import init_db, get_db
 from routes import detection, intensity, classification, live_map, citizen, track, auth, analysis
 
@@ -74,20 +75,26 @@ app.include_router(analysis.router, prefix="/api")
 @app.post("/api/analyze")
 async def analyze_cyclone_image(image: UploadFile = File(...)):
     """
-    Unified Single-Request Pipeline:
+    Unified Single-Request Pipeline powered by Google Gemini 2.5 Flash Vision AI:
       Upload Image
-      -> In-Memory Read (Zero Disk I/O)
+      -> Gemini Multimodal Vision Inference
       -> Objective 1 Cyclone Detection
-      -> If NO CYCLONE: Return detection result (skips Intensity & Classification)
-      -> If CYCLONE: Objective 2 Intensity Estimation -> Objective 3 Classification
-      -> Final Result
+      -> Objective 2 Intensity Estimation
+      -> Objective 3 WMO Classification & Dvorak T-number
     """
     if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
         raise HTTPException(status_code=400, detail="Unsupported file format. Please upload an image.")
 
     try:
         image_bytes = await image.read()
-        return ml_service.run_full_pipeline(image_bytes)
+        mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
+
+        try:
+            return cloud_vision_service.full_pipeline_with_gemini(image_bytes, mime_type=mime_type)
+        except Exception as g_err:
+            print(f"[Analyze API] Gemini engine exception ({g_err}), falling back to local pipeline.")
+            return ml_service.run_full_pipeline(image_bytes)
+
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:

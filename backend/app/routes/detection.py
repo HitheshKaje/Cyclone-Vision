@@ -4,6 +4,7 @@ import time
 import logging
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from services.ml_service import ml_service
+from services.cloud_vision_service import cloud_vision_service
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
@@ -26,27 +27,21 @@ async def detect_cyclone(image: UploadFile = File(...)):
     t_start = time.perf_counter()
 
     try:
-        # Read image directly in memory (zero disk I/O)
-        t0 = time.perf_counter()
         image_bytes = await image.read()
+        mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
+
+        # 1. Primary Engine: High-Accuracy Google Gemini Vision AI
+        try:
+            result = cloud_vision_service.detect_with_gemini(image_bytes, mime_type=mime_type)
+            t_total = time.perf_counter() - t_start
+            logger.info(f"[Detect API] Powered by {result.get('source')} in {t_total:.2f}s")
+            return result
+        except Exception as g_err:
+            logger.warning(f"[Detect API] Gemini engine exception ({g_err}), utilizing fallback model.")
+
+        # 2. Fallback Engine: Local ML Model
         img_bgr = ml_service.decode_image_bytes(image_bytes)
-        t_read = time.perf_counter() - t0
-
-        # Run Objective 1 detection using cached in-memory model
         result, t_prep, t_infer = ml_service.run_detection(img_bgr)
-        t_total = time.perf_counter() - t_start
-
-        # Performance diagnostics
-        perf_output = (
-            f"[PERF] Image read: {t_read:.4f}s\n"
-            f"[PERF] Image preprocessing: {t_prep:.4f}s\n"
-            f"[PERF] Detection inference: {t_infer:.4f}s\n"
-            f"[PERF] Total detection API: {t_total:.4f}s\n"
-        )
-        sys.stderr.write(perf_output)
-        sys.stderr.flush()
-        print(perf_output, flush=True)
-
         return result
 
     except ValueError as ve:
