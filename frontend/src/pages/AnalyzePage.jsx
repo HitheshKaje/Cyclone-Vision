@@ -5,6 +5,7 @@ import {
   Play, 
   Loader2, 
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   ArrowRight,
   Target,
@@ -313,9 +314,10 @@ const AnalyzePage = ({
       setCurrentStage('Completed');
       setAnalysisStatus('completed');
 
-      const finalLat = extractedCoords ? parseFloat(extractedCoords.lat) : (detectData.is_cyclone ? (parseFloat(latitude) || 15.40) : null);
-      const finalLon = extractedCoords ? parseFloat(extractedCoords.lon) : (detectData.is_cyclone ? (parseFloat(longitude) || 86.20) : null);
-      const finalSubbasin = extractedCoords?.basin || (finalLon != null ? (finalLon >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea') : null);
+      const isSatValid = detectData.is_valid_satellite !== false;
+      const finalLat = (isSatValid && detectData.is_cyclone) ? (extractedCoords ? parseFloat(extractedCoords.lat) : (parseFloat(latitude) || 15.40)) : null;
+      const finalLon = (isSatValid && detectData.is_cyclone) ? (extractedCoords ? parseFloat(extractedCoords.lon) : (parseFloat(longitude) || 86.20)) : null;
+      const finalSubbasin = (isSatValid && detectData.is_cyclone) ? (extractedCoords?.basin || (finalLon != null ? (finalLon >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea') : null)) : null;
 
       const analysisRecord = {
         id: Date.now().toString(),
@@ -328,9 +330,9 @@ const AnalyzePage = ({
         latitude: finalLat,
         longitude: finalLon,
         subbasin: finalSubbasin,
-        hasRadiusLines: extractedCoords?.hasRadius || false,
-        coordMethod: extractedCoords?.method || (detectData.is_cyclone ? 'Auto-Extracted from Image' : null),
-        coordConfidence: extractedCoords?.confidence || (detectData.is_cyclone ? 92 : null),
+        hasRadiusLines: isSatValid ? (extractedCoords?.hasRadius || false) : false,
+        coordMethod: isSatValid ? (extractedCoords?.method || (detectData.is_cyclone ? 'Auto-Extracted from Image' : null)) : null,
+        coordConfidence: isSatValid ? (extractedCoords?.confidence || (detectData.is_cyclone ? 92 : null)) : null,
         timestamp: new Date().toLocaleString([], {
           year: 'numeric',
           month: 'short',
@@ -363,6 +365,7 @@ const AnalyzePage = ({
 
   const isAnalyzing = analysisStatus === 'analyzing';
   const isCompleted = analysisStatus === 'completed';
+  const isValidSatellite = currentAnalysis?.detection?.is_valid_satellite !== false;
 
   return (
     <div className="space-y-6 pb-12 w-full max-w-7xl mx-auto">
@@ -511,8 +514,12 @@ const AnalyzePage = ({
                   <Settings size={14} className="text-sky-400" /> Pipeline Execution Status
                 </span>
                 {isCompleted && (
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Analysis completed
+                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    !isValidSatellite
+                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  }`}>
+                    {!isValidSatellite ? 'Invalid Non-Satellite Image' : 'Analysis completed'}
                   </span>
                 )}
               </div>
@@ -520,13 +527,17 @@ const AnalyzePage = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* Step 1: Cyclone Detection */}
                 <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 transition-colors ${
-                  isCompleted || currentStage === 'Intensity' || currentStage === 'Classification'
+                  isCompleted && !isValidSatellite
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400'
+                    : isCompleted || currentStage === 'Intensity' || currentStage === 'Classification'
                     ? 'bg-emerald-500/10 border-emerald-500/20 text-slate-800 dark:text-slate-200'
                     : currentStage === 'Detection'
                     ? 'bg-sky-500/10 border-sky-300 text-slate-800 dark:text-slate-200 ring-1 ring-sky-300'
                     : 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
                 }`}>
-                  {isCompleted || currentStage === 'Intensity' || currentStage === 'Classification' ? (
+                  {isCompleted && !isValidSatellite ? (
+                    <AlertTriangle size={18} className="text-amber-500 shrink-0" />
+                  ) : isCompleted || currentStage === 'Intensity' || currentStage === 'Classification' ? (
                     <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                   ) : currentStage === 'Detection' ? (
                     <Loader2 size={18} className="animate-spin text-emerald-500 shrink-0" />
@@ -538,6 +549,8 @@ const AnalyzePage = ({
                     <p className="text-[10px] text-slate-500">
                       {currentStage === 'Detection' 
                         ? 'Processing...' 
+                        : isCompleted && !isValidSatellite
+                        ? 'Invalid Satellite Image'
                         : (isCompleted || currentStage === 'Intensity' || currentStage === 'Classification') 
                         ? 'Completed' 
                         : 'Pending'}
@@ -548,7 +561,7 @@ const AnalyzePage = ({
                 {/* Step 2: Intensity Estimation */}
                 <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 transition-colors ${
                   isCompleted || currentStage === 'Classification'
-                    ? currentAnalysis?.detection?.is_cyclone === false
+                    ? (currentAnalysis?.detection?.is_cyclone === false || !isValidSatellite)
                       ? 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
                       : 'bg-emerald-500/10 border-emerald-500/20 text-slate-800 dark:text-slate-200'
                     : currentStage === 'Intensity'
@@ -556,7 +569,7 @@ const AnalyzePage = ({
                     : 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
                 }`}>
                   {isCompleted || currentStage === 'Classification' ? (
-                    currentAnalysis?.detection?.is_cyclone === false ? (
+                    (currentAnalysis?.detection?.is_cyclone === false || !isValidSatellite) ? (
                       <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 text-[10px] font-bold flex items-center justify-center shrink-0">—</span>
                     ) : (
                       <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
@@ -571,6 +584,8 @@ const AnalyzePage = ({
                     <p className="text-[10px] text-slate-500">
                       {currentStage === 'Intensity'
                         ? 'Estimating...'
+                        : isCompleted && !isValidSatellite
+                        ? 'Skipped (Invalid Image)'
                         : (isCompleted || currentStage === 'Classification')
                         ? (currentAnalysis?.detection?.is_cyclone === false ? 'Skipped (No Cyclone)' : 'Completed')
                         : 'Pending'}
@@ -581,7 +596,7 @@ const AnalyzePage = ({
                 {/* Step 3: Classification */}
                 <div className={`p-3 rounded-lg border text-xs flex items-center gap-3 transition-colors ${
                   isCompleted
-                    ? currentAnalysis?.detection?.is_cyclone === false
+                    ? (currentAnalysis?.detection?.is_cyclone === false || !isValidSatellite)
                       ? 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
                       : 'bg-emerald-500/10 border-emerald-500/20 text-slate-800 dark:text-slate-200'
                     : currentStage === 'Classification'
@@ -589,7 +604,7 @@ const AnalyzePage = ({
                     : 'bg-slate-100/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50 text-slate-500'
                 }`}>
                   {isCompleted ? (
-                    currentAnalysis?.detection?.is_cyclone === false ? (
+                    (currentAnalysis?.detection?.is_cyclone === false || !isValidSatellite) ? (
                       <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 text-[10px] font-bold flex items-center justify-center shrink-0">—</span>
                     ) : (
                       <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
@@ -604,6 +619,8 @@ const AnalyzePage = ({
                     <p className="text-[10px] text-slate-500">
                       {currentStage === 'Classification'
                         ? 'Categorizing...'
+                        : isCompleted && !isValidSatellite
+                        ? 'Skipped (Invalid Image)'
                         : isCompleted
                         ? (currentAnalysis?.detection?.is_cyclone === false ? 'Skipped (No Cyclone)' : 'Completed')
                         : 'Pending'}
@@ -615,7 +632,58 @@ const AnalyzePage = ({
               {/* Post-Detection Section */}
               {isCompleted && (
                 <div className="space-y-4 pt-1">
-                  {currentAnalysis?.detection?.is_cyclone ? (
+                  {!isValidSatellite ? (
+                    /* CASE 1: Rejected Non-Satellite Image (Person, everyday object, galaxy, graphic) */
+                    <div className="p-5 rounded-2xl border-2 border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20 text-slate-900 dark:text-slate-100 space-y-4 shadow-lg">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-amber-200 dark:border-amber-800/40">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                            <AlertTriangle size={24} />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-bold text-amber-950 dark:text-amber-200">
+                              Invalid Image — Not a Meteorological Satellite Image
+                            </h3>
+                            <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                              The uploaded file is not recognized as an Earth weather satellite observation.
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                          Non-Satellite Input
+                        </span>
+                      </div>
+
+                      <div className="text-xs text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-amber-200/60 dark:border-amber-800/30 space-y-1">
+                        <p className="font-semibold text-amber-900 dark:text-amber-300">
+                          Domain Gate Reason:
+                        </p>
+                        <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                          {currentAnalysis?.detection?.validation_message || 'Detected non-satellite photo (e.g. human portrait, selfie, everyday object, or outer space graphic). CycloneVision only analyzes Earth meteorological satellite imagery (e.g. INSAT-3D, GOES, NOAA, Himawari).'}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleResetImage}
+                          className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-amber-600/20 transition-all cursor-pointer"
+                        >
+                          <RotateCcw size={15} />
+                          <span>Upload Genuine Satellite Image</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('results')}
+                          className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
+                        >
+                          <span>Rejection Diagnostics</span>
+                          <ArrowRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : currentAnalysis?.detection?.is_cyclone ? (
                     /* Cyclone Confirmed: Show Geographical Coordinates Confirmation & Direct Navigation */
                     <div className="rounded-2xl border-2 border-emerald-500/40 bg-white dark:bg-gradient-to-b dark:from-slate-900/90 dark:to-[#0b1329] p-5 space-y-4 shadow-xl text-slate-900 dark:text-white">
                       {/* Header */}
@@ -793,8 +861,8 @@ const AnalyzePage = ({
                     </div>
                   )}
 
-                  {/* Coastal Early Warning & Citizen Siren Broadcast Control */}
-                  {currentAnalysis && (
+                  {/* Coastal Early Warning & Citizen Siren Broadcast Control (ONLY for verified cyclones) */}
+                  {currentAnalysis && isValidSatellite && currentAnalysis?.detection?.is_cyclone && (
                     <div className="pt-2">
                       <CoastalBroadcastControl currentAnalysis={currentAnalysis} />
                     </div>

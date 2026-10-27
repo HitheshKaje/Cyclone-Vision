@@ -117,38 +117,70 @@ class CloudVisionIntensityService:
         t0 = time.perf_counter()
 
         prompt = (
-            "You are an expert meteorological vision system specializing in tropical cyclone detection from satellite imagery.\n"
-            "Task: Inspect this satellite image carefully.\n"
-            "Determine whether a tropical cyclone, cyclonic vortex, tropical storm, or developing tropical depression is present.\n"
-            "Differentiate genuine cyclonic circulation from non-cyclonic features (such as normal monsoon clouds, linear frontal bands, land, or clear ocean).\n"
+            "You are an expert meteorological vision system specializing in tropical cyclone detection and satellite image verification.\n\n"
+            "TASK:\n"
+            "1. FIRST, verify if this image is a genuine Earth meteorological weather satellite capture "
+            "(e.g. infrared, visible, water vapor observation of Earth's atmosphere, clouds, and oceans like INSAT-3D, GOES, Himawari, NOAA, Meteosat).\n"
+            "   - If it is NOT a weather satellite image (e.g. photo of a person/selfie, portrait, indoor/outdoor scene, household item, car, building, animal, artwork, drawing, deep space void, star field, or black hole):\n"
+            "     -> You MUST set is_valid_satellite = false, is_cyclone = false, confidence_percent = 0.0, and specify what the image actually depicts in validation_message.\n"
+            "2. SECOND, if and only if is_valid_satellite == true, determine if a tropical cyclone, cyclonic vortex, tropical storm, or depression is present.\n"
+            "   - If cyclonic circulation is present: is_cyclone = true with realistic confidence.\n"
+            "   - If no cyclonic circulation (normal calm weather, non-cyclonic clouds, clear ocean): is_cyclone = false with realistic confidence.\n\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
+            '  "is_valid_satellite": true,\n'
+            '  "validation_message": "Valid Earth meteorological satellite observation.",\n'
             '  "is_cyclone": true,\n'
             '  "confidence_percent": 95.0,\n'
-            '  "pattern_detected": "Curved Band / Spiral Eyewall / Disorganized Clustered",\n'
-            '  "features_observed": "Distinct cyclonic curved rainbands converging into central core",\n'
-            '  "reasoning": "Clear description of observed meteorological features"\n'
+            '  "pattern_detected": "Curved Band / Spiral Eyewall / Disorganized Clustered / Normal Cloud / Non-Satellite",\n'
+            '  "features_observed": "Distinct cyclonic curved rainbands / normal clouds / non-satellite object",\n'
+            '  "reasoning": "Clear description of observed features"\n'
             "}"
         )
 
         try:
             parsed, used_model = self._call_gemini_json(prompt, image_bytes, mime_type, api_key)
+            is_valid_sat = bool(parsed.get("is_valid_satellite", True))
+            val_msg = parsed.get("validation_message", "Valid Earth meteorological satellite observation.")
+            t_infer = time.perf_counter() - t0
+
+            if not is_valid_sat:
+                return {
+                    "success": True,
+                    "prediction": "Invalid Satellite Image",
+                    "status": "INVALID IMAGE (NOT A SATELLITE IMAGE)",
+                    "status_label": "Invalid Satellite Image",
+                    "is_cyclone": False,
+                    "is_valid_satellite": False,
+                    "confidence": 0.0,
+                    "confidence_percent": 0.0,
+                    "validation_message": val_msg,
+                    "description": val_msg,
+                    "source": f"Google Gemini Vision ({used_model})",
+                    "inference_time_ms": round(t_infer * 1000, 1)
+                }
+
             is_cyclone = bool(parsed.get("is_cyclone", True))
             conf = float(parsed.get("confidence_percent", 92.0))
             pattern = parsed.get("pattern_detected", "Cyclonic circulation pattern")
             features = parsed.get("features_observed", "Convective rainbands")
             reasoning = parsed.get("reasoning", "Satellite cloud structure evaluated")
-            t_infer = time.perf_counter() - t0
 
             status_str = "CYCLONE DETECTED" if is_cyclone else "NO CYCLONE DETECTED"
 
             return {
+                "success": True,
                 "is_cyclone": is_cyclone,
+                "is_valid_satellite": True,
                 "confidence_percent": round(conf, 1),
+                "confidence": round(conf / 100.0, 4),
                 "status": status_str,
+                "status_label": "Cyclone Detected" if is_cyclone else "No Cyclone",
+                "prediction": "Cyclone" if is_cyclone else "No Cyclone",
                 "pattern_detected": pattern,
                 "features_observed": features,
                 "reasoning": reasoning,
+                "validation_message": "Valid Earth meteorological satellite observation.",
                 "source": f"Google Gemini Vision ({used_model})",
                 "inference_time_ms": round(t_infer * 1000, 1)
             }
@@ -289,27 +321,54 @@ class CloudVisionIntensityService:
         try:
             arr = np.frombuffer(image_bytes, np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            from services.ml_service import ml_service
+            is_valid, reason = ml_service.validate_satellite_domain(img)
+            if not is_valid:
+                return {
+                    "success": True,
+                    "prediction": "Invalid Satellite Image",
+                    "status": "INVALID IMAGE (NOT A SATELLITE IMAGE)",
+                    "status_label": "Invalid Satellite Image",
+                    "is_cyclone": False,
+                    "is_valid_satellite": False,
+                    "confidence": 0.0,
+                    "confidence_percent": 0.0,
+                    "validation_message": reason,
+                    "description": reason,
+                    "source": "Local Fallback Domain Gate",
+                    "inference_time_ms": 15.0
+                }
+
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             std_dev = float(np.std(gray))
             is_cyc = std_dev > 35.0
             return {
+                "success": True,
                 "is_cyclone": is_cyc,
+                "is_valid_satellite": True,
                 "confidence_percent": 88.0,
+                "confidence": 0.88,
                 "status": "CYCLONE DETECTED" if is_cyc else "NO CYCLONE DETECTED",
+                "status_label": "Cyclone Detected" if is_cyc else "No Cyclone",
+                "prediction": "Cyclone" if is_cyc else "No Cyclone",
                 "pattern_detected": "Convective Cloud Organization",
                 "features_observed": "Spiral gradient variation",
                 "reasoning": "Fallback pattern analysis",
+                "validation_message": "Valid Earth meteorological satellite observation.",
                 "source": "Local Fallback Analyzer",
                 "inference_time_ms": 15.0
             }
         except Exception:
             return {
-                "is_cyclone": True,
-                "confidence_percent": 85.0,
-                "status": "CYCLONE DETECTED",
-                "pattern_detected": "Curved Banding",
-                "features_observed": "Cloud mass organization",
-                "reasoning": "Standard detection",
+                "success": True,
+                "is_cyclone": False,
+                "is_valid_satellite": False,
+                "confidence_percent": 0.0,
+                "confidence": 0.0,
+                "status": "INVALID IMAGE (NOT A SATELLITE IMAGE)",
+                "status_label": "Invalid Satellite Image",
+                "prediction": "Invalid Satellite Image",
+                "validation_message": "Could not validate input image as meteorological satellite capture.",
                 "source": "Fallback Analyzer",
                 "inference_time_ms": 10.0
             }
