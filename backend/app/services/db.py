@@ -735,8 +735,39 @@ def save_alert(alert_data: Dict[str, Any]) -> Dict[str, Any]:
     doc.pop("_id", None)
     alert_id = doc.get("id") or f"alt_{int(time.time())}"
     doc["id"] = alert_id
+    if doc.get("active") is True:
+        # Mark previous active alerts as inactive so only the latest is active
+        alerts.update_many({"id": {"$ne": alert_id}, "active": True}, {"$set": {"active": False}})
     alerts.update_one({"id": alert_id}, {"$set": doc}, upsert=True)
     return doc
+
+
+def update_siren_state(siren_active: bool) -> bool:
+    """Directly updates the siren_active state across all active alerts in MongoDB."""
+    db = get_db()
+    if db is None:
+        return False
+    try:
+        alerts = db["alerts"]
+        alerts.update_many({"active": True}, {"$set": {"siren_active": siren_active}})
+        return True
+    except Exception as e:
+        print(f"[MongoDB] Error updating siren state: {e}")
+        return False
+
+
+def clear_all_active_alerts() -> bool:
+    """Sets active=False and siren_active=False on all alerts in MongoDB."""
+    db = get_db()
+    if db is None:
+        return False
+    try:
+        alerts = db["alerts"]
+        alerts.update_many({"active": True}, {"$set": {"active": False, "siren_active": False}})
+        return True
+    except Exception as e:
+        print(f"[MongoDB] Error clearing active alerts: {e}")
+        return False
 
 
 def get_active_alert() -> Optional[Dict[str, Any]]:
@@ -749,4 +780,5 @@ def get_active_alert() -> Optional[Dict[str, Any]]:
     if doc:
         doc.pop("_id", None)
     return doc
+
 

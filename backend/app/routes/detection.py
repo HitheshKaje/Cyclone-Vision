@@ -52,19 +52,34 @@ async def detect_cyclone(image: UploadFile = File(...)):
             }
 
         # 1. Primary Engine: High-Accuracy Google Gemini Vision AI
+        result = None
         try:
             result = cloud_vision_service.detect_with_gemini(image_bytes, mime_type=mime_type)
             # If Gemini also detected non-satellite, preserve is_valid_satellite
             if result.get("is_valid_satellite") is False:
                 return result
-            t_total = time.perf_counter() - t_start
-            logger.info(f"[Detect API] Powered by {result.get('source')} in {t_total:.2f}s")
-            return result
         except Exception as g_err:
             logger.warning(f"[Detect API] Gemini engine exception ({g_err}), utilizing fallback model.")
 
         # 2. Fallback Engine: Local ML Model
-        result, t_prep, t_infer = ml_service.run_detection(img_bgr)
+        if result is None:
+            result, t_prep, t_infer = ml_service.run_detection(img_bgr)
+
+        # 3. Ensure coordinates are attached if cyclone is detected
+        if result.get("is_cyclone") and (result.get("latitude") is None or result.get("longitude") is None):
+            try:
+                from routes.track import extract_coordinates_from_image
+                coords = extract_coordinates_from_image(img_bgr, filename=image.filename)
+                if coords.get("detected"):
+                    result["latitude"] = coords.get("latitude")
+                    result["longitude"] = coords.get("longitude")
+                    result["subbasin"] = coords.get("subbasin")
+                    result["has_coordinates"] = True
+            except Exception as coord_err:
+                logger.warning(f"Coordinate extraction notice: {coord_err}")
+
+        t_total = time.perf_counter() - t_start
+        logger.info(f"[Detect API] Powered by {result.get('source', 'CycloneVision Model')} in {t_total:.2f}s")
         return result
 
     except ValueError as ve:

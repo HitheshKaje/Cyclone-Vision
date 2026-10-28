@@ -245,6 +245,15 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
     calculateTrackFromOcean(inputLat, inputLon);
   }, []);
 
+  // Auto-synchronize when AI detected cyclone coordinates are extracted from uploaded image
+  useEffect(() => {
+    if (detectedLat !== null && detectedLon !== null && !isNaN(detectedLat) && !isNaN(detectedLon)) {
+      setInputLat(detectedLat);
+      setInputLon(detectedLon);
+      calculateTrackFromOcean(detectedLat, detectedLon);
+    }
+  }, [detectedLat, detectedLon]);
+
   // Form submission handler
   const handleFormSubmit = (e) => {
     e.preventDefault();

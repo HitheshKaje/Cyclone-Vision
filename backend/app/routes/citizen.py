@@ -7,11 +7,11 @@ Provides:
 """
 
 from fastapi import APIRouter
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
-from services.db import save_alert, get_active_alert
+from services.db import save_alert, get_active_alert, update_siren_state, clear_all_active_alerts
 
 router = APIRouter()
 
@@ -32,7 +32,8 @@ ACTIVE_BROADCAST = {
     "area": "West & East Coast Maritime Zones",
     "source": "CycloSafe Early Warning Command Center",
     "issued_at": datetime.utcnow().isoformat() + "Z",
-    "coordinates": None
+    "coordinates": None,
+    "forecast": []
 }
 
 class BroadcastPayload(BaseModel):
@@ -46,8 +47,18 @@ class BroadcastPayload(BaseModel):
     message: Optional[str] = None
     fishermen_directive: Optional[str] = None
     area: Optional[str] = "Karnataka & Central West Coast"
+    target_lighthouse: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
+    subbasin: Optional[str] = None
+    forecast: Optional[List[Dict[str, Any]]] = None
+
+class DetectMarineSectorPayload(BaseModel):
+    lat: float
+    lng: float
+    wind_speed_kt: Optional[float] = 65.0
+    cyclone_name: Optional[str] = "Tropical Cyclone Disturbance"
+    subbasin: Optional[str] = None
 
 class SirenTogglePayload(BaseModel):
     siren_active: bool
@@ -148,6 +159,45 @@ async def get_historical_cyclones():
         "records": VERIFIED_HISTORICAL_CYCLONES
     }
 
+def ensure_alert_forecast(alert_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensures 5-day forecast waypoints exist whenever coordinates are present."""
+    if not alert_dict:
+        return alert_dict
+    coords = alert_dict.get("coordinates")
+    forecast = alert_dict.get("forecast")
+    if alert_dict.get("active") and coords and coords.get("lat") is not None and coords.get("lng") is not None:
+        if not forecast:
+            lat = float(coords["lat"])
+            lng = float(coords["lng"])
+            is_bob = lng >= 78.0
+            now_dt = datetime.utcnow()
+            uncertainty_radii = [135, 264, 357, 420, 455]
+            stage_names = [
+                "Day 1: Open Ocean Tracking",
+                "Day 2: Northwestward Progression",
+                "Day 3: Coastal Shelf Approach",
+                "Day 4: Coastal Landfall Approach",
+                "Day 5: Inland Dissipation & Decay"
+            ]
+            generated_forecast = []
+            for idx, h in enumerate([24, 48, 72, 96, 120]):
+                step = idx + 1
+                d_lat = round(step * 0.45, 2)
+                d_lon = round(-step * 1.65 if is_bob else -step * 0.9, 2)
+                generated_forecast.append({
+                    "step": step,
+                    "horizon_hours": h,
+                    "latitude": round(lat + d_lat, 2),
+                    "longitude": round(lng + d_lon, 2),
+                    "delta_lat": d_lat,
+                    "delta_lon": d_lon,
+                    "arrival_time": (now_dt + timedelta(hours=h)).isoformat() + "Z",
+                    "uncertainty_radius_km": uncertainty_radii[idx],
+                    "stage": stage_names[idx]
+                })
+            alert_dict["forecast"] = generated_forecast
+    return alert_dict
+
 @router.get("/citizen/alerts")
 @router.get("/lighthouse/status")
 async def get_citizen_alerts():
@@ -157,8 +207,24 @@ async def get_citizen_alerts():
     """
     db_alert = get_active_alert()
     if db_alert:
-        return db_alert
-    return ACTIVE_BROADCAST
+        return ensure_alert_forecast(db_alert)
+    return ensure_alert_forecast(ACTIVE_BROADCAST)
+
+@router.post("/citizen/detect-marine-sector")
+async def detect_affected_marine_sector(payload: DetectMarineSectorPayload):
+    """
+    Intelligently identifies the nearby Indian coastal maritime sectors and
+    affected lighthouse stations based on the detected cyclone eye location and winds,
+    powered by Google Gemini AI with 16-key failover and geodesic calculations.
+    """
+    from services.marine_sectors_service import marine_sectors_service
+    return marine_sectors_service.detect_nearby_sectors_and_lighthouses(
+        lat=payload.lat,
+        lon=payload.lng,
+        wind_speed_kt=payload.wind_speed_kt or 65.0,
+        cyclone_name=payload.cyclone_name or "Detected Cyclone System",
+        subbasin=payload.subbasin
+    )
 
 @router.post("/citizen/broadcast")
 async def publish_citizen_broadcast(payload: BroadcastPayload):
@@ -186,6 +252,50 @@ async def publish_citizen_broadcast(payload: BroadcastPayload):
         default_directive = payload.fishermen_directive or "CAUTION: Wind and wave activity increasing. Exercise caution near coastal waters."
         title = f"YELLOW ADVISORY: {payload.cyclone_name} Monitored"
 
+    # Resolve 5-day forecast waypoints: from payload, from Bi-LSTM track prediction, or steering physics
+    forecast_waypoints = payload.forecast or []
+    if (not forecast_waypoints) and (payload.lat is not None and payload.lng is not None):
+        try:
+            from routes.track import predict_track_from_point, PointPredictionPayload
+            track_res = await predict_track_from_point(PointPredictionPayload(
+                latitude=payload.lat,
+                longitude=payload.lng,
+                wind_speed_kt=payload.wind_speed_kt or 65.0,
+                storm_name=payload.cyclone_name or "Detected Cyclone System"
+            ))
+            if track_res and "forecast" in track_res and track_res["forecast"]:
+                forecast_waypoints = track_res["forecast"]
+        except Exception as e:
+            print(f"[Citizen Broadcast] Bi-LSTM track prediction notice: {e}")
+
+        # Meteorological steering physics fallback if model inference failed
+        if (not forecast_waypoints) and (payload.lat is not None and payload.lng is not None):
+            is_bob = payload.lng >= 78.0
+            now_dt = datetime.utcnow()
+            uncertainty_radii = [135, 264, 357, 420, 455]
+            stage_names = [
+                "Day 1: Open Ocean Tracking",
+                "Day 2: Northwestward Progression",
+                "Day 3: Coastal Shelf Approach",
+                "Day 4: Coastal Landfall Approach",
+                "Day 5: Inland Dissipation & Decay"
+            ]
+            for idx, h in enumerate([24, 48, 72, 96, 120]):
+                step = idx + 1
+                d_lat = round(step * 0.45, 2)
+                d_lon = round(-step * 1.65 if is_bob else -step * 0.9, 2)
+                forecast_waypoints.append({
+                    "step": step,
+                    "horizon_hours": h,
+                    "latitude": round(payload.lat + d_lat, 2),
+                    "longitude": round(payload.lng + d_lon, 2),
+                    "delta_lat": d_lat,
+                    "delta_lon": d_lon,
+                    "arrival_time": (now_dt + timedelta(hours=h)).isoformat() + "Z",
+                    "uncertainty_radius_km": uncertainty_radii[idx],
+                    "stage": stage_names[idx]
+                })
+
     ACTIVE_BROADCAST = {
         "available": True,
         "active": True,
@@ -200,9 +310,11 @@ async def publish_citizen_broadcast(payload: BroadcastPayload):
         "message": default_msg,
         "fishermen_directive": default_directive,
         "area": payload.area or "Central West & Southwest Coastal Maritime Zone",
+        "target_lighthouse": payload.target_lighthouse,
         "source": "CycloSafe Early Warning Command Center (Live Admin Broadcast)",
         "issued_at": datetime.utcnow().isoformat() + "Z",
-        "coordinates": {"lat": payload.lat, "lng": payload.lng} if (payload.lat is not None and payload.lng is not None) else None
+        "coordinates": {"lat": payload.lat, "lng": payload.lng} if (payload.lat is not None and payload.lng is not None) else None,
+        "forecast": forecast_waypoints
     }
 
     # Persist directly into MongoDB alerts collection
@@ -221,9 +333,23 @@ async def publish_citizen_broadcast(payload: BroadcastPayload):
 async def toggle_lighthouse_siren(payload: SirenTogglePayload):
     """
     Directly toggles the coastal lighthouse siren state (ON/OFF).
+    Updates in-memory state and persists immediately across all active alerts in MongoDB.
     """
     global ACTIVE_BROADCAST
     ACTIVE_BROADCAST["siren_active"] = payload.siren_active
+    
+    # Persist siren toggle directly into MongoDB so polling doesn't overwrite it
+    try:
+        update_siren_state(payload.siren_active)
+    except Exception as e:
+        print(f"[Broadcast API] Warning: MongoDB siren update error: {e}")
+
+    # Synchronize in-memory active alert if one exists in DB
+    db_alert = get_active_alert()
+    if db_alert:
+        ACTIVE_BROADCAST = db_alert
+        ACTIVE_BROADCAST["siren_active"] = payload.siren_active
+
     status_str = "ACTIVATED" if payload.siren_active else "SILENCED"
     return {
         "success": True,
@@ -234,7 +360,7 @@ async def toggle_lighthouse_siren(payload: SirenTogglePayload):
 @router.post("/citizen/broadcast/clear")
 async def clear_citizen_broadcast():
     """
-    Admin clears the alert. Sets system back to Normal conditions.
+    Admin clears the alert. Sets system back to Normal conditions and silences sirens.
     """
     global ACTIVE_BROADCAST
     ACTIVE_BROADCAST = {
@@ -253,8 +379,15 @@ async def clear_citizen_broadcast():
         "area": "Coastal Maritime Zones",
         "source": "CycloSafe Early Warning Command Center",
         "issued_at": datetime.utcnow().isoformat() + "Z",
-        "coordinates": None
+        "coordinates": None,
+        "forecast": []
     }
+    try:
+        clear_all_active_alerts()
+        save_alert(ACTIVE_BROADCAST)
+    except Exception as e:
+        print(f"[Broadcast API] Warning: MongoDB clear alert error: {e}")
+
     return {
         "success": True,
         "message": "Broadcast cleared. Normal conditions restored.",

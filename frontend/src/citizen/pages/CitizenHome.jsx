@@ -70,7 +70,8 @@ const CitizenHome = ({ onNavigate }) => {
         wind_speed: advisory.wind_speed_kmh,
         last_updated: advisory.issued_at,
         description: advisory.message,
-        source: advisory.source
+        source: advisory.source,
+        forecast: advisory.forecast || []
       }
     : null;
 

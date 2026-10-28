@@ -160,6 +160,9 @@ const AnalyzePage = ({
       setPreviewUrl(e.target.result);
     };
     reader.readAsDataURL(selectedFile);
+
+    // Auto-extract eyewall coordinates as soon as image is selected/uploaded
+    extractCoordinatesFromImage(selectedFile);
   };
 
   const handleFileChange = (e) => {
@@ -269,20 +272,39 @@ const AnalyzePage = ({
       if (detectData.is_cyclone) {
         setCurrentStage('Intensity');
 
-        // Cyclone confirmed! Now auto-extract coordinates from concentric radius lines / storm eye
-        try {
-          const autoCoords = await extractCoordinatesFromImage(file);
-          if (autoCoords) {
-            extractedCoords = autoCoords;
-            setLatitude(autoCoords.lat);
-            setLongitude(autoCoords.lon);
-            setCoordSubbasin(autoCoords.basin);
-            setCoordMethod(autoCoords.method);
-            setHasRadiusLines(Boolean(autoCoords.hasRadius));
-            setCoordConfidence(autoCoords.confidence || 92);
+        // Check if coordinates were returned by detection API or need extraction
+        if (detectData.latitude != null && detectData.longitude != null) {
+          const latStr = Number(detectData.latitude).toFixed(2);
+          const lonStr = Number(detectData.longitude).toFixed(2);
+          const basinStr = detectData.subbasin || (detectData.longitude >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea');
+          extractedCoords = {
+            lat: latStr,
+            lon: lonStr,
+            basin: basinStr,
+            method: 'AI Georeferenced Eyewall Coordinates',
+            hasRadius: true,
+            confidence: 96
+          };
+          setLatitude(latStr);
+          setLongitude(lonStr);
+          setCoordSubbasin(basinStr);
+          setCoordMethod('AI Georeferenced Eyewall Coordinates');
+          setHasRadiusLines(true);
+        } else if (!hasRadiusLines) {
+          try {
+            const autoCoords = await extractCoordinatesFromImage(file);
+            if (autoCoords) {
+              extractedCoords = autoCoords;
+              setLatitude(autoCoords.lat);
+              setLongitude(autoCoords.lon);
+              setCoordSubbasin(autoCoords.basin);
+              setCoordMethod(autoCoords.method);
+              setHasRadiusLines(Boolean(autoCoords.hasRadius));
+              setCoordConfidence(autoCoords.confidence || 92);
+            }
+          } catch (cErr) {
+            console.warn('Coordinate auto-extraction fallback:', cErr);
           }
-        } catch (cErr) {
-          console.warn('Coordinate auto-extraction fallback:', cErr);
         }
 
         const intensityFormData = new FormData();
@@ -315,9 +337,15 @@ const AnalyzePage = ({
       setAnalysisStatus('completed');
 
       const isSatValid = detectData.is_valid_satellite !== false;
-      const finalLat = (isSatValid && detectData.is_cyclone) ? (extractedCoords ? parseFloat(extractedCoords.lat) : (parseFloat(latitude) || 15.40)) : null;
-      const finalLon = (isSatValid && detectData.is_cyclone) ? (extractedCoords ? parseFloat(extractedCoords.lon) : (parseFloat(longitude) || 86.20)) : null;
-      const finalSubbasin = (isSatValid && detectData.is_cyclone) ? (extractedCoords?.basin || (finalLon != null ? (finalLon >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea') : null)) : null;
+      const finalLat = (isSatValid && detectData.is_cyclone) 
+        ? (parseFloat(latitude) || (extractedCoords ? parseFloat(extractedCoords.lat) : (detectData.latitude != null ? parseFloat(detectData.latitude) : 15.30))) 
+        : null;
+      const finalLon = (isSatValid && detectData.is_cyclone) 
+        ? (parseFloat(longitude) || (extractedCoords ? parseFloat(extractedCoords.lon) : (detectData.longitude != null ? parseFloat(detectData.longitude) : 89.60))) 
+        : null;
+      const finalSubbasin = (isSatValid && detectData.is_cyclone) 
+        ? (coordSubbasin || extractedCoords?.basin || detectData.subbasin || (finalLon != null ? (finalLon >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea') : 'Bay of Bengal')) 
+        : null;
 
       const analysisRecord = {
         id: Date.now().toString(),
@@ -697,9 +725,13 @@ const AnalyzePage = ({
                               <h3 className="text-base font-black tracking-tight text-slate-900 dark:text-white">
                                 Cyclone Detected — Geographical Coordinates & Location
                               </h3>
-                              {hasRadiusLines ? (
+                              {isExtractingCoords ? (
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40 flex items-center gap-1 animate-pulse shadow-xs">
+                                  <RefreshCw size={11} className="animate-spin" /> Auto-Extracting Eyewall Coordinates...
+                                </span>
+                              ) : hasRadiusLines ? (
                                 <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 flex items-center gap-1 shadow-xs">
-                                  <Sparkles size={11} /> Radius Lines Auto-Extracted
+                                  <Sparkles size={11} /> {coordMethod || 'AI Georeferenced Eyewall Coordinates'}
                                 </span>
                               ) : (
                                 <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30">
@@ -775,34 +807,6 @@ const AnalyzePage = ({
                               °E
                             </span>
                           </div>
-                        </div>
-                      </div>
-
-                      {/* Quick Location Presets */}
-                      <div className="pt-1">
-                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
-                          Quick Presets:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[
-                            { name: 'Bay of Bengal (Central)', lat: '15.20', lon: '86.40' },
-                            { name: 'Odisha Coast', lat: '18.80', lon: '85.60' },
-                            { name: 'Arabian Sea (Central)', lat: '15.50', lon: '68.50' },
-                            { name: 'Gujarat Coast', lat: '20.90', lon: '69.40' }
-                          ].map((p, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => handleUpdateCoordinates(p.lat, p.lon, p.name)}
-                              className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer border ${
-                                latitude === p.lat && longitude === p.lon
-                                  ? 'bg-emerald-500 text-slate-900 font-black border-emerald-400 shadow-md'
-                                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
-                              }`}
-                            >
-                              {p.name} ({p.lat}°N, {p.lon}°E)
-                            </button>
-                          ))}
                         </div>
                       </div>
 
@@ -931,9 +935,9 @@ const AnalyzePage = ({
               ) : (
                 <div className="grid grid-cols-3 gap-3 pt-4">
                   {[
-                    { id: 'severe', name: 'Severe Cyclone', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=400&q=80' },
-                    { id: 'moderate', name: 'Moderate Cyclone', url: 'https://images.unsplash.com/photo-1584267385494-9fdd9a71ad75?auto=format&fit=crop&w=400&q=80' },
-                    { id: 'clear', name: 'Clear Weather', url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80' }
+                    { id: 'severe', name: 'Severe Cyclone', url: '/samples/severe_cyclone.jpg' },
+                    { id: 'moderate', name: 'Moderate Cyclone', url: '/samples/moderate_cyclone.jpg' },
+                    { id: 'clear', name: 'Calm Weather', url: '/samples/clear_weather.jpg' }
                   ].map((sample) => (
                     <div 
                       key={sample.id} 

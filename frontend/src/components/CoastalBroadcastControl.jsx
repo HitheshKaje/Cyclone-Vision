@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Radio, 
   Volume2, 
@@ -9,29 +9,76 @@ import {
   RotateCcw,
   ShieldAlert,
   Send,
-  Anchor
+  Anchor,
+  Sparkles,
+  Compass,
+  RefreshCw,
+  Navigation,
+  TowerControl
 } from 'lucide-react';
 import { 
   publishCitizenBroadcast, 
   toggleLighthouseSiren, 
   clearCitizenBroadcast,
-  fetchOfficialAdvisories
+  fetchOfficialAdvisories,
+  detectAffectedMarineSector
 } from '../citizen/services/citizenApi';
 import { addSystemLog } from '../utils/auditLogger';
+import { getApiBaseUrl } from '../utils/apiConfig';
+
+const DEFAULT_SECTORS = [
+  { id: 'odisha_bengal', name: 'Odisha & Bengal Coast (Puri - Paradip)', basin: 'Bay of Bengal' },
+  { id: 'andhra_tamilnadu', name: 'Tamil Nadu & Andhra Coast (Chennai - Visakhapatnam)', basin: 'Bay of Bengal' },
+  { id: 'karnataka_coast', name: 'Karnataka Coast (Mangalore - Malpe - Karwar)', basin: 'Arabian Sea' },
+  { id: 'kerala_coast', name: 'Kerala Coastal Waters (Kochi - Kozhikode)', basin: 'Arabian Sea' },
+  { id: 'gujarat_coast', name: 'Gujarat Coastal Waters (Dwarka - Porbandar - Kutch)', basin: 'Arabian Sea' },
+  { id: 'maharashtra_goa', name: 'Maharashtra & Goa Coast (Mumbai - Ratnagiri - Aguada)', basin: 'Arabian Sea' },
+  { id: 'andaman_nicobar', name: 'Andaman & Nicobar Marine Zone (Port Blair)', basin: 'Bay of Bengal' },
+  { id: 'all_coastal', name: 'All Coastal Sectors (Pan-India)', basin: 'Pan-India' }
+];
+
+const DEFAULT_LIGHTHOUSES = [
+  { id: 'paradip', name: 'Paradip Coastal Warning Tower & Lighthouse', sector_id: 'odisha_bengal', signal: 'Signal 10 (Great Danger)' },
+  { id: 'puri', name: 'Puri Coastal Lighthouse Station', sector_id: 'odisha_bengal', signal: 'Signal 10 (Great Danger)' },
+  { id: 'visakhapatnam', name: 'Visakhapatnam Dolphin Nose Light', sector_id: 'andhra_tamilnadu', signal: 'Signal 10 (Great Danger)' },
+  { id: 'kalingapatnam', name: 'Kalingapatnam Coastal Light Beacon', sector_id: 'andhra_tamilnadu', signal: 'Signal 09 (Severe Warning)' },
+  { id: 'chennai', name: 'Chennai Port Light Beacon #02', sector_id: 'andhra_tamilnadu', signal: 'Signal 09 (Severe Warning)' },
+  { id: 'kaup', name: 'Kaup Lighthouse Station #04 (Udupi Coast)', sector_id: 'karnataka_coast', signal: 'Signal 10 (Great Danger)' },
+  { id: 'mangalore', name: 'Mangalore Port Light Beacon #01', sector_id: 'karnataka_coast', signal: 'Signal 09 (Severe Warning)' },
+  { id: 'karwar', name: 'Karwar Head Lighthouse #07 (Oyster Rocks)', sector_id: 'karnataka_coast', signal: 'Signal 08 (Cyclone Threat)' },
+  { id: 'kochi', name: 'Kochi (Cochin / Vypin) Lighthouse', sector_id: 'kerala_coast', signal: 'Signal 09 (Severe Warning)' },
+  { id: 'dwarka', name: 'Dwarka Coastal Lighthouse Station', sector_id: 'gujarat_coast', signal: 'Signal 10 (Great Danger)' },
+  { id: 'porbandar', name: 'Porbandar Light Station', sector_id: 'gujarat_coast', signal: 'Signal 09 (Severe Warning)' }
+];
 
 const CoastalBroadcastControl = ({ currentAnalysis }) => {
   const [broadcastState, setBroadcastState] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sirenToggling, setSirenToggling] = useState(false);
-  const [selectedArea, setSelectedArea] = useState('Karnataka Coastal Maritime Zone (Mangalore - Malpe - Karwar)');
-  const [targetStation, setTargetStation] = useState('Kaup Coastal Lighthouse Station #04');
+  
+  // Dynamic Marine Sector & Lighthouse State
+  const [availableSectors, setAvailableSectors] = useState(DEFAULT_SECTORS);
+  const [availableLighthouses, setAvailableLighthouses] = useState(DEFAULT_LIGHTHOUSES);
+  const [selectedArea, setSelectedArea] = useState('Odisha & Bengal Coast (Puri - Paradip)');
+  const [targetStation, setTargetStation] = useState('Paradip Coastal Warning Tower & Lighthouse');
+  const [isDetectingMarine, setIsDetectingMarine] = useState(false);
+  const [aiDirective, setAiDirective] = useState(null);
+  const [recommendedSignal, setRecommendedSignal] = useState('Signal 10 (Great Danger)');
+  const [riskLevel, setRiskLevel] = useState('CRITICAL');
+  const [detectionEngine, setDetectionEngine] = useState('');
+  const [nearestDistanceKm, setNearestDistanceKm] = useState(null);
+
   const [includeSirenOnPublish, setIncludeSirenOnPublish] = useState(true);
   const [successMessage, setSuccessMessage] = useState(null);
 
+  const isTogglingRef = useRef(false);
+  const lastCoordsRef = useRef('');
+
   // Poll current broadcast status from backend
   const refreshStatus = async () => {
+    if (isTogglingRef.current) return;
     const res = await fetchOfficialAdvisories();
-    if (res.success && res.data) {
+    if (res.success && res.data && !isTogglingRef.current) {
       setBroadcastState(res.data);
     }
   };
@@ -52,13 +99,143 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
   const cycloneLat = currentAnalysis?.latitude != null ? parseFloat(currentAnalysis.latitude) : 15.4;
   const cycloneLng = currentAnalysis?.longitude != null ? parseFloat(currentAnalysis.longitude) : 86.2;
   const subbasin = currentAnalysis?.subbasin || (cycloneLng >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea');
-
   const cycloneName = `Cyclone ${fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ')}`;
 
-  // Handle publishing analysis to citizen portal
+  // Automatically detect threatened marine sector and lighthouse station using Google Gemini API pool
+  const triggerMarineDetection = async (lat, lon, windSpeed, stormName, basin) => {
+    setIsDetectingMarine(true);
+    try {
+      const res = await detectAffectedMarineSector({
+        lat,
+        lng: lon,
+        wind_speed_kt: windSpeed,
+        cyclone_name: stormName,
+        subbasin: basin
+      });
+
+      if (res.success && res.data) {
+        const d = res.data;
+        if (d.affected_sectors && d.affected_sectors.length > 0) {
+          setAvailableSectors(d.affected_sectors);
+        }
+        if (d.affected_lighthouses && d.affected_lighthouses.length > 0) {
+          setAvailableLighthouses(d.affected_lighthouses);
+        }
+        if (d.primary_sector) {
+          setSelectedArea(d.primary_sector);
+        }
+        if (d.primary_lighthouse) {
+          setTargetStation(d.primary_lighthouse);
+        }
+        if (d.ai_directive) {
+          setAiDirective(d.ai_directive);
+        }
+        if (d.recommended_signal) {
+          setRecommendedSignal(d.recommended_signal);
+        }
+        if (d.risk_level) {
+          setRiskLevel(d.risk_level);
+        }
+        if (d.detection_engine) {
+          setDetectionEngine(d.detection_engine);
+        }
+        if (d.primary_lighthouse_distance_km != null) {
+          setNearestDistanceKm(d.primary_lighthouse_distance_km);
+        }
+      }
+    } catch (err) {
+      console.warn('[CoastalBroadcastControl] Marine proximity auto-detection notice:', err);
+    } finally {
+      setIsDetectingMarine(false);
+    }
+  };
+
+  // Run auto-detection when cyclone coordinates, wind speed, or subbasin change
+  useEffect(() => {
+    if (isCyclone && cycloneLat != null && cycloneLng != null) {
+      const coordKey = `${cycloneLat.toFixed(2)}_${cycloneLng.toFixed(2)}_${windKt}_${subbasin}`;
+      if (lastCoordsRef.current !== coordKey) {
+        lastCoordsRef.current = coordKey;
+        triggerMarineDetection(cycloneLat, cycloneLng, windKt, cycloneName, subbasin);
+      }
+    }
+  }, [cycloneLat, cycloneLng, windKt, isCyclone, subbasin]);
+
+  // When user selects a different sector, filter lighthouses to that sector or prioritize them
+  const handleSectorChange = (newSectorName) => {
+    setSelectedArea(newSectorName);
+    
+    // Find matching sector object
+    const matchedSector = availableSectors.find(s => s.name === newSectorName);
+    if (matchedSector && matchedSector.id !== 'all_coastal') {
+      const sectorLighthouses = availableLighthouses.filter(lh => lh.sector_id === matchedSector.id || lh.sector_name === newSectorName);
+      if (sectorLighthouses.length > 0) {
+        setTargetStation(sectorLighthouses[0].name);
+      }
+    }
+  };
+
+  // Filter displayed lighthouses based on selected sector
+  const currentSectorObj = availableSectors.find(s => s.name === selectedArea);
+  const displayedLighthouses = (currentSectorObj && currentSectorObj.id !== 'all_coastal')
+    ? [
+        ...availableLighthouses.filter(lh => lh.sector_id === currentSectorObj.id || lh.sector_name === selectedArea),
+        ...availableLighthouses.filter(lh => lh.sector_id !== currentSectorObj.id && lh.sector_name !== selectedArea)
+      ]
+    : availableLighthouses;
+
+  // Handle publishing analysis to citizen portal with 5-day prediction track
   const handlePublishBroadcast = async () => {
     setIsSubmitting(true);
     setSuccessMessage(null);
+
+    // 1. Pre-fetch / build 5-day trajectory waypoints so citizen map displays full 5-day path
+    let forecastData = currentAnalysis?.forecast || null;
+    if (!forecastData && isCyclone && cycloneLat != null && cycloneLng != null) {
+      try {
+        const baseUrl = getApiBaseUrl();
+        const trackRes = await fetch(`${baseUrl}/api/track/predict-from-point`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            latitude: cycloneLat,
+            longitude: cycloneLng,
+            wind_speed_kt: windKt,
+            storm_name: cycloneName
+          })
+        });
+        if (trackRes.ok) {
+          const trackJson = await trackRes.json();
+          if (trackJson?.forecast && trackJson.forecast.length > 0) {
+            forecastData = trackJson.forecast;
+          }
+        }
+      } catch (err) {
+        console.warn('Forecast pre-fetch note:', err);
+      }
+
+      // Physics fallback if offline
+      if (!forecastData) {
+        const isBob = cycloneLng >= 78.0;
+        const now = Date.now();
+        forecastData = [24, 48, 72, 96, 120].map((h, idx) => {
+          const step = idx + 1;
+          const fLat = cycloneLat + step * 0.45;
+          const fLon = isBob ? cycloneLng - step * 1.65 : cycloneLng - step * 0.9;
+          return {
+            step,
+            horizon_hours: h,
+            latitude: Number(fLat.toFixed(2)),
+            longitude: Number(fLon.toFixed(2)),
+            delta_lat: Number((step * 0.45).toFixed(2)),
+            delta_lon: Number((isBob ? -step * 1.65 : -step * 0.9).toFixed(2)),
+            arrival_time: new Date(now + h * 3600 * 1000).toISOString(),
+            uncertainty_radius_km: 135 + idx * 80,
+            stage: idx < 3 ? "Projected Severe Cyclone" : "Projected Landfall on Coast"
+          };
+        });
+      }
+    }
 
     const level = classification === 'SEVERE' ? 'RED' : classification === 'MEDIUM' ? 'ORANGE' : 'YELLOW';
 
@@ -71,17 +248,19 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
       level: isCyclone ? level : 'NORMAL',
       siren_active: isCyclone ? includeSirenOnPublish : false,
       area: selectedArea,
+      target_lighthouse: targetStation,
       message: isCyclone
-        ? `AI detection confirmed ${classification} cyclonic disturbance centered at ${cycloneLat.toFixed(2)}°N, ${cycloneLng.toFixed(2)}°E (${subbasin}) with peak sustained winds of ${windKmh} km/h (${windKt} kt). High sea swells and severe coastal winds expected.`
+        ? (aiDirective || `AI detection confirmed ${classification} cyclonic disturbance centered at ${cycloneLat.toFixed(2)}°N, ${cycloneLng.toFixed(2)}°E (${subbasin}) with peak sustained winds of ${windKmh} km/h (${windKt} kt). 5-day projected trajectory active towards coastal zones.`)
         : 'Satellite analysis confirmed clear coastal waters. Normal operations permitted.',
       fishermen_directive: isCyclone
         ? (level === 'RED' 
-            ? 'RED ALERT: Strict ban on all fishing vessels. Boats at sea must return to harbor immediately.' 
-            : 'CAUTION: Fishermen in deep sea waters advised to exercise vigilance and stay near port.')
+            ? `RED ALERT (${recommendedSignal || 'Signal 10'}): Strict ban on all fishing vessels in ${selectedArea}. Boats at sea must return to harbor immediately.` 
+            : `CAUTION (${recommendedSignal || 'Signal 08'}): Fishermen in ${selectedArea} advised to exercise vigilance and stay near port.`)
         : 'Regular fishing operations permitted. Check standard harbor flags.',
       lat: cycloneLat,
       lng: cycloneLng,
-      subbasin: subbasin
+      subbasin: subbasin,
+      forecast: forecastData
     };
 
     const res = await publishCitizenBroadcast(payload);
@@ -89,13 +268,13 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
 
     if (res.success) {
       setBroadcastState(res.data.broadcast);
-      setSuccessMessage('Successfully broadcast to Citizen Dashboard and Lighthouse network!');
+      setSuccessMessage(`Successfully broadcast to Citizen Dashboard, ${selectedArea} & ${targetStation}!`);
       setTimeout(() => setSuccessMessage(null), 5000);
       addSystemLog({
         module: 'Broadcast-Service',
         level: payload.level === 'RED' ? 'WARNING' : 'INFO',
         event: `Coastal Emergency Alert Dispatched: ${payload.level} ALERT`,
-        details: `Sector: ${payload.area} | Cyclone: ${payload.cyclone_name} | Lat: ${payload.lat}°N, Lon: ${payload.lng}°E | Siren: ${payload.siren_active ? 'ENABLED' : 'DISABLED'}`,
+        details: `Sector: ${payload.area} | Lighthouse Beacon: ${targetStation} | Signal: ${recommendedSignal} | Cyclone: ${payload.cyclone_name} | Lat: ${payload.lat}°N, Lon: ${payload.lng}°E | 5-Day Forecast: ${payload.forecast?.length || 0} waypoints | Siren: ${payload.siren_active ? 'ENABLED' : 'DISABLED'}`,
         payload: payload
       });
     }
@@ -103,22 +282,31 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
 
   // Handle direct toggle of Lighthouse Siren
   const handleToggleSiren = async () => {
+    if (isTogglingRef.current) return;
     const nextState = !broadcastState?.siren_active;
+    isTogglingRef.current = true;
     setSirenToggling(true);
-    const res = await toggleLighthouseSiren(nextState);
-    setSirenToggling(false);
 
-    if (res.success) {
-      setBroadcastState(prev => ({ ...prev, siren_active: nextState }));
-      setSuccessMessage(nextState ? 'Lighthouse Siren ACTIVATED!' : 'Lighthouse Siren SILENCED.');
-      setTimeout(() => setSuccessMessage(null), 4000);
-      addSystemLog({
-        module: 'Broadcast-Service',
-        level: nextState ? 'WARNING' : 'INFO',
-        event: nextState ? 'Coastal Lighthouse Siren ACTIVATED' : 'Coastal Lighthouse Siren SILENCED',
-        details: nextState ? 'Audible acoustic warning siren triggered on coastal beacons' : 'Coastal sirens silenced back to standby',
-        payload: { siren_active: nextState }
-      });
+    try {
+      const res = await toggleLighthouseSiren(nextState);
+      if (res.success) {
+        setBroadcastState(prev => ({ ...prev, siren_active: nextState }));
+        setIncludeSirenOnPublish(nextState);
+        setSuccessMessage(nextState ? `Lighthouse Siren ACTIVATED on ${targetStation}!` : 'Lighthouse Siren SILENCED.');
+        setTimeout(() => setSuccessMessage(null), 4000);
+        addSystemLog({
+          module: 'Broadcast-Service',
+          level: nextState ? 'WARNING' : 'INFO',
+          event: nextState ? 'Coastal Lighthouse Siren ACTIVATED' : 'Coastal Lighthouse Siren SILENCED',
+          details: nextState ? `Audible acoustic warning siren triggered on ${targetStation}` : 'Coastal sirens silenced back to standby',
+          payload: { siren_active: nextState, target_lighthouse: targetStation }
+        });
+      }
+    } finally {
+      setTimeout(() => {
+        isTogglingRef.current = false;
+        setSirenToggling(false);
+      }, 600);
     }
   };
 
@@ -202,58 +390,116 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
         </div>
       )}
 
-      {/* Target Sector & Station Settings */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-        <div>
-          <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block mb-1">
-            Target Maritime Sector
-          </label>
-          <select
-            value={selectedArea}
-            onChange={(e) => setSelectedArea(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 shadow-xs cursor-pointer"
-          >
-            <option value="Karnataka Coastal Maritime Zone (Mangalore - Malpe - Karwar)" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
-              Karnataka Coast (Mangalore - Malpe - Karwar)
-            </option>
-            <option value="Kerala Coastal Waters (Kochi - Kozhikode)" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
-              Kerala Coastal Waters (Kochi - Kozhikode)
-            </option>
-            <option value="Odisha & Bengal Coast (Puri - Paradip)" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
-              Odisha & Bengal Coast (Puri - Paradip)
-            </option>
-            <option value="Tamil Nadu & Andhra Coast (Chennai - Visakhapatnam)" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
-              Tamil Nadu & Andhra Coast (Chennai - Visakhapatnam)
-            </option>
-            <option value="Pan-India All Coastal Sectors" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
-              All Coastal Sectors (Pan-India)
-            </option>
-          </select>
+      {/* Target Sector & Station Settings (AI Auto-Detected with Multi-Key Failover) */}
+      <div className="space-y-3 mb-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Sparkles size={14} className="text-amber-500 animate-pulse" />
+              <span>AI Target Sector & Lighthouse Station</span>
+            </span>
+            {isDetectingMarine && (
+              <span className="text-[10px] font-bold text-sky-500 flex items-center gap-1">
+                <Loader2 size={12} className="animate-spin" /> Auto-Detecting Nearby Coast...
+              </span>
+            )}
+          </div>
+          
+          {detectionEngine && (
+            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+              {detectionEngine}
+            </span>
+          )}
         </div>
 
-        <div>
-          <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block mb-1">
-            Target Lighthouse Station Beacon
-          </label>
-          <select
-            value={targetStation}
-            onChange={(e) => setTargetStation(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 shadow-xs cursor-pointer"
-          >
-            <option value="Kaup Coastal Lighthouse Station #04" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
-              Kaup Lighthouse Station #04 (Udupi Coast)
-            </option>
-            <option value="Mangalore Port Light Beacon #01" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
-              Mangalore Port Light Beacon #01
-            </option>
-            <option value="Karwar Head Lighthouse #07" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
-              Karwar Head Lighthouse #07
-            </option>
-            <option value="Visakhapatnam Dolphin Nose Light" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
-              Visakhapatnam Dolphin Nose Light
-            </option>
-          </select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block">
+                Target Maritime Sector
+              </label>
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                AI Auto-Selected
+              </span>
+            </div>
+            <select
+              value={selectedArea}
+              onChange={(e) => handleSectorChange(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 shadow-xs cursor-pointer"
+            >
+              {availableSectors.map((sector) => (
+                <option key={sector.id} value={sector.name} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
+                  {sector.name} {sector.distance_km != null ? `(${sector.distance_km} km away ${sector.risk_level ? `• ${sector.risk_level}` : ''})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block">
+                Target Lighthouse Station Beacon
+              </label>
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <TowerControl size={11} /> Highest Risk Beacon
+              </span>
+            </div>
+            <select
+              value={targetStation}
+              onChange={(e) => setTargetStation(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-sky-500 shadow-xs cursor-pointer"
+            >
+              {displayedLighthouses.map((lh) => (
+                <option key={lh.id || lh.name} value={lh.name} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200">
+                  {lh.name} {lh.distance_km != null ? `(${lh.distance_km} km` : ''}{lh.signal ? ` • ${lh.signal.split(' - ')[0]}` : ''}{lh.distance_km != null ? ')' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+
+        {/* AI Coastal Warning & Danger Signal Advisory Banner */}
+        {aiDirective && (
+          <div className="p-3 rounded-xl bg-gradient-to-r from-sky-500/10 via-amber-500/10 to-red-500/10 border border-sky-500/30 dark:border-sky-500/40 text-xs space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-bold text-sky-800 dark:text-sky-300 text-[11px] uppercase tracking-wider">
+                <Sparkles size={14} className="text-amber-500" />
+                <span>AI Coastal Risk Assessment ({detectionEngine || 'Gemini Vision AI'})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                  riskLevel === 'CRITICAL' ? 'bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30' :
+                  riskLevel === 'HIGH' ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30' :
+                  'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                }`}>
+                  {riskLevel || 'HIGH'} THREAT
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                  {recommendedSignal || 'Signal 10 (Great Danger)'}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-slate-700 dark:text-slate-200 text-xs leading-relaxed font-medium">
+              {aiDirective}
+            </p>
+
+            <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/50 dark:border-slate-700/40">
+              <span>
+                Nearest Coastal Beacon: <strong className="text-slate-800 dark:text-slate-200">{targetStation}</strong> ({nearestDistanceKm != null ? `${nearestDistanceKm} km` : 'Proximity Calculated'})
+              </span>
+              <button
+                type="button"
+                onClick={() => triggerMarineDetection(cycloneLat, cycloneLng, windKt, cycloneName, subbasin)}
+                disabled={isDetectingMarine}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+              >
+                <RefreshCw size={11} className={isDetectingMarine ? 'animate-spin' : ''} />
+                <span>Re-evaluate Proximity</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Analysis Preview to be Broadcasted */}
@@ -261,7 +507,7 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
         <span className="font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-1.5 text-[10px]">
           Data to be published from current image analysis:
         </span>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-800 dark:text-slate-200 font-medium">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-slate-800 dark:text-slate-200 font-medium">
           <div>
             <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Detection:</span>
             <span className="font-bold text-slate-900 dark:text-white">{isCyclone ? 'CYCLONE DETECTED' : 'NO CYCLONE'}</span>
@@ -282,92 +528,89 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
             <span className="text-slate-500 dark:text-slate-400 block text-[11px]">AI Confidence:</span>
             <span className="font-bold text-emerald-600 dark:text-emerald-400">{confidence}%</span>
           </div>
+          <div>
+            <span className="text-slate-500 dark:text-slate-400 block text-[11px]">5-Day Prediction Track:</span>
+            <span className="font-bold text-red-500 dark:text-red-400">Day 1–5 Included</span>
+          </div>
         </div>
       </div>
 
-      {/* ACTION CONTROLS: 2 Core Buttons requested by user */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-        
-        {/* Left Options: Siren Toggle checkbox before publishing */}
-        {isCyclone && (
-          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={includeSirenOnPublish}
-              onChange={(e) => setIncludeSirenOnPublish(e.target.checked)}
-              className="w-4 h-4 rounded-sm border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-red-500 focus:ring-red-500 cursor-pointer"
-            />
-            <span>Include Audible Siren alarm on citizens' phones with broadcast</span>
-          </label>
-        )}
-
-        {/* Buttons Action Bar */}
-        <div className="flex flex-wrap items-center gap-2.5 sm:ml-auto">
-          
-          {/* BUTTON 1: Broadcast / Notify Citizens */}
-          <button
-            onClick={handlePublishBroadcast}
-            disabled={isSubmitting}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                <span>Broadcasting...</span>
-              </>
-            ) : (
-              <>
-                <Send size={16} />
-                <span>Notify Citizens & Coastal App</span>
-              </>
-            )}
-          </button>
-
-          {/* BUTTON 2: Siren Sound Control (On/Off) */}
-          <button
-            onClick={handleToggleSiren}
-            disabled={sirenToggling}
-            className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer select-none ${
-              isSirenBlasting
-                ? 'bg-red-600 hover:bg-red-700 text-white ring-4 ring-red-500/40 animate-pulse'
-                : 'bg-amber-600 hover:bg-amber-500 text-white'
-            }`}
-          >
-            {sirenToggling ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                <span>Switching Siren...</span>
-              </>
-            ) : isSirenBlasting ? (
-              <>
-                <VolumeX size={18} />
-                <span>Silence Siren on Phones</span>
-              </>
-            ) : (
-              <>
-                <Volume2 size={18} />
-                <span>🚨 Sound Siren on Citizens' Phones</span>
-              </>
-            )}
-          </button>
-
-          {/* BUTTON 3: Clear / Reset */}
-          {isLiveActive && (
-            <button
-              onClick={handleClearBroadcast}
-              disabled={isSubmitting}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer"
-              title="Clear active alert and restore normal status"
-            >
-              <RotateCcw size={14} />
-              <span>All Clear</span>
-            </button>
+      {/* Action Buttons: Publish Broadcast & Toggle Siren */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        {/* Main Publish to Citizen Network Button */}
+        <button
+          type="button"
+          onClick={handlePublishBroadcast}
+          disabled={isSubmitting || !isCyclone}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
+            !isCyclone
+              ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+              : 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white shadow-sky-500/25 active:scale-98'
+          }`}
+        >
+          {isSubmitting ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <Send size={18} />
           )}
+          <span>{isLiveActive ? 'Update Coastal Broadcast' : 'Notify Citizens & Coastal App'}</span>
+        </button>
 
-        </div>
+        {/* Siren Trigger Button */}
+        <button
+          type="button"
+          onClick={handleToggleSiren}
+          disabled={sirenToggling || !isCyclone}
+          className={`py-3 px-5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
+            !isCyclone
+              ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+              : isSirenBlasting
+              ? 'bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white shadow-red-500/30 animate-pulse'
+              : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-amber-500/25'
+          }`}
+        >
+          {sirenToggling ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : isSirenBlasting ? (
+            <VolumeX size={18} />
+          ) : (
+            <Volume2 size={18} />
+          )}
+          <span>
+            {isSirenBlasting ? 'Silence Siren Alarm' : '🚨 Sound Siren on Citizens\' Phones'}
+          </span>
+        </button>
 
+        {/* All-Clear Reset Button */}
+        {isLiveActive && (
+          <button
+            type="button"
+            onClick={handleClearBroadcast}
+            disabled={isSubmitting}
+            className="py-3 px-4 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0"
+            title="Clear active broadcast and return to normal maritime status"
+          >
+            <RotateCcw size={16} />
+            <span>All Clear</span>
+          </button>
+        )}
       </div>
 
+      {/* Audible Siren Checkbox option */}
+      {isCyclone && (
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="includeSiren"
+            checked={includeSirenOnPublish}
+            onChange={(e) => setIncludeSirenOnPublish(e.target.checked)}
+            className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 dark:border-slate-700 cursor-pointer"
+          />
+          <label htmlFor="includeSiren" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+            Include Audible Siren alarm on citizens' phones with broadcast
+          </label>
+        </div>
+      )}
     </div>
   );
 };

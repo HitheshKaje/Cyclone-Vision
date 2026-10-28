@@ -38,6 +38,7 @@ const LighthouseStation = ({ onNavigateBack }) => {
   const gainNodeRef = useRef(null);
   const sirenIntervalRef = useRef(null);
   const vibrationIntervalRef = useRef(null);
+  const hasAutoSelectedRef = useRef(false);
 
   // Initialize or unlock Web Audio API on user interaction (required by mobile browsers)
   const unlockAudioContext = () => {
@@ -149,6 +150,27 @@ const LighthouseStation = ({ onNavigateBack }) => {
         setAlertData(res.data);
         const shouldSound = manualOverride || (res.data.siren_active === true);
         setSirenActive(shouldSound);
+
+        // Auto-synchronize targeted lighthouse beacon if broadcast from Admin
+        if (res.data.target_lighthouse && !hasAutoSelectedRef.current) {
+          hasAutoSelectedRef.current = true;
+          const targetName = res.data.target_lighthouse.toLowerCase();
+          const match = STATIONS.find(s => 
+            targetName.includes(s.id) || 
+            s.name.toLowerCase().includes(targetName) || 
+            targetName.includes(s.name.toLowerCase())
+          );
+          if (match) {
+            setStation(match);
+          } else {
+            setStation({
+              id: 'targeted_beacon',
+              name: res.data.target_lighthouse,
+              signal: res.data.level === 'RED' ? 'Signal 10 (Great Danger)' : 'Signal 09 (Severe Warning)',
+              focalHeight: 'Coastal Early Warning Tower'
+            });
+          }
+        }
       } else {
         setSirenActive(manualOverride);
       }

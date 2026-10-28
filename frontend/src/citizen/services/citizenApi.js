@@ -92,6 +92,37 @@ export const fetchOfficialAdvisories = async () => {
 };
 
 /**
+ * Detects nearby affected coastal maritime sectors and lighthouse stations
+ * using Google Gemini AI and geodesic calculations
+ */
+export const detectAffectedMarineSector = async ({ lat, lng, wind_speed_kt, cyclone_name, subbasin }) => {
+  const baseUrl = getApiBaseUrl();
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/citizen/detect-marine-sector`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lat,
+        lng,
+        wind_speed_kt: wind_speed_kt || 65.0,
+        cyclone_name: cyclone_name || 'Detected Cyclone',
+        subbasin
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    const data = await response.json();
+    return { success: true, data };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.name === 'AbortError' ? 'Connection timed out' : err.message
+    };
+  }
+};
+
+/**
  * Publish detected cyclone analysis to Citizen & Lighthouse portals
  */
 export const publishCitizenBroadcast = async (payload) => {

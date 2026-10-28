@@ -95,6 +95,17 @@ const CycloneSummaryCard = ({ cyclone, isCached = false }) => {
         </div>
       </div>
 
+      {cyclone.forecast && cyclone.forecast.length > 0 && (
+        <div className="mt-3 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-between text-xs text-red-700 dark:text-red-300">
+          <span className="font-semibold">
+            {i18n.language === 'kn' ? '೫ ದಿನಗಳ ಚಂಡಮಾರುತ ಚಲನೆ ನಕ್ಷೆಯಲ್ಲಿ ಸಕ್ರಿಯವಾಗಿದೆ' : '5-Day Landfall Trajectory Active on Map'}
+          </span>
+          <span className="text-[10px] font-bold uppercase bg-red-600 text-white px-2 py-0.5 rounded-full">
+            Day 1–5
+          </span>
+        </div>
+      )}
+
       {cyclone.description && (
         <p className="text-xs text-slate-600 dark:text-slate-400 border-t border-slate-200/60 dark:border-slate-700/60 pt-3 leading-relaxed">
           {i18n.language === 'kn' && (cyclone.description.toLowerCase().includes('cyclone') || cyclone.description.toLowerCase().includes('alert'))

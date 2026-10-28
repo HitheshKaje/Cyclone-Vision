@@ -64,6 +64,7 @@ const Dashboard = ({
       {activeTab === 'map' && (
         <MapPage 
           currentAnalysis={currentAnalysis}
+          setActiveTab={setActiveTab}
         />
       )}
 

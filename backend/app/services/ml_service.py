@@ -260,84 +260,138 @@ class MLService:
 
     def validate_satellite_domain(self, img_bgr: np.ndarray) -> Tuple[bool, str]:
         """
-        Validates whether an input image conforms to Earth meteorological satellite domains.
-        Rejects non-satellite imagery:
-          1. Human Portraits / Selfies / People (human skin chrominance blobs, facial regions).
-          2. Non-meteorological Saturated Graphics (artwork, cartoons, vibrant ocean whirlpool illustrations).
-          3. Outer space / Astronomical scenes (black holes, star fields, cosmic voids).
-          4. Household / Everyday objects (Coffee cups, tables, indoor rooms).
+        Validates whether an input image conforms to Earth meteorological satellite or weather map domains.
+        Accredits:
+          - Earth weather satellite observations (Visible, IR, Water Vapor, RGB composites).
+          - Meteorological satellite maps with geographical coordinate grids (lat/lon lines, degrees, coastlines).
+          - Oceanic and atmospheric cloud formations, tropical cyclones, and storm systems.
+        Rejects non-meteorological inputs:
+          - Human portraits / selfies / people.
+          - Non-meteorological vector graphics / cartoons without clouds or ocean.
+          - Outer space / deep cosmic voids / black holes.
+          - Household everyday indoor scenes.
         """
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
         hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
         h, w = gray.shape
-        total_pixels = h * w
-        
+        total_pixels = float(h * w)
+
+        b_chan = img_bgr[:, :, 0]
+        g_chan = img_bgr[:, :, 1]
+        r_chan = img_bgr[:, :, 2]
         h_chan, s_chan, v_chan = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
 
-        # 1. Human Portrait / Face / Selfie Detection (YCbCr + HSV Chrominance Skin Model)
-        ycbcr = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)
-        cr = ycbcr[:, :, 1]
-        cb = ycbcr[:, :, 2]
-        skin_mask = (cb >= 77) & (cb <= 127) & (cr >= 133) & (cr <= 173) & (v_chan >= 40)
-        skin_frac = float(np.mean(skin_mask))
-        
-        face_patch = skin_mask[int(h * 0.10):int(h * 0.65), int(w * 0.20):int(w * 0.80)]
-        face_skin_frac = float(np.mean(face_patch))
+        # 1. Detect Earth Meteorological Cloud Formations (desaturated bright pixels)
+        cloud_mask = (gray > 155) & (s_chan < 90)
+        cloud_frac = float(np.mean(cloud_mask))
 
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(skin_mask.astype(np.uint8), connectivity=8)
-        max_blob_area = int(np.max(stats[1:, cv2.CC_STAT_AREA])) if num_labels > 1 else 0
-        max_blob_ratio = float(max_blob_area / total_pixels) if total_pixels > 0 else 0.0
-        
-        if max_blob_ratio > 0.015 and (skin_frac > 0.04 or face_skin_frac > 0.08):
-            return False, "Human portrait / non-meteorological photo detected (facial skin features present). Please upload Earth meteorological satellite imagery."
+        # 2. Detect Earth Oceans / Water Bodies (blue dominant)
+        ocean_mask = (b_chan > r_chan + 12) & (b_chan >= g_chan - 25) & (v_chan > 20) & (v_chan < 220)
+        ocean_frac = float(np.mean(ocean_mask))
 
-        # Check B: Vivid artificial studio backdrop (e.g. solid saturated blue/cyan/white/red)
-        corner_h, corner_w = max(5, int(h * 0.20)), max(5, int(w * 0.20))
-        top_left = img_bgr[:corner_h, :corner_w]
-        top_right = img_bgr[:corner_h, w - corner_w:]
-        std_tl = float(np.mean(np.std(top_left, axis=(0, 1))))
-        std_tr = float(np.mean(np.std(top_right, axis=(0, 1))))
-        corner_diff = float(np.mean(np.abs(np.mean(top_left, axis=(0, 1)) - np.mean(top_right, axis=(0, 1)))))
-        sat_corner = float(np.mean(hsv[:corner_h, :corner_w, 1]))
+        # 3. Detect Geographical Coordinate Grids (Horizontal & Vertical Lat/Lon lines)
+        edges = cv2.Canny(gray, 40, 120)
+        min_len = int(min(h, w) * 0.12)
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=45, minLineLength=min_len, maxLineGap=20)
 
-        if std_tl < 15.0 and std_tr < 15.0 and corner_diff < 18.0 and sat_corner > 70.0:
-            return False, "Artificial studio backdrop detected (uniform portrait / studio background). Please upload Earth meteorological satellite imagery."
+        horiz_count = 0
+        vert_count = 0
+        if lines is not None:
+            for line_entry in lines:
+                pts = line_entry.ravel()
+                if len(pts) >= 4:
+                    x1, y1, x2, y2 = pts[0], pts[1], pts[2], pts[3]
+                    dx = abs(x2 - x1)
+                    dy = abs(y2 - y1)
+                    if dy <= 4 and dx >= min_len:
+                        horiz_count += 1
+                    elif dx <= 4 and dy >= min_len:
+                        vert_count += 1
 
-        # 2. Check for Non-Meteorological Highly Saturated Graphics / Artwork / Concept Art
+        has_coordinate_grid = (horiz_count >= 2 and vert_count >= 2) or (len(lines) >= 8 if lines is not None else False)
+
+        # 4. Check for margin tick marks / coordinate labels in the outer borders (top/bottom/left/right 8%)
+        margin_h = max(2, int(h * 0.08))
+        margin_w = max(2, int(w * 0.08))
+        border_edges = (
+            np.sum(edges[:margin_h, :]) +
+            np.sum(edges[h - margin_h:, :]) +
+            np.sum(edges[:, :margin_w]) +
+            np.sum(edges[:, w - margin_w:])
+        )
+        border_edge_density = float(border_edges / (2 * (margin_h * w + margin_w * h) * 255))
+        has_border_annotations = border_edge_density > 0.035
+
+        # =========================================================================
+        # FAST WHITELIST: Genuine Meteorological Satellite Imagery & Weather Maps
+        # =========================================================================
+        # A. If coordinate grid or border degree annotations are present:
+        if has_coordinate_grid or (has_border_annotations and (cloud_frac > 0.04 or ocean_frac > 0.04)):
+            return True, "Valid Earth satellite domain (Meteorological satellite map with coordinate grid)."
+
+        # B. If substantial ocean and cloud formations are present:
+        if ocean_frac > 0.08 and cloud_frac > 0.06:
+            return True, "Valid Earth satellite domain (Earth oceanic-atmospheric observation)."
+
+        # C. If classic convective cyclone cloud organization is present:
+        if cloud_frac > 0.18 and float(np.std(gray)) > 30.0:
+            return True, "Valid Earth satellite domain (Atmospheric cloud formation)."
+
+        # =========================================================================
+        # FILTER 1: Human Portrait / Face / Selfie Detection
+        # =========================================================================
+        # Only evaluate if the image is NOT an ocean/atmosphere scene
+        if ocean_frac < 0.04 and cloud_frac < 0.04:
+            face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            if os.path.exists(face_cascade_path):
+                face_cascade = cv2.CascadeClassifier(face_cascade_path)
+                min_face = int(min(h, w) * 0.16)
+                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(min_face, min_face))
+                if len(faces) > 0:
+                    return False, "Human portrait / selfie photo detected (facial structure identified). Please upload Earth meteorological satellite imagery."
+
+            ycbcr = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)
+            cr = ycbcr[:, :, 1]
+            cb = ycbcr[:, :, 2]
+            skin_mask = (cb >= 77) & (cb <= 127) & (cr >= 133) & (cr <= 173) & (v_chan >= 40)
+            skin_frac = float(np.mean(skin_mask))
+
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(skin_mask.astype(np.uint8), connectivity=8)
+            max_blob_area = int(np.max(stats[1:, cv2.CC_STAT_AREA])) if num_labels > 1 else 0
+            max_blob_ratio = float(max_blob_area / total_pixels) if total_pixels > 0 else 0.0
+
+            if max_blob_ratio > 0.18 and skin_frac > 0.22:
+                return False, "Human portrait / non-meteorological photo detected (facial skin features present). Please upload Earth meteorological satellite imagery."
+
+        # =========================================================================
+        # FILTER 2: Non-Meteorological Highly Saturated Graphics / Cartoons
+        # =========================================================================
         mean_sat = float(np.mean(s_chan))
-        if mean_sat > 55.0:
+        if mean_sat > 195.0 and cloud_frac < 0.04 and not has_coordinate_grid:
             return False, f"High-saturation non-satellite graphic or illustration detected (color saturation {mean_sat:.1f}% exceeds satellite baseline). Please upload weather satellite imagery."
 
-        # 3. Check for Household / Everyday Photography (warm wood, tables, indoor objects)
+        # =========================================================================
+        # FILTER 3: Household / Everyday Indoor Photography (warm wood, tables)
+        # =========================================================================
         warm_mask = (h_chan >= 8) & (h_chan <= 28) & (s_chan > 50) & (v_chan > 40)
         warm_ratio = float(np.mean(warm_mask))
-        if warm_ratio > 0.22:
+        if warm_ratio > 0.45 and ocean_frac < 0.04 and cloud_frac < 0.04 and not has_coordinate_grid:
             return False, "Non-satellite image detected (household object / everyday scene). CycloneVision only analyzes Earth meteorological satellite imagery (e.g. INSAT-3D, NOAA, GOES)."
 
-        # 4. Check for Outer Space / Astronomical Scene (Black hole, cosmic void, star fields)
-        dark_mask = (gray < 30).astype(np.uint8)
+        # =========================================================================
+        # FILTER 4: Outer Space / Astronomical Scene (Black hole, cosmic void, star fields)
+        # =========================================================================
+        dark_mask = (gray < 25).astype(np.uint8)
         dark_ratio = float(np.sum(dark_mask) / total_pixels)
-        
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        high_freq = cv2.subtract(gray, blurred)
-        
-        # Central singularity / black hole check
-        center_patch = gray[int(h * 0.30):int(h * 0.70), int(w * 0.30):int(w * 0.70)]
-        center_dark_frac = float(np.mean(center_patch < 40))
-        star_candidates = int(np.sum((high_freq > 20) & (gray < 70)))
-        
-        if center_dark_frac > 0.20 and star_candidates > 300:
-            return False, "Astronomical scene detected (cosmic black hole / star field void). Please upload Earth meteorological satellite imagery."
-
-        h_half, w_half = h // 2, w // 2
-        q1 = np.mean(dark_mask[:h_half, :w_half])
-        q2 = np.mean(dark_mask[:h_half, w_half:])
-        q3 = np.mean(dark_mask[h_half:, :w_half])
-        q4 = np.mean(dark_mask[h_half:, w_half:])
-        quadrants_dark = sum(q > 0.18 for q in [q1, q2, q3, q4])
-
-        if dark_ratio > 0.45 and quadrants_dark >= 3:
-            return False, "Outer space / astronomical scene detected (deep space void across multiple quadrants). Please upload Earth meteorological satellite imagery."
+        if dark_ratio > 0.55 and ocean_frac < 0.04 and cloud_frac < 0.04 and not has_coordinate_grid:
+            h_half, w_half = h // 2, w // 2
+            q1 = np.mean(dark_mask[:h_half, :w_half])
+            q2 = np.mean(dark_mask[:h_half, w_half:])
+            q3 = np.mean(dark_mask[h_half:, :w_half])
+            q4 = np.mean(dark_mask[h_half:, w_half:])
+            quadrants_dark = sum(q > 0.25 for q in [q1, q2, q3, q4])
+            if quadrants_dark >= 3:
+                return False, "Outer space / astronomical scene detected (deep space void across multiple quadrants). Please upload Earth meteorological satellite imagery."
 
         return True, "Valid Earth satellite domain."
 

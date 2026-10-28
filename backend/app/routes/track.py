@@ -39,10 +39,26 @@ def get_track_model():
     if _track_model is None:
         if not os.path.exists(MODEL_PATH):
             raise FileNotFoundError(f"Track prediction model not found at: {MODEL_PATH}")
-        import keras
-        logger.info(f"Loading Track Prediction LSTM Model from: {MODEL_PATH}...")
-        _track_model = keras.models.load_model(MODEL_PATH)
-        logger.info("-> Track prediction model loaded successfully!")
+        try:
+            import keras
+            logger.info(f"Loading Track Prediction LSTM Model from: {MODEL_PATH}...")
+            _track_model = keras.models.load_model(MODEL_PATH)
+            logger.info("-> Track prediction model loaded successfully!")
+        except Exception as e:
+            logger.warning(f"keras.models.load_model direct deserialize notice: {e}. Building graph and loading weights...")
+            import tensorflow as tf
+            from tensorflow.keras import layers, models
+            inputs = layers.Input(shape=(8, 7), name="track_history_input")
+            x = layers.Bidirectional(layers.LSTM(128, return_sequences=True), name="bi_lstm_1")(inputs)
+            x = layers.Dropout(0.2, name="dropout_1")(x)
+            x = layers.Bidirectional(layers.LSTM(64, return_sequences=False), name="bi_lstm_2")(x)
+            x = layers.Dropout(0.2, name="dropout_2")(x)
+            x = layers.Dense(64, activation="relu", name="dense_proj")(x)
+            outputs = layers.Dense(10, activation="linear", name="displacement_output")(x)
+            model = models.Model(inputs=inputs, outputs=outputs, name="CycloSafe_Track_BiLSTM")
+            model.load_weights(MODEL_PATH)
+            _track_model = model
+            logger.info("-> Track prediction model graph built and weights loaded successfully!")
     return _track_model
 
 def get_track_scaler():
@@ -180,6 +196,15 @@ async def predict_cyclone_track(payload: TrackPredictionRequest):
             f_lon = round(current_lon + d_lon, 2)
             arrival_time = (base_time + timedelta(hours=h)).isoformat() + "Z"
 
+            stage_names = [
+                "Day 1: Open Ocean Tracking",
+                "Day 2: Northwestward Progression",
+                "Day 3: Coastal Shelf Approach",
+                "Day 4: Coastal Landfall Approach",
+                "Day 5: Inland Dissipation & Decay"
+            ]
+            stage_desc = stage_names[idx] if idx < len(stage_names) else "Projected Landfall / Dissipation"
+
             forecast_waypoints.append({
                 "step": idx + 1,
                 "horizon_hours": h,
@@ -189,7 +214,7 @@ async def predict_cyclone_track(payload: TrackPredictionRequest):
                 "delta_lon": round(d_lon, 2),
                 "arrival_time": arrival_time,
                 "uncertainty_radius_km": uncertainty_radii[idx],
-                "stage": "Projected Severe Cyclone" if idx < 3 else "Projected Landfall / Dissipation"
+                "stage": stage_desc
             })
 
         return {
@@ -382,36 +407,93 @@ def extract_coordinates_from_image(img_bgr: np.ndarray, filename: str = "") -> D
     }
 
 
+class PointPredictionPayload(BaseModel):
+    latitude: float
+    longitude: float
+    wind_speed_kt: Optional[float] = 75.0
+    pressure_mb: Optional[float] = 980.0
+    storm_name: Optional[str] = "Detected Cyclone System"
+
+
+@router.post("/track/predict-from-point")
+async def predict_track_from_point(payload: PointPredictionPayload):
+    """
+    Generates a 5-day future track projection towards land based on current detected position & intensity.
+    Uses North Indian Ocean steering physics (Beta drift & monsoon trough) and the Bi-LSTM model.
+    """
+    lat = payload.latitude
+    lon = payload.longitude
+    wind = payload.wind_speed_kt or 75.0
+    is_bay_of_bengal = lon >= 78.0
+
+    # Historical direction vector leading up to current point (6h step)
+    # Bay of Bengal cyclones typically track northwestward (~0.35° lat, -0.35° lon per 6h)
+    d_lat_6h = 0.35
+    d_lon_6h = -0.35 if is_bay_of_bengal else -0.25
+
+    now = datetime.utcnow()
+    synthetic_history = [
+        TrackObservation(
+            lat=round(lat - (3 - i) * d_lat_6h, 2),
+            lon=round(lon - (3 - i) * d_lon_6h, 2),
+            timestamp=(now - timedelta(hours=(3 - i) * 6)).isoformat() + "Z",
+            wind_speed_kt=round(max(35.0, wind - (3 - i) * 5.0), 1),
+            pressure_mb=round((payload.pressure_mb or 980.0) + (3 - i) * 4.0, 1)
+        )
+        for i in range(4)
+    ]
+
+    req = TrackPredictionRequest(
+        storm_name=payload.storm_name or "Detected Cyclone System",
+        storm_id="POINT_PREDICT",
+        history=synthetic_history
+    )
+    return await predict_cyclone_track(req)
+
+
 @router.post("/extract-coordinates")
 @router.post("/track/extract-coordinates")
 async def extract_image_coordinates(image: UploadFile = File(...)):
     """
-    Extracts or estimates geographical latitude and longitude from an uploaded satellite image.
-    If the image has radius lines, concentric range rings, or graticule lines,
-    it detects the center of curvature and maps it to North Indian Ocean coordinates.
+    Extracts geographical latitude and longitude from an uploaded satellite image.
+    Uses AI vision to inspect coordinate grids, axis tick marks, and pinpoint the cyclone eyewall.
+    Falls back to CV Hough circles and graticule analysis if offline.
     """
     if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif', '.webp')):
         raise HTTPException(status_code=400, detail="Invalid image format.")
 
     try:
         content = await image.read()
+        mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
+
+        # 1. Try AI-powered georeferencing first (reads grid labels, lat/lon ticks, eyewall center)
+        try:
+            from services.cloud_vision_service import cloud_vision_service
+            ai_coords = cloud_vision_service.extract_eyewall_coordinates(content, mime_type=mime_type)
+            if ai_coords and ai_coords.get("detected"):
+                logger.info(f"[Coordinates] AI Georeferenced Eyewall at {ai_coords['latitude']}°N, {ai_coords['longitude']}°E ({ai_coords.get('subbasin')})")
+                return ai_coords
+        except Exception as ai_err:
+            logger.warning(f"AI coordinate georeferencing notice: {ai_err}")
+
+        # 2. Check filename or fallback to CV
         nparr = np.frombuffer(content, np.uint8)
         img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img_bgr is None:
-            raise ValueError("Could not decode image buffer.")
+        if img_bgr is not None:
+            return extract_coordinates_from_image(img_bgr, filename=image.filename)
 
-        result = extract_coordinates_from_image(img_bgr, filename=image.filename)
-        return result
+        raise ValueError("Could not decode image buffer.")
     except Exception as e:
         logger.error(f"Coordinate extraction error: {e}")
         return {
             "success": True,
             "detected": False,
-            "latitude": 15.0,
-            "longitude": 85.0,
+            "latitude": 15.3,
+            "longitude": 89.6,
             "subbasin": "Bay of Bengal",
             "detection_method": "Default Regional Centroid",
             "has_radius_lines": False,
             "confidence_percent": 60.0
         }
+
 
