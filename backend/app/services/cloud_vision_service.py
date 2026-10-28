@@ -210,8 +210,8 @@ class CloudVisionIntensityService:
                 "generationConfig": model_gen_config
             }
 
-            # Try candidate keys for this model
-            for active_key in candidate_keys[:3]:
+            # Try candidate keys for this model across the entire configured pool
+            for active_key in candidate_keys:
                 cooldown_exp = self.cooldowns.get((active_key, model_name), 0)
                 if cooldown_exp > now:
                     continue
@@ -240,23 +240,17 @@ class CloudVisionIntensityService:
                         break
 
                     elif r.status_code == 429:
-                        err_text = r.text
-                        is_daily = (
-                            "per day" in err_text.lower()
-                            or "free_tier_requests" in err_text.lower()
-                            or "quota" in err_text.lower()
-                            or "generaterequestsperdayperproject" in err_text.lower()
-                        )
-                        if is_daily:
-                            self.model_cooldowns[model_name] = time.time() + 1800
-                            logger.warning(f"[Gemini Vision] Model {model_name} daily project quota exhausted.")
-                            break
-                        else:
-                            self.cooldowns[(active_key, model_name)] = time.time() + 60
+                        logger.warning(f"[Gemini Vision] {key_label} quota exhausted (429). Automatically switching to next key...")
+                        self.cooldowns[(active_key, model_name)] = time.time() + 1800
+                        if active_key in all_keys:
+                            self.active_key_index = (all_keys.index(active_key) + 1) % len(all_keys)
                         continue
 
                     elif r.status_code in (400, 403) and ("api key" in r.text.lower() or "invalid" in r.text.lower()):
+                        logger.warning(f"[Gemini Vision] {key_label} rejected (invalid key). Switching to next key...")
                         self.invalid_keys.add(active_key)
+                        if active_key in all_keys:
+                            self.active_key_index = (all_keys.index(active_key) + 1) % len(all_keys)
                         continue
 
                     elif r.status_code == 404:
