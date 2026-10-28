@@ -51,8 +51,11 @@ function App() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem('API_BASE_URL');
-      if (stored && stored.includes(':8000')) {
-        localStorage.setItem('API_BASE_URL', stored.replace(':8000', ':8001'));
+      if (stored && (stored.includes(':8000') || stored.includes(':8005'))) {
+        localStorage.setItem(
+          'API_BASE_URL',
+          stored.replace(':8000', ':8001').replace(':8005', ':8001')
+        );
       }
     } catch (_) {}
 

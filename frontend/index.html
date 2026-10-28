@@ -12,6 +12,14 @@
 </head>
 
 <body class="bg-slate-50 text-slate-900 antialiased font-sans">
+  <script>
+    try {
+      var _u = localStorage.getItem('API_BASE_URL');
+      if (_u && (_u.indexOf(':8005') !== -1 || _u.indexOf(':8000') !== -1 || _u.indexOf(':8001') === -1)) {
+        localStorage.removeItem('API_BASE_URL');
+      }
+    } catch (_) {}
+  </script>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>

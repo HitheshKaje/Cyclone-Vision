@@ -139,6 +139,38 @@ def init_db():
                 except Exception as ex:
                     print(f"[MongoDB] Admin field sync note: {ex}")
 
+        # Ensure partial unique indexes on users collection so null/omitted fields do not cause E11000 duplicate key errors
+        try:
+            user_indexes = users.index_information()
+            if "email_1" in user_indexes and not user_indexes["email_1"].get("partialFilterExpression"):
+                users.drop_index("email_1")
+            users.create_index(
+                [("email", 1)],
+                unique=True,
+                partialFilterExpression={"email": {"$type": "string"}},
+                background=True
+            )
+
+            if "mobile_1" in user_indexes and not user_indexes["mobile_1"].get("partialFilterExpression"):
+                users.drop_index("mobile_1")
+            users.create_index(
+                [("mobile", 1)],
+                unique=True,
+                partialFilterExpression={"mobile": {"$type": "string"}},
+                background=True
+            )
+
+            if "phone_1" in user_indexes and not user_indexes["phone_1"].get("partialFilterExpression"):
+                users.drop_index("phone_1")
+            users.create_index(
+                [("phone", 1)],
+                unique=True,
+                partialFilterExpression={"phone": {"$type": "string"}},
+                background=True
+            )
+        except Exception as idx_err:
+            print(f"[MongoDB] Index sync note: {idx_err}")
+
         # Auto-seed baseline satellite analyses if collection is currently empty
         seed_default_analyses_if_empty(db)
 

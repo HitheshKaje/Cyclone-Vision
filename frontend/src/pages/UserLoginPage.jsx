@@ -150,12 +150,17 @@ const UserLoginPage = ({ onLoginSuccess, onNavigate }) => {
         }
       } else {
         // Register Mode
+        const rawPhone = phone.replace(/\D/g, '');
+        const savedPassword = password;
+        const registeredLoginType = loginType;
+        const cleanEmail = email.trim() || null;
+
         const payload = {
           name: name.trim(),
           login_type: loginType,
-          phone: phone.replace(/\D/g, ''),
-          email: email.trim() || null,
-          password,
+          phone: rawPhone,
+          email: cleanEmail,
+          password: savedPassword,
           user_type: userType,
           status: userType === 'fisherman' ? 'IN_HARBOR' : 'ACTIVE',
           district,
@@ -166,16 +171,20 @@ const UserLoginPage = ({ onLoginSuccess, onNavigate }) => {
           ward: userType === 'citizen' ? ward.trim() : null
         };
 
-        const res = await registerUser(payload);
+        const res = await registerUser(payload, { autoLogin: false });
         if (res.success) {
-          setSuccessMessage('Registration completed! Direct cyclone alert profile created.');
-          setTimeout(() => {
-            if (onLoginSuccess) {
-              onLoginSuccess();
-            } else if (onNavigate) {
-              onNavigate('/citizen');
-            }
-          }, 700);
+          setAuthMode('login');
+          if (registeredLoginType === 'email' && cleanEmail) {
+            setLoginType('email');
+            setIdentifier(cleanEmail);
+          } else {
+            setLoginType('mobile');
+            setIdentifier(rawPhone);
+          }
+          setPassword(savedPassword);
+          setConfirmPassword('');
+          setErrors({});
+          setSuccessMessage('Registration successful! Your login credentials have been pre-filled. Please click "Sign In" below to enter.');
         } else {
           setErrorMessage(res.error || 'Registration could not be completed.');
         }

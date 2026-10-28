@@ -229,12 +229,16 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
           cleanEmail = `${cleanEmail}.com`;
         }
 
+        const rawPhone = phone.replace(/\D/g, '');
+        const savedPassword = password;
+        const registeredLoginType = loginType;
+
         const payload = {
           name: name.trim(),
           login_type: loginType,
-          phone: phone.replace(/\D/g, ''),
+          phone: rawPhone,
           email: cleanEmail,
-          password,
+          password: savedPassword,
           user_type: userType,
           status: userType === 'fisherman' ? 'IN_HARBOR' : 'ACTIVE',
           district,
@@ -244,13 +248,21 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
           ward: userType === 'citizen' ? ward.trim() : null
         };
 
-        const res = await registerUser(payload);
+        const res = await registerUser(payload, { autoLogin: false });
         if (res.success) {
-          setSuccessMessage('Registration successful! Direct alerts active in MongoDB.');
-          setTimeout(() => {
-            if (onUserSuccess) onUserSuccess();
-            else if (onNavigate) onNavigate('/citizen');
-          }, 700);
+          // Do NOT direct login: switch to Sign In mode and pre-fill credentials
+          setAuthMode('login');
+          if (registeredLoginType === 'email' && cleanEmail) {
+            setLoginType('email');
+            setIdentifier(cleanEmail);
+          } else {
+            setLoginType('mobile');
+            setIdentifier(rawPhone);
+          }
+          setPassword(savedPassword);
+          setConfirmPassword('');
+          setErrors({});
+          setSuccessMessage('Registration successful! Your login credentials have been pre-filled. Please click "Sign In" below to enter.');
         } else {
           setErrorMessage(res.error || 'Registration failed. Please check form details.');
         }
@@ -895,7 +907,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                 ) : (
                   <>
                     <UserPlus size={16} />
-                    <span>Register into MongoDB & Enter</span>
+                    <span>Register into MongoDB</span>
                   </>
                 )}
               </>

@@ -1,22 +1,54 @@
 import { getApiBaseUrl } from './apiConfig';
 
-const API_TIMEOUT_MS = 8000;
+const API_TIMEOUT_MS = 6000;
 
 const fetchWithTimeout = async (url, options = {}) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const candidates = [url];
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
+  if (url.includes(':8005')) {
+    candidates.push(url.replace(':8005', ':8001'));
   }
+  if (url.includes(':8000')) {
+    candidates.push(url.replace(':8000', ':8001'));
+  }
+  if (!candidates.some(c => c.includes(':8001'))) {
+    try {
+      const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8001');
+      candidates.push(`http://127.0.0.1:8001${parsed.pathname}${parsed.search}`);
+    } catch (_) {}
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const parsed = new URL(url, window.location.origin);
+      const originUrl = `${window.location.origin}${parsed.pathname}${parsed.search}`;
+      if (!candidates.includes(originUrl)) {
+        candidates.push(originUrl);
+      }
+    } catch (_) {}
+  }
+
+  let lastError = null;
+  for (const candidate of candidates) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    try {
+      const response = await fetch(candidate, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      // Auto-heal localStorage
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('API_BASE_URL', 'http://127.0.0.1:8001'); } catch (_) {}
+      }
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('Network error connecting to backend.');
 };
 
 /**
@@ -73,7 +105,7 @@ export const loginUser = async ({ loginType, identifier, password, roleTarget = 
 /**
  * Register a new Citizen or Fisherman user into MongoDB
  */
-export const registerUser = async (payload) => {
+export const registerUser = async (payload, { autoLogin = false } = {}) => {
   const baseUrl = getApiBaseUrl();
   try {
     const response = await fetchWithTimeout(`${baseUrl}/api/auth/register`, {
@@ -91,11 +123,13 @@ export const registerUser = async (payload) => {
       };
     }
 
-    localStorage.setItem('cyclosafe_user_token', data.token);
-    localStorage.setItem('cyclosafe_current_citizen_user', JSON.stringify(data.user));
-    
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('cyclosafe_user_registered', { detail: data.user }));
+    if (autoLogin) {
+      localStorage.setItem('cyclosafe_user_token', data.token);
+      localStorage.setItem('cyclosafe_current_citizen_user', JSON.stringify(data.user));
+      
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cyclosafe_user_registered', { detail: data.user }));
+      }
     }
 
     return {
