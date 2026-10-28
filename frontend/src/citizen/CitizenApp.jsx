@@ -5,7 +5,6 @@ import CitizenHome from './pages/CitizenHome';
 import { Loader2 } from 'lucide-react';
 
 const CycloneMap = lazy(() => import('./pages/CycloneMap'));
-const CycloneHistory = lazy(() => import('./pages/CycloneHistory'));
 const WeatherSafety = lazy(() => import('./pages/WeatherSafety'));
 const EmergencyInformation = lazy(() => import('./pages/EmergencyInformation'));
 const LighthouseStation = lazy(() => import('./pages/LighthouseStation'));
@@ -37,12 +36,6 @@ const CitizenApp = ({ currentPath, onNavigate }) => {
         return (
           <Suspense fallback={<PageLoader />}>
             <CycloneMap />
-          </Suspense>
-        );
-      case '/citizen/history':
-        return (
-          <Suspense fallback={<PageLoader />}>
-            <CycloneHistory />
           </Suspense>
         );
       case '/citizen/weather':

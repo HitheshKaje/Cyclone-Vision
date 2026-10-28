@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { 
   Home, 
   Map, 
-  History, 
   CloudSun, 
   PhoneCall, 
   Globe, 
@@ -24,7 +23,6 @@ import { logoutUser } from '../../utils/authService';
 const navItems = [
   { id: 'home', path: '/citizen', labelKey: 'nav.home', icon: Home },
   { id: 'map', path: '/citizen/map', labelKey: 'nav.map', icon: Map },
-  { id: 'history', path: '/citizen/history', labelKey: 'nav.history', icon: History },
   { id: 'weather', path: '/citizen/weather', labelKey: 'nav.weather', icon: CloudSun },
   { id: 'emergency', path: '/citizen/emergency', labelKey: 'nav.emergency', icon: PhoneCall, highlight: true },
 ];
@@ -253,7 +251,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
         aria-label="Mobile Navigation"
         className="fixed bottom-0 inset-x-0 z-50 bg-white/95 dark:bg-[#0f172a]/95 border-t border-slate-200 dark:border-slate-800 backdrop-blur-md shadow-lg sm:hidden select-none"
       >
-        <div className="grid grid-cols-5 h-16">
+        <div className="grid grid-cols-4 h-16">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentPath === item.path || (item.path === '/citizen' && currentPath === '/citizen/');
