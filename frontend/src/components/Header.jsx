@@ -1,6 +1,7 @@
-import React from 'react';
-import { Menu, Bell, User, LogOut, Sun, Moon, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Menu, Bell, User, LogOut, Sun, Moon, ShieldCheck, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import cycloneLogo from '../assets/cyclone-logo.png';
+import { fetchOfficialAdvisories, toggleLighthouseSiren } from '../citizen/services/citizenApi';
 
 const CycloSafeLogo = () => (
   <div className="flex items-center justify-center shrink-0">
@@ -14,6 +15,56 @@ const CycloSafeLogo = () => (
 
 const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode, onLogout, adminUser }) => {
   const adminName = adminUser?.name || 'Command Center Admin';
+  const [sirenActive, setSirenActive] = useState(false);
+  const [sirenLoading, setSirenLoading] = useState(false);
+
+  // Poll backend for real-time siren broadcast state & listen to local toggles
+  useEffect(() => {
+    let isMounted = true;
+    const checkSirenStatus = async () => {
+      try {
+        const res = await fetchOfficialAdvisories();
+        if (isMounted && res.success && res.data) {
+          setSirenActive(res.data.siren_active === true);
+        }
+      } catch (_) {}
+    };
+
+    checkSirenStatus();
+    const interval = setInterval(checkSirenStatus, 2500);
+
+    const handleSirenEvent = (e) => {
+      if (e.detail?.siren_active !== undefined) {
+        setSirenActive(e.detail.siren_active === true);
+      }
+    };
+    window.addEventListener('cyclosafe_siren_toggled', handleSirenEvent);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('cyclosafe_siren_toggled', handleSirenEvent);
+    };
+  }, []);
+
+  // Quick Action: Silence / Turn off siren on user dashboard
+  const handleTurnOffSiren = async (e) => {
+    e?.stopPropagation?.();
+    setSirenLoading(true);
+    try {
+      const res = await toggleLighthouseSiren(false);
+      if (res.success) {
+        setSirenActive(false);
+        window.dispatchEvent(new CustomEvent('cyclosafe_siren_toggled', { 
+          detail: { siren_active: false } 
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to turn off citizen siren:', err);
+    } finally {
+      setSirenLoading(false);
+    }
+  };
 
   return (
     <header className="h-16 bg-white dark:bg-[#0f172a] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 w-full select-none transition-colors duration-300">
@@ -50,9 +101,45 @@ const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode, onLogout, adminUser
           </div>
         </div>
 
-        {/* Right Side: Theme Toggle + Notifications + Admin Profile & Logout */}
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        {/* Right Side: Siren Quick Control + Theme Toggle + Notifications + Admin Profile & Logout */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           
+          {/* User Dashboard Siren Action Button */}
+          {sirenActive ? (
+            <div className="flex items-center gap-1.5 sm:gap-2 pl-2.5 pr-1.5 py-1 rounded-xl bg-red-500/15 border border-red-500/40 text-red-600 dark:text-red-400 animate-pulse shadow-sm">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                <span className="text-[11px] font-black uppercase tracking-wider hidden md:inline">
+                  User Siren Blasting
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleTurnOffSiren}
+                disabled={sirenLoading}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                title="Silence emergency siren on citizen dashboards and coastal lighthouses"
+              >
+                {sirenLoading ? <Loader2 size={13} className="animate-spin" /> : <VolumeX size={13} />}
+                <span>Turn OFF Siren</span>
+              </button>
+            </div>
+          ) : (
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 text-slate-500 dark:text-slate-400 text-xs font-semibold">
+              <Volume2 size={13} className="text-emerald-500" />
+              <span className="text-[11px]">User Siren: Standby</span>
+              <button
+                type="button"
+                onClick={handleTurnOffSiren}
+                disabled={sirenLoading}
+                className="ml-1 text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline cursor-pointer"
+                title="Ensure citizen siren is off"
+              >
+                Force Off
+              </button>
+            </div>
+          )}
+
           {/* Theme Toggle */}
           <button 
             onClick={toggleDarkMode}

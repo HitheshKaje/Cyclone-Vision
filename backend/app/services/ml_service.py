@@ -325,6 +325,44 @@ class MLService:
         has_border_annotations = border_edge_density > 0.035
 
         # =========================================================================
+        # FILTER 1 (CRITICAL): Human Portrait / Face / Selfie Detection (Unconditional)
+        # Genuine meteorological satellite images NEVER contain human faces or skin.
+        # =========================================================================
+        face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        if os.path.exists(face_cascade_path):
+            face_cascade = cv2.CascadeClassifier(face_cascade_path)
+            min_face = int(min(h, w) * 0.08)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.06, minNeighbors=3, minSize=(min_face, min_face))
+            if len(faces) > 0:
+                return False, "Human portrait / photo detected (facial structure identified). CycloneVision only analyzes Earth meteorological satellite imagery."
+
+        ycbcr = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)
+        cr = ycbcr[:, :, 1]
+        cb = ycbcr[:, :, 2]
+        skin_mask = (cb >= 77) & (cb <= 127) & (cr >= 133) & (cr <= 173) & (v_chan >= 40)
+        skin_frac = float(np.mean(skin_mask))
+
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(skin_mask.astype(np.uint8), connectivity=8)
+        max_blob_area = int(np.max(stats[1:, cv2.CC_STAT_AREA])) if num_labels > 1 else 0
+        max_blob_ratio = float(max_blob_area / total_pixels) if total_pixels > 0 else 0.0
+
+        if skin_frac > 0.08 or max_blob_ratio > 0.06:
+            return False, "Human portrait / non-meteorological photo detected (human skin features present). CycloneVision only analyzes Earth meteorological satellite imagery."
+
+        # =========================================================================
+        # FILTER 2: Tableware, Cups, Household Everyday Objects
+        # e.g., coffee cups, tea cups with froth/swirl, plates, indoor tableware
+        # =========================================================================
+        brown_coffee_mask = (h_chan >= 8) & (h_chan <= 35) & (s_chan > 50) & (v_chan > 30) & (v_chan < 220)
+        brown_ratio = float(np.mean(brown_coffee_mask))
+        if brown_ratio > 0.18 and not has_coordinate_grid:
+            # Check for circular tableware rim (coffee cup, tea cup)
+            circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1.2, minDist=min(h, w) * 0.4,
+                                       param1=50, param2=30, minRadius=int(min(h, w) * 0.20), maxRadius=int(max(h, w) * 0.49))
+            if circles is not None and len(circles) > 0:
+                return False, "Non-satellite image detected (household object / tableware / cup). Please upload authentic Earth meteorological satellite imagery."
+
+        # =========================================================================
         # FAST WHITELIST: Genuine Meteorological Satellite Imagery & Weather Maps
         # =========================================================================
         # A. If coordinate grid or border degree annotations are present:
@@ -335,53 +373,27 @@ class MLService:
         if ocean_frac > 0.08 and cloud_frac > 0.06:
             return True, "Valid Earth satellite domain (Earth oceanic-atmospheric observation)."
 
-        # C. If classic convective cyclone cloud organization is present:
-        if cloud_frac > 0.18 and float(np.std(gray)) > 30.0:
-            return True, "Valid Earth satellite domain (Atmospheric cloud formation)."
+        # C. If classic convective cyclone cloud organization is present WITH ocean or dark background:
+        if cloud_frac > 0.22 and ocean_frac > 0.04 and float(np.std(gray)) > 30.0:
+            return True, "Valid Earth satellite domain (Atmospheric cloud formation over ocean)."
 
         # =========================================================================
-        # FILTER 1: Human Portrait / Face / Selfie Detection
-        # =========================================================================
-        # Only evaluate if the image is NOT an ocean/atmosphere scene
-        if ocean_frac < 0.04 and cloud_frac < 0.04:
-            face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-            if os.path.exists(face_cascade_path):
-                face_cascade = cv2.CascadeClassifier(face_cascade_path)
-                min_face = int(min(h, w) * 0.16)
-                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(min_face, min_face))
-                if len(faces) > 0:
-                    return False, "Human portrait / selfie photo detected (facial structure identified). Please upload Earth meteorological satellite imagery."
-
-            ycbcr = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)
-            cr = ycbcr[:, :, 1]
-            cb = ycbcr[:, :, 2]
-            skin_mask = (cb >= 77) & (cb <= 127) & (cr >= 133) & (cr <= 173) & (v_chan >= 40)
-            skin_frac = float(np.mean(skin_mask))
-
-            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(skin_mask.astype(np.uint8), connectivity=8)
-            max_blob_area = int(np.max(stats[1:, cv2.CC_STAT_AREA])) if num_labels > 1 else 0
-            max_blob_ratio = float(max_blob_area / total_pixels) if total_pixels > 0 else 0.0
-
-            if max_blob_ratio > 0.18 and skin_frac > 0.22:
-                return False, "Human portrait / non-meteorological photo detected (facial skin features present). Please upload Earth meteorological satellite imagery."
-
-        # =========================================================================
-        # FILTER 2: Non-Meteorological Highly Saturated Graphics / Cartoons
+        # FILTER 3: Non-Meteorological Highly Saturated Graphics / Cartoons
         # =========================================================================
         mean_sat = float(np.mean(s_chan))
-        if mean_sat > 195.0 and cloud_frac < 0.04 and not has_coordinate_grid:
+        if mean_sat > 180.0 and not has_coordinate_grid:
             return False, f"High-saturation non-satellite graphic or illustration detected (color saturation {mean_sat:.1f}% exceeds satellite baseline). Please upload weather satellite imagery."
 
         # =========================================================================
-        # FILTER 3: Household / Everyday Indoor Photography (warm wood, tables)
+        # FILTER 4: Household / Everyday Indoor Photography (warm wood, tables)
         # =========================================================================
         warm_mask = (h_chan >= 8) & (h_chan <= 28) & (s_chan > 50) & (v_chan > 40)
         warm_ratio = float(np.mean(warm_mask))
-        if warm_ratio > 0.45 and ocean_frac < 0.04 and cloud_frac < 0.04 and not has_coordinate_grid:
+        if warm_ratio > 0.35 and ocean_frac < 0.04 and cloud_frac < 0.04 and not has_coordinate_grid:
             return False, "Non-satellite image detected (household object / everyday scene). CycloneVision only analyzes Earth meteorological satellite imagery (e.g. INSAT-3D, NOAA, GOES)."
 
         # =========================================================================
-        # FILTER 4: Outer Space / Astronomical Scene (Black hole, cosmic void, star fields)
+        # FILTER 5: Outer Space / Astronomical Scene (Black hole, cosmic void, star fields)
         # =========================================================================
         dark_mask = (gray < 25).astype(np.uint8)
         dark_ratio = float(np.sum(dark_mask) / total_pixels)

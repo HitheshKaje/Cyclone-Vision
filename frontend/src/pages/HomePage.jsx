@@ -11,9 +11,13 @@ import {
   RefreshCw,
   Clock,
   Sparkles,
-  Layers
+  Layers,
+  Volume2,
+  VolumeX,
+  Loader2
 } from 'lucide-react';
 import { fetchAnalysisStats } from '../utils/analysisApi';
+import { fetchOfficialAdvisories, toggleLighthouseSiren } from '../citizen/services/citizenApi';
 
 const HomePage = ({
   setActiveTab,
@@ -23,6 +27,75 @@ const HomePage = ({
   const [liveStats, setLiveStats] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState(null);
+  const [sirenActive, setSirenActive] = useState(false);
+  const [sirenLoading, setSirenLoading] = useState(false);
+  const [sirenToast, setSirenToast] = useState('');
+
+  // Poll siren state and listen to local toggle events
+  useEffect(() => {
+    let isMounted = true;
+    const checkSiren = async () => {
+      try {
+        const res = await fetchOfficialAdvisories();
+        if (isMounted && res.success && res.data) {
+          setSirenActive(res.data.siren_active === true);
+        }
+      } catch (_) {}
+    };
+
+    checkSiren();
+    const interval = setInterval(checkSiren, 2500);
+
+    const handleSirenEvent = (e) => {
+      if (e.detail?.siren_active !== undefined) {
+        setSirenActive(e.detail.siren_active === true);
+      }
+    };
+    window.addEventListener('cyclosafe_siren_toggled', handleSirenEvent);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('cyclosafe_siren_toggled', handleSirenEvent);
+    };
+  }, []);
+
+  // Action: Turn off user siren
+  const handleTurnOffSiren = async () => {
+    setSirenLoading(true);
+    try {
+      const res = await toggleLighthouseSiren(false);
+      if (res.success) {
+        setSirenActive(false);
+        setSirenToast('User Dashboard Siren Silenced');
+        setTimeout(() => setSirenToast(''), 3500);
+        window.dispatchEvent(new CustomEvent('cyclosafe_siren_toggled', { detail: { siren_active: false } }));
+      }
+    } catch (err) {
+      console.error('Failed to silence user siren:', err);
+    } finally {
+      setSirenLoading(false);
+    }
+  };
+
+  // Action: Test/Sound user siren
+  const handleTriggerSiren = async () => {
+    if (!window.confirm('Sound the emergency siren on Citizen Dashboards and coastal stations?')) return;
+    setSirenLoading(true);
+    try {
+      const res = await toggleLighthouseSiren(true);
+      if (res.success) {
+        setSirenActive(true);
+        setSirenToast('Emergency Siren Activated on User Dashboards');
+        setTimeout(() => setSirenToast(''), 3500);
+        window.dispatchEvent(new CustomEvent('cyclosafe_siren_toggled', { detail: { siren_active: true } }));
+      }
+    } catch (err) {
+      console.error('Failed to sound user siren:', err);
+    } finally {
+      setSirenLoading(false);
+    }
+  };
 
   // Load real-time stats directly from MongoDB cyclosafe.analyses
   const loadStats = useCallback(async () => {
@@ -111,6 +184,83 @@ const HomePage = ({
           </div>
         )}
       </div>
+
+      {/* Siren Feedback Toast */}
+      {sirenToast && (
+        <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 text-xs font-bold flex items-center justify-between">
+          <span>{sirenToast}</span>
+        </div>
+      )}
+
+      {/* User Dashboard Siren Direct Admin Control Card */}
+      {sirenActive ? (
+        <div className="relative overflow-hidden rounded-2xl p-4 sm:p-5 border-2 border-red-500/50 bg-gradient-to-r from-red-500/15 via-rose-500/10 to-red-500/15 dark:from-red-950/40 dark:via-rose-900/30 dark:to-red-950/40 shadow-lg animate-pulse flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-md">
+              <Volume2 size={24} className="animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white">
+                  EMERGENCY ACTIVE
+                </span>
+                <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                  Coastal Siren Sounding on Citizen User Dashboard
+                </span>
+              </div>
+              <p className="text-xs text-slate-700 dark:text-slate-300 mt-1">
+                The emergency acoustic alarm is currently playing on all citizen mobile dashboards and coastal lighthouse stations.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleTurnOffSiren}
+            disabled={sirenLoading}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all shrink-0"
+          >
+            {sirenLoading ? <Loader2 size={16} className="animate-spin" /> : <VolumeX size={16} />}
+            <span>Turn OFF User Siren Now</span>
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-xl p-3.5 border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+              <Volume2 size={16} />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                User Dashboard Emergency Siren: <span className="text-emerald-600 dark:text-emerald-400 font-black">STANDBY (OFF)</span>
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                Citizen mobile phones and coastal foghorns are silent.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={handleTurnOffSiren}
+              disabled={sirenLoading}
+              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
+              title="Force silence on all citizen user dashboards"
+            >
+              <VolumeX size={13} className="inline mr-1" />
+              <span>Ensure Siren OFF</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleTriggerSiren}
+              disabled={sirenLoading}
+              className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-xs font-bold cursor-pointer transition-colors"
+              title="Test citizen acoustic emergency siren"
+            >
+              <span>🚨 Test Siren Drill</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. 4 Dynamic Stat Cards (Driven directly by MongoDB) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">

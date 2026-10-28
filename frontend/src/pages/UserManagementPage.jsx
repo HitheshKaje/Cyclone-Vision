@@ -19,13 +19,18 @@ import {
   Send,
   Shield,
   Compass,
-  ArrowUpDown
+  ArrowUpDown,
+  Volume2,
+  VolumeX,
+  Loader2
 } from 'lucide-react';
 import { 
   fetchRegisteredUsers, 
   deleteRegisteredUser, 
   updateUserStatus,
-  clearAllRegisteredUsers 
+  clearAllRegisteredUsers,
+  fetchOfficialAdvisories,
+  toggleLighthouseSiren
 } from '../citizen/services/citizenApi';
 
 const UserManagementPage = () => {
@@ -36,6 +41,52 @@ const UserManagementPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL', 'AT_SEA', 'IN_HARBOR', 'ACTIVE'
   const [alertSentUser, setAlertSentUser] = useState(null);
+  const [sirenActive, setSirenActive] = useState(false);
+  const [sirenLoading, setSirenLoading] = useState(false);
+
+  // Poll siren status and sync with local toggle events
+  useEffect(() => {
+    let isMounted = true;
+    const checkSiren = async () => {
+      try {
+        const res = await fetchOfficialAdvisories();
+        if (isMounted && res.success && res.data) {
+          setSirenActive(res.data.siren_active === true);
+        }
+      } catch (_) {}
+    };
+
+    checkSiren();
+    const interval = setInterval(checkSiren, 2500);
+
+    const handleSirenEvent = (e) => {
+      if (e.detail?.siren_active !== undefined) {
+        setSirenActive(e.detail.siren_active === true);
+      }
+    };
+    window.addEventListener('cyclosafe_siren_toggled', handleSirenEvent);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('cyclosafe_siren_toggled', handleSirenEvent);
+    };
+  }, []);
+
+  const handleTurnOffSiren = async () => {
+    setSirenLoading(true);
+    try {
+      const res = await toggleLighthouseSiren(false);
+      if (res.success) {
+        setSirenActive(false);
+        window.dispatchEvent(new CustomEvent('cyclosafe_siren_toggled', { detail: { siren_active: false } }));
+      }
+    } catch (err) {
+      console.error('Failed to silence siren from users page:', err);
+    } finally {
+      setSirenLoading(false);
+    }
+  };
 
   // Load registered community users from backend and localStorage
   const loadUsers = useCallback(async () => {
@@ -288,20 +339,46 @@ const UserManagementPage = () => {
           </div>
         </div>
 
-        {/* Alert Readiness */}
-        <div className="app-card p-4 flex items-center gap-3.5 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <div className="p-3 rounded-xl bg-amber-500/10 text-amber-500">
-            <Bell size={20} />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Siren Alert Coverage</div>
-            <div className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">
-              {stats.alertsActive} Active
+        {/* Alert Readiness & Siren Off Control */}
+        <div className={`app-card p-4 flex items-center justify-between gap-3 border shadow-xs transition-colors ${
+          sirenActive 
+            ? 'border-red-500/50 bg-red-500/5 dark:bg-red-950/20' 
+            : 'border-slate-200 dark:border-slate-800'
+        }`}>
+          <div className="flex items-center gap-3.5">
+            <div className={`p-3 rounded-xl ${
+              sirenActive ? 'bg-red-500/20 text-red-500 animate-pulse' : 'bg-amber-500/10 text-amber-500'
+            }`}>
+              {sirenActive ? <Volume2 size={20} /> : <Bell size={20} />}
             </div>
-            <div className="text-[10px] text-slate-400 font-medium">
-              100% Broadcast Ready
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                User Siren Status
+              </div>
+              <div className={`text-sm font-black mt-0.5 ${
+                sirenActive ? 'text-red-600 dark:text-red-400 animate-pulse' : 'text-slate-800 dark:text-slate-200'
+              }`}>
+                {sirenActive ? '🔴 Siren Sounding' : '🟢 Standby (Off)'}
+              </div>
+              <div className="text-[10px] text-slate-400 font-medium">
+                {stats.alertsActive} Active Alerts
+              </div>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={handleTurnOffSiren}
+            disabled={sirenLoading}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+              sirenActive
+                ? 'bg-red-600 hover:bg-red-700 text-white shadow-sm active:scale-95'
+                : 'border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+            title="Turn off siren on all user dashboards"
+          >
+            {sirenLoading ? <Loader2 size={12} className="animate-spin" /> : <VolumeX size={12} />}
+            <span>{sirenActive ? 'Turn OFF Siren' : 'Force Off'}</span>
+          </button>
         </div>
 
       </div>

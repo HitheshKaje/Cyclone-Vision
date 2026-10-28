@@ -207,8 +207,33 @@ const ResultsPage = ({
         </div>
       </div>
 
-      {/* Coastal Early Warning & Citizen Broadcast Controller */}
-      <CoastalBroadcastControl currentAnalysis={currentAnalysis} />
+      {/* Coastal Early Warning & Citizen Broadcast Controller (Shown ONLY for valid satellite observations) */}
+      {!isValidSatellite ? (
+        <div className="p-5 rounded-2xl border-2 border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20 text-slate-900 dark:text-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0">
+              <AlertTriangle size={28} />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-amber-950 dark:text-amber-200">
+                Invalid Image — Not a Meteorological Satellite Image
+              </h3>
+              <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                {validationMessage || 'The uploaded file is not recognized as an Earth weather satellite observation (e.g. human portrait, household scene, or illustration).'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab('analyze')}
+            className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-2 shadow-md shrink-0 cursor-pointer"
+          >
+            <RotateCcw size={15} />
+            <span>Upload Satellite Image</span>
+          </button>
+        </div>
+      ) : (
+        <CoastalBroadcastControl currentAnalysis={currentAnalysis} />
+      )}
 
       {/* 2. Desktop Two-Column Layout for Current Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

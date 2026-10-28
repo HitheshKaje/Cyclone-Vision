@@ -306,12 +306,20 @@ class CloudVisionIntensityService:
         # Unified Prompt: Detection + Coordinates + Intensity in ONE SHOT
         prompt = (
             "You are an expert meteorological vision system specializing in tropical cyclone detection, "
-            "georeferencing, and intensity estimation from satellite imagery.\n\n"
-            "TASK:\n"
-            "1. Verify if this image is an Earth meteorological weather satellite capture, radar scan, or weather satellite map.\n"
-            "   (Coordinate grids, degree labels, coastlines, or cloud textures are 100% VALID Earth meteorological captures -> is_valid_satellite = true).\n"
-            "2. If is_valid_satellite is true, determine if a tropical cyclone, cyclonic vortex, or tropical storm is present (is_cyclone = true/false).\n"
-            "3. If is_cyclone is true:\n"
+            "georeferencing, and intensity estimation from authentic Earth satellite imagery.\n\n"
+            "CRITICAL DOMAIN CHECK (RULE 1):\n"
+            "First, strictly inspect whether this image is a genuine Earth meteorological weather satellite capture (e.g. INSAT-3D, GOES, NOAA, Himawari, Meteosat, weather radar scan, or meteorological map with coordinate grids).\n"
+            "- If the image is a person, human face, selfie, portrait (e.g. photo of a human):\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Human portrait or non-satellite photo detected.'\n"
+            "- If the image is a coffee cup, tea cup, tableware, food, indoor furniture, or household scene:\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Household object or tableware detected.'\n"
+            "- If the image is a drawing, digital artwork, CGI graphic, illustration, cartoon, whirlpool graphic, or meme:\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Non-meteorological illustration or graphic detected.'\n"
+            "- If the image is an animal, vehicle, landscape photo, or regular non-orbital camera capture:\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false.\n"
+            "ONLY set is_valid_satellite = true if the image is an authentic spaceborne Earth meteorological satellite observation or meteorological weather map.\n\n"
+            "TASK 2: If is_valid_satellite is true, determine if a tropical cyclone, cyclonic vortex, or tropical storm is present (is_cyclone = true/false).\n"
+            "TASK 3: If is_cyclone is true:\n"
             "   - Read or interpolate the center latitude (°N) and longitude (°E) of the cyclone eye/circulation from the grid or land features.\n"
             "   - Determine basin ('Bay of Bengal' or 'Arabian Sea').\n"
             "   - Estimate maximum sustained wind speed Vmax in knots (kt) (e.g. 45.0, 65.0, 90.0) based on Dvorak patterns, eye definition, or text labels.\n"
@@ -349,18 +357,17 @@ class CloudVisionIntensityService:
             val_msg = parsed.get("validation_message", "Valid Earth meteorological satellite observation.")
             t_infer = time.perf_counter() - t0
 
-            # Domain validation double check
-            if not is_valid_sat:
-                try:
-                    arr = np.frombuffer(image_bytes, np.uint8)
-                    cv_img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-                    from services.ml_service import ml_service
-                    is_valid_cv, cv_reason = ml_service.validate_satellite_domain(cv_img)
-                    if is_valid_cv:
-                        is_valid_sat = True
-                        val_msg = cv_reason
-                except Exception:
-                    pass
+            # Scan Gemini text fields for non-satellite keywords (catches when Gemini identified it as a portrait, cup, or graphic in reasoning)
+            combined_text = f"{parsed.get('reasoning', '')} {parsed.get('validation_message', '')} {parsed.get('features_observed', '')} {parsed.get('pattern_detected', '')}".lower()
+            non_sat_indicators = [
+                "not a meteorological", "not a satellite", "not satellite", "portrait", "person", "selfie", "human",
+                "facial", "coffee cup", "tea cup", "cup rim", "cup handle", "tableware", "creative manipulation",
+                "non-meteorological", "everyday object", "illustration", "whirlpool", "graphic", "drawing", "artwork",
+                "not real-world meteorological", "does not contain real-world meteorological", "superimposed"
+            ]
+            if any(ind in combined_text for ind in non_sat_indicators):
+                is_valid_sat = False
+                val_msg = parsed.get("reasoning") or parsed.get("validation_message") or "Non-satellite image detected. CycloneVision only analyzes Earth meteorological satellite imagery."
 
             if not is_valid_sat:
                 res = {
@@ -466,12 +473,12 @@ class CloudVisionIntensityService:
             detection_res = {
                 "success": True,
                 "is_cyclone": is_cyclone,
-                "is_valid_satellite": True,
+                "is_valid_satellite": is_valid_sat,
                 "confidence_percent": round(conf, 1),
                 "confidence": round(conf / 100.0, 4),
-                "status": "CYCLONE DETECTED" if is_cyclone else "NO CYCLONE DETECTED",
-                "status_label": "Cyclone Detected" if is_cyclone else "No Cyclone",
-                "prediction": "Cyclone" if is_cyclone else "No Cyclone",
+                "status": "CYCLONE DETECTED" if is_cyclone else ("INVALID IMAGE (NOT A SATELLITE IMAGE)" if not is_valid_sat else "NO CYCLONE DETECTED"),
+                "status_label": "Cyclone Detected" if is_cyclone else ("Invalid Satellite Image" if not is_valid_sat else "No Cyclone"),
+                "prediction": "Cyclone" if is_cyclone else ("Invalid Satellite Image" if not is_valid_sat else "No Cyclone"),
                 "latitude": lat_val,
                 "longitude": lon_val,
                 "subbasin": subbasin_val,
@@ -479,7 +486,7 @@ class CloudVisionIntensityService:
                 "pattern_detected": pattern,
                 "features_observed": features,
                 "reasoning": reasoning,
-                "validation_message": "Valid Earth meteorological satellite observation.",
+                "validation_message": val_msg,
                 "source": f"Google Gemini Vision ({used_model})",
                 "inference_time_ms": round(t_infer * 1000, 1),
                 # Embed intensity so frontend can use it directly with 0 additional calls!

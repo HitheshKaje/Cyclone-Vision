@@ -86,7 +86,19 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
   useEffect(() => {
     refreshStatus();
     const interval = setInterval(refreshStatus, 3000);
-    return () => clearInterval(interval);
+
+    const handleSirenEvent = (e) => {
+      if (e.detail?.siren_active !== undefined) {
+        setBroadcastState(prev => ({ ...prev, siren_active: e.detail.siren_active === true }));
+        setIncludeSirenOnPublish(e.detail.siren_active === true);
+      }
+    };
+    window.addEventListener('cyclosafe_siren_toggled', handleSirenEvent);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('cyclosafe_siren_toggled', handleSirenEvent);
+    };
   }, []);
 
   const isCyclone = currentAnalysis?.detection?.is_cyclone === true;
@@ -292,14 +304,45 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
       if (res.success) {
         setBroadcastState(prev => ({ ...prev, siren_active: nextState }));
         setIncludeSirenOnPublish(nextState);
-        setSuccessMessage(nextState ? `Lighthouse Siren ACTIVATED on ${targetStation}!` : 'Lighthouse Siren SILENCED.');
+        setSuccessMessage(nextState ? `Lighthouse Siren ACTIVATED on ${targetStation}!` : 'Lighthouse Siren SILENCED on User Dashboard.');
         setTimeout(() => setSuccessMessage(null), 4000);
+        window.dispatchEvent(new CustomEvent('cyclosafe_siren_toggled', { detail: { siren_active: nextState } }));
         addSystemLog({
           module: 'Broadcast-Service',
           level: nextState ? 'WARNING' : 'INFO',
           event: nextState ? 'Coastal Lighthouse Siren ACTIVATED' : 'Coastal Lighthouse Siren SILENCED',
           details: nextState ? `Audible acoustic warning siren triggered on ${targetStation}` : 'Coastal sirens silenced back to standby',
           payload: { siren_active: nextState, target_lighthouse: targetStation }
+        });
+      }
+    } finally {
+      setTimeout(() => {
+        isTogglingRef.current = false;
+        setSirenToggling(false);
+      }, 600);
+    }
+  };
+
+  // Dedicated action to turn off siren on User Dashboard & Lighthouses
+  const handleTurnOffSirenOnly = async () => {
+    if (isTogglingRef.current) return;
+    isTogglingRef.current = true;
+    setSirenToggling(true);
+
+    try {
+      const res = await toggleLighthouseSiren(false);
+      if (res.success) {
+        setBroadcastState(prev => ({ ...prev, siren_active: false }));
+        setIncludeSirenOnPublish(false);
+        setSuccessMessage('Emergency siren SILENCED on User Dashboard & Lighthouses.');
+        setTimeout(() => setSuccessMessage(null), 4000);
+        window.dispatchEvent(new CustomEvent('cyclosafe_siren_toggled', { detail: { siren_active: false } }));
+        addSystemLog({
+          module: 'Broadcast-Service',
+          level: 'INFO',
+          event: 'Coastal Siren SILENCED',
+          details: 'User dashboard and coastal siren alarms silenced by administrator.',
+          payload: { siren_active: false }
         });
       }
     } finally {
@@ -318,8 +361,10 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
 
     if (res.success) {
       setBroadcastState(res.data.broadcast);
+      setIncludeSirenOnPublish(false);
       setSuccessMessage('All coastal warnings cleared. Normal status restored.');
       setTimeout(() => setSuccessMessage(null), 4000);
+      window.dispatchEvent(new CustomEvent('cyclosafe_siren_toggled', { detail: { siren_active: false } }));
       addSystemLog({
         module: 'Broadcast-Service',
         level: 'SUCCESS',
@@ -535,6 +580,34 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
         </div>
       </div>
 
+      {/* Active Siren Banner with Direct OFF Button */}
+      {isSirenBlasting && (
+        <div className="mb-4 p-3.5 rounded-xl bg-red-500/10 border-2 border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+              <VolumeX size={22} />
+            </div>
+            <div>
+              <div className="text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400">
+                User Siren Currently Blasting
+              </div>
+              <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                The acoustic alarm is wailing on registered citizen phones and coastal lighthouses.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleTurnOffSirenOnly}
+            disabled={sirenToggling}
+            className="w-full sm:w-auto px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer shrink-0"
+          >
+            {sirenToggling ? <Loader2 size={14} className="animate-spin" /> : <VolumeX size={14} />}
+            <span>Turn OFF User Siren</span>
+          </button>
+        </div>
+      )}
+
       {/* Action Buttons: Publish Broadcast & Toggle Siren */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         {/* Main Publish to Citizen Network Button */}
@@ -556,16 +629,16 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
           <span>{isLiveActive ? 'Update Coastal Broadcast' : 'Notify Citizens & Coastal App'}</span>
         </button>
 
-        {/* Siren Trigger Button */}
+        {/* Siren Trigger Button - ALWAYS clickable when siren is blasting so admin can silence it */}
         <button
           type="button"
           onClick={handleToggleSiren}
-          disabled={sirenToggling || !isCyclone}
+          disabled={sirenToggling || (!isCyclone && !isSirenBlasting)}
           className={`py-3 px-5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
-            !isCyclone
-              ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-              : isSirenBlasting
+            isSirenBlasting
               ? 'bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white shadow-red-500/30 animate-pulse'
+              : !isCyclone
+              ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
               : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-amber-500/25'
           }`}
         >
