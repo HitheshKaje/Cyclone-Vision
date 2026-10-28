@@ -27,13 +27,11 @@ from routes import detection, intensity, classification, live_map, citizen, trac
 async def lifespan(app: FastAPI):
     """
     FastAPI lifespan handler:
-    Loads all models (Detection, Intensity, Classification) once at application startup.
-    Pre-warms the models so user requests never suffer from cold-start or disk-loading delays.
-    Models stay resident in memory across requests.
     Initializes MongoDB connection and seeds admin user.
+    Note: EfficientNetB0 local models are retained on disk but not loaded into memory
+    per user configuration to use Google Gemini Vision API exclusively.
     """
     init_db()
-    ml_service.load_all_models()
     yield
     # Cleanup logic if needed at shutdown
 
@@ -92,8 +90,7 @@ async def analyze_cyclone_image(image: UploadFile = File(...)):
         try:
             return cloud_vision_service.full_pipeline_with_gemini(image_bytes, mime_type=mime_type)
         except Exception as g_err:
-            print(f"[Analyze API] Gemini engine exception ({g_err}), falling back to local pipeline.")
-            return ml_service.run_full_pipeline(image_bytes)
+            raise HTTPException(status_code=502, detail=f"Google Gemini Vision API analysis error: {str(g_err)}")
 
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -103,12 +100,10 @@ async def analyze_cyclone_image(image: UploadFile = File(...)):
 
 @app.get("/")
 def read_root():
-    # Reload trigger
-    from services.ml_service import DETECTION_MODEL_PATH
     return {
         "message": "Welcome to CycloneVision API",
-        "models_loaded": ml_service.is_loaded,
-        "active_detection_model": os.path.basename(DETECTION_MODEL_PATH)
+        "engine": "Google Gemini Vision Cloud AI (API Only)",
+        "status": "Online"
     }
 
 @app.get("/api/system/status")
@@ -116,9 +111,9 @@ def get_system_status():
     import json
     
     # Try to load real metrics from disk
-    dataset_name = "NASA GIBS / TCIR"
+    dataset_name = "NASA GIBS / TCIR / Google Gemini Vision"
     images_count = "Not available"
-    version = "Not available"
+    version = "v2.0-API"
     last_updated = "Not available"
     
     metrics_path = os.path.join(APP_DIR, "..", "outputs", "metrics", "results.json")
@@ -136,13 +131,13 @@ def get_system_status():
         "status": {
             "api": "Online",
             "database": "Online (MongoDB: cyclosafe)" if get_db() is not None else "Offline (MongoDB unavailable)",
-            "model": "Online" if ml_service.is_loaded else "Offline"
+            "model": "Online (Google Gemini Vision API)"
         },
-        "model_version": "EfficientNetB0-CycloSafe (Active)",
+        "model_version": "Google Gemini Vision Cloud API (Active)",
         "dataset": {
             "name": dataset_name,
             "images": images_count,
-            "classes": ml_service.class_names,
+            "classes": ["No_Cyclone", "Cyclone"],
             "version": version,
             "last_updated": last_updated
         }

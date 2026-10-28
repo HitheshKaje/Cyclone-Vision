@@ -158,8 +158,14 @@ async def register(payload: RegisterRequest):
 
     # Validate optional email
     clean_email = payload.email.strip().lower() if payload.email and payload.email.strip() else None
-    if clean_email and not EMAIL_REGEX.match(clean_email):
-        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+    if clean_email:
+        if "@" in clean_email and "." not in clean_email.split("@")[-1]:
+            clean_email = f"{clean_email}.com"
+        if not EMAIL_REGEX.match(clean_email):
+            raise HTTPException(
+                status_code=400, 
+                detail="Please enter a valid email address (e.g. user@domain.com) or leave it blank."
+            )
 
     if len(payload.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")

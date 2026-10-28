@@ -143,9 +143,13 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
         }
 
         if (email.trim()) {
+          let cleanEmail = email.trim();
+          if (cleanEmail.includes('@') && !cleanEmail.split('@')[1].includes('.')) {
+            cleanEmail = `${cleanEmail}.com`;
+          }
           const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-          if (!emailRegex.test(email.trim())) {
-            errs.email = 'Enter a valid email format';
+          if (!emailRegex.test(cleanEmail)) {
+            errs.email = 'Enter a valid email format (e.g. user@gmail.com) or leave blank';
           }
         }
 
@@ -166,7 +170,11 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
     }
 
     setErrors(errs);
-    return Object.keys(errs).length === 0;
+    if (Object.keys(errs).length > 0) {
+      setErrorMessage(Object.values(errs)[0]);
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -216,11 +224,16 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
         }
       } else {
         // User Register
+        let cleanEmail = email.trim() || null;
+        if (cleanEmail && cleanEmail.includes('@') && !cleanEmail.split('@')[1].includes('.')) {
+          cleanEmail = `${cleanEmail}.com`;
+        }
+
         const payload = {
           name: name.trim(),
           login_type: loginType,
           phone: phone.replace(/\D/g, ''),
-          email: email.trim() || null,
+          email: cleanEmail,
           password,
           user_type: userType,
           status: userType === 'fisherman' ? 'IN_HARBOR' : 'ACTIVE',
@@ -682,16 +695,23 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                       <Mail size={16} />
                     </span>
                     <input
-                      type="email"
+                      type="text"
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
                         if (errors.email) setErrors({ ...errors, email: null });
                       }}
                       placeholder="user@gmail.com"
-                      className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-sky-500/20"
+                      className={`w-full pl-10 pr-4 py-2 rounded-xl border text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 transition-all ${
+                        errors.email ? 'border-rose-400 bg-rose-50/50' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
+                      }`}
                     />
                   </div>
+                  {errors.email && (
+                    <p className="text-[11px] font-semibold text-rose-600 mt-0.5 pl-1">
+                      {errors.email}
+                    </p>
+                  )}
                 </div>
               </div>
 

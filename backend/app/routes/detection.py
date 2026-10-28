@@ -11,12 +11,9 @@ router = APIRouter()
 
 def get_model():
     """
-    Backwards compatibility helper: returns the loaded Objective 1 Detection model.
-    The model is loaded once at application startup and cached in memory.
+    Backwards compatibility helper: returns None. Local ML model execution disabled per configuration.
     """
-    if ml_service.detection_model is None:
-        ml_service.load_all_models()
-    return ml_service.detection_model
+    return None
 
 @router.post("/detect")
 async def detect_cyclone(image: UploadFile = File(...)):
@@ -51,19 +48,17 @@ async def detect_cyclone(image: UploadFile = File(...)):
                 "inference_time_ms": round(t_total * 1000, 1)
             }
 
-        # 1. Primary Engine: High-Accuracy Google Gemini Vision AI
-        result = None
+        # 1. Primary Engine: High-Accuracy Google Gemini Vision AI API (Exclusively)
         try:
             result = cloud_vision_service.detect_with_gemini(image_bytes, mime_type=mime_type)
-            # If Gemini also detected non-satellite, preserve is_valid_satellite
             if result.get("is_valid_satellite") is False:
                 return result
         except Exception as g_err:
-            logger.warning(f"[Detect API] Gemini engine exception ({g_err}), utilizing fallback model.")
-
-        # 2. Fallback Engine: Local ML Model
-        if result is None:
-            result, t_prep, t_infer = ml_service.run_detection(img_bgr)
+            logger.error(f"[Detect API] Gemini engine error: {g_err}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Google Gemini Vision API detection error: {str(g_err)}. Please verify your API key."
+            )
 
         # 3. Ensure coordinates are attached if cyclone is detected
         if result.get("is_cyclone") and (result.get("latitude") is None or result.get("longitude") is None):

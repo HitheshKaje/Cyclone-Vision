@@ -193,8 +193,8 @@ class CloudVisionIntensityService:
             if self.model_cooldowns.get(model_name, 0) > now:
                 continue
 
-            if models_tried >= 2:
-                # Cap cloud retry budget to strictly guarantee total API latency < 3 seconds
+            if models_tried >= 3:
+                # Cap cloud retry budget to strictly guarantee total API latency <= 5 seconds
                 break
             models_tried += 1
 
@@ -210,67 +210,65 @@ class CloudVisionIntensityService:
                 "generationConfig": model_gen_config
             }
 
-            # Limit attempts to at most 1 key per model to prevent latency accumulation
-            active_key = candidate_keys[0] if candidate_keys else None
-            if not active_key:
-                break
+            # Try candidate keys for this model
+            for active_key in candidate_keys[:3]:
+                cooldown_exp = self.cooldowns.get((active_key, model_name), 0)
+                if cooldown_exp > now:
+                    continue
 
-            cooldown_exp = self.cooldowns.get((active_key, model_name), 0)
-            if cooldown_exp > now:
-                continue
+                try:
+                    key_idx = all_keys.index(active_key) + 1
+                except ValueError:
+                    key_idx = 1
+                key_label = f"Key #{key_idx} ({active_key[:8]}...{active_key[-4:]})"
 
-            try:
-                key_idx = all_keys.index(active_key) + 1
-            except ValueError:
-                key_idx = 1
-            key_label = f"Key #{key_idx} ({active_key[:8]}...{active_key[-4:]})"
+                headers = {
+                    "x-goog-api-key": active_key,
+                    "Content-Type": "application/json"
+                }
 
-            headers = {
-                "x-goog-api-key": active_key,
-                "Content-Type": "application/json"
-            }
+                try:
+                    # High-speed timeout: 4.5s maximum per request
+                    r = self.session.post(url, headers=headers, json=payload, timeout=4.5)
+                    if r.status_code == 200:
+                        resp = r
+                        used_model = model_name
+                        used_key_num = key_idx
+                        if active_key in all_keys:
+                            self.active_key_index = all_keys.index(active_key)
+                        logger.info(f"[Gemini Vision] Success with {model_name} on {key_label}")
+                        break
 
-            try:
-                # Fast 2.0s timeout: if cloud doesn't answer rapidly, fail over to local ML
-                r = self.session.post(url, headers=headers, json=payload, timeout=2.0)
-                if r.status_code == 200:
-                    resp = r
-                    used_model = model_name
-                    used_key_num = key_idx
-                    if active_key in all_keys:
-                        self.active_key_index = all_keys.index(active_key)
-                    logger.info(f"[Gemini Vision] Success with {model_name} on {key_label}")
-                    break
+                    elif r.status_code == 429:
+                        err_text = r.text
+                        is_daily = (
+                            "per day" in err_text.lower()
+                            or "free_tier_requests" in err_text.lower()
+                            or "quota" in err_text.lower()
+                            or "generaterequestsperdayperproject" in err_text.lower()
+                        )
+                        if is_daily:
+                            self.model_cooldowns[model_name] = time.time() + 1800
+                            logger.warning(f"[Gemini Vision] Model {model_name} daily project quota exhausted.")
+                            break
+                        else:
+                            self.cooldowns[(active_key, model_name)] = time.time() + 60
+                        continue
 
-                elif r.status_code == 429:
-                    err_text = r.text
-                    is_daily = (
-                        "per day" in err_text.lower()
-                        or "free_tier_requests" in err_text.lower()
-                        or "quota" in err_text.lower()
-                        or "generaterequestsperdayperproject" in err_text.lower()
-                    )
-                    if is_daily:
-                        self.model_cooldowns[model_name] = time.time() + 1800
-                        logger.warning(f"[Gemini Vision] Model {model_name} daily project quota exhausted.")
+                    elif r.status_code in (400, 403) and ("api key" in r.text.lower() or "invalid" in r.text.lower()):
+                        self.invalid_keys.add(active_key)
+                        continue
+
+                    elif r.status_code == 404:
+                        self.model_cooldowns[model_name] = time.time() + 86400
+                        break
+
                     else:
-                        self.cooldowns[(active_key, model_name)] = time.time() + 60
-                    continue
+                        continue
 
-                elif r.status_code in (400, 403) and ("api key" in r.text.lower() or "invalid" in r.text.lower()):
-                    self.invalid_keys.add(active_key)
+                except Exception as e:
+                    logger.info(f"[Gemini Vision] {model_name} request timeout/connection notice: {e}")
                     continue
-
-                elif r.status_code == 404:
-                    self.model_cooldowns[model_name] = time.time() + 86400
-                    continue
-
-                else:
-                    continue
-
-            except Exception as e:
-                logger.info(f"[Gemini Vision] {model_name} fast-fail (timeout/connection): {e}")
-                continue
 
             if resp is not None:
                 break
@@ -404,13 +402,28 @@ class CloudVisionIntensityService:
             if lon_val is not None and not subbasin_val:
                 subbasin_val = "Bay of Bengal" if lon_val >= 78.0 else "Arabian Sea"
 
-            vmax = float(parsed.get("wind_speed_kt", 45.0))
+            # Safe parsing of intensity values (handles None/null when no cyclone is detected)
+            raw_vmax = parsed.get("wind_speed_kt")
+            try:
+                vmax = float(raw_vmax) if raw_vmax is not None else (45.0 if is_cyclone else 0.0)
+            except (ValueError, TypeError):
+                vmax = 45.0 if is_cyclone else 0.0
+
             kmh = round(vmax * 1.852, 1)
-            pressure = float(parsed.get("estimated_pressure_mb", 992.0))
-            dvorak = str(parsed.get("dvorak_t_number", "T3.0"))
+
+            raw_pressure = parsed.get("estimated_pressure_mb")
+            try:
+                pressure = float(raw_pressure) if raw_pressure is not None else (992.0 if is_cyclone else 1012.0)
+            except (ValueError, TypeError):
+                pressure = 992.0 if is_cyclone else 1012.0
+
+            dvorak = str(parsed.get("dvorak_t_number") or ("T3.0" if is_cyclone else "N/A"))
 
             # Strict WMO categorization
-            if vmax < 34.0:
+            if not is_cyclone or vmax < 15.0:
+                cat, code, cls_type = "No Cyclone Active", "NC", "LOW"
+                wmo = "Normal Atmospheric Conditions"
+            elif vmax < 34.0:
                 cat, code, cls_type = "Tropical Depression (TD)", "TD", "LOW"
                 wmo = "Vmax < 34 kt (31-61 km/h)"
             elif vmax < 64.0:
@@ -433,7 +446,7 @@ class CloudVisionIntensityService:
                 "classification": cls_type,
                 "dvorak_t_number": dvorak,
                 "features_observed": features,
-                "description": f"WMO Classified as {cat} with peak winds of {vmax} kt",
+                "description": f"WMO Classified as {cat} with peak winds of {vmax} kt" if is_cyclone else "No cyclonic disturbance observed",
                 "source": f"Google Gemini Vision Cloud API ({used_model})",
                 "inference_time_ms": round(t_infer * 1000, 1)
             }
@@ -483,101 +496,10 @@ class CloudVisionIntensityService:
             return detection_res
 
         except Exception as e:
-            logger.info(f"[Cloud Vision] Fast local ML fallback engaged: {e}")
-            return self._detect_local_ml_fallback(image_bytes, img_hash)
+            logger.error(f"[Cloud Vision] Gemini API detection error: {e}")
+            raise RuntimeError(f"Google Gemini Vision API detection error: {e}")
 
-    def _detect_local_ml_fallback(self, image_bytes: bytes, img_hash: str) -> Dict[str, Any]:
-        """
-        Ultra-fast local ML fallback (< 1.0 second).
-        Uses pre-trained EfficientNet models and OpenCV contour georeferencing.
-        Caches results so /api/intensity and /api/extract-coordinates return in <1ms.
-        """
-        t0 = time.perf_counter()
-        arr = np.frombuffer(image_bytes, np.uint8)
-        img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
-        from services.ml_service import ml_service
-        is_valid, domain_reason = ml_service.validate_satellite_domain(img_bgr)
-        if not is_valid:
-            res = {
-                "success": True,
-                "prediction": "Invalid Satellite Image",
-                "status": "INVALID IMAGE (NOT A SATELLITE IMAGE)",
-                "status_label": "Invalid Satellite Image",
-                "is_cyclone": False,
-                "is_valid_satellite": False,
-                "confidence": 0.0,
-                "confidence_percent": 0.0,
-                "validation_message": domain_reason,
-                "description": domain_reason,
-                "source": "Local ML Domain Gate",
-                "inference_time_ms": round((time.perf_counter() - t0) * 1000, 1)
-            }
-            self._analysis_cache[img_hash] = {"detection": res, "intensity": None, "coordinates": None}
-            return res
-
-        # Run local ML detection (0.5s)
-        det_result, _, t_det = ml_service.run_detection(img_bgr)
-        is_cyclone = bool(det_result.get("is_cyclone", False))
-
-        lat_val = None
-        lon_val = None
-        subbasin_val = None
-        has_coords = False
-        coords_res = None
-        intensity_res = None
-
-        if is_cyclone:
-            # Local OpenCV georeferencing (0.02s)
-            try:
-                from routes.track import extract_coordinates_from_image
-                coords_res = extract_coordinates_from_image(img_bgr)
-                if coords_res.get("detected"):
-                    lat_val = coords_res.get("latitude")
-                    lon_val = coords_res.get("longitude")
-                    subbasin_val = coords_res.get("subbasin", "Bay of Bengal")
-                    has_coords = True
-            except Exception:
-                pass
-
-            # Local ML Intensity (0.4s)
-            try:
-                intensity_res, _, _, _ = ml_service.run_intensity_and_classification(img_bgr)
-            except Exception:
-                intensity_res = self.estimate_with_cv_heuristic(image_bytes)
-
-        t_total = time.perf_counter() - t0
-
-        detection_res = {
-            "success": True,
-            "is_cyclone": is_cyclone,
-            "is_valid_satellite": True,
-            "confidence_percent": round(float(det_result.get("confidence_percent", 92.0)), 1),
-            "confidence": round(float(det_result.get("confidence", 0.92)), 4),
-            "status": "CYCLONE DETECTED" if is_cyclone else "NO CYCLONE DETECTED",
-            "status_label": "Cyclone Detected" if is_cyclone else "No Cyclone",
-            "prediction": "Cyclone" if is_cyclone else "No Cyclone",
-            "latitude": lat_val,
-            "longitude": lon_val,
-            "subbasin": subbasin_val,
-            "has_coordinates": has_coords,
-            "pattern_detected": "Convective Cloud Organization",
-            "features_observed": "Cyclonic cloud core and rainband gradients",
-            "reasoning": f"Analyzed by local deep learning model {det_result.get('model', 'EfficientNetB0')}",
-            "validation_message": "Valid Earth meteorological satellite observation.",
-            "source": f"Local ML Pipeline ({det_result.get('model', 'EfficientNetB0')})",
-            "inference_time_ms": round(t_total * 1000, 1),
-            "intensity": intensity_res if is_cyclone else None
-        }
-
-        # Cache full pipeline output
-        self._analysis_cache[img_hash] = {
-            "detection": detection_res,
-            "intensity": intensity_res,
-            "coordinates": coords_res
-        }
-
-        return detection_res
 
     def estimate_with_gemini(self, image_bytes: bytes, mime_type: str = "image/jpeg", api_key: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -643,15 +565,8 @@ class CloudVisionIntensityService:
             return intensity_res
 
         except Exception as e:
-            logger.info(f"[Intensity] Using fast local ML model: {e}")
-            arr = np.frombuffer(image_bytes, np.uint8)
-            img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            from services.ml_service import ml_service
-            try:
-                res, _, _, _ = ml_service.run_intensity_and_classification(img_bgr)
-                return res
-            except Exception:
-                return self.estimate_with_cv_heuristic(image_bytes)
+            logger.error(f"[Intensity] Gemini API error: {e}")
+            raise RuntimeError(f"Google Gemini Vision API intensity estimation failed: {e}")
 
     def extract_eyewall_coordinates(self, image_bytes: bytes, mime_type: str = "image/jpeg", api_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """

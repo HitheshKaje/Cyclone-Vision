@@ -12,12 +12,9 @@ router = APIRouter()
 
 def get_intensity_model():
     """
-    Backwards compatibility helper: returns the loaded Objective 2 Intensity model.
-    The model is loaded once at application startup and cached in memory.
+    Backwards compatibility helper: returns None. Local ML model execution disabled per configuration.
     """
-    if ml_service.intensity_model is None:
-        ml_service.load_all_models()
-    return ml_service.intensity_model
+    return None
 
 @router.post("/intensity/cloud")
 async def estimate_cyclone_intensity_cloud(
@@ -27,8 +24,7 @@ async def estimate_cyclone_intensity_cloud(
 ):
     """
     API-Only Intensity Estimation & 3-Tier WMO Classification:
-    Uses External Cloud Vision API (Google Gemini 2.5 Flash Vision) without needing
-    any local .keras or TensorFlow model files.
+    Uses External Cloud Vision API (Google Gemini Vision) exclusively without local models.
     """
     if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
         raise HTTPException(
@@ -49,7 +45,7 @@ async def estimate_cyclone_intensity_cloud(
             api_key=effective_key
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cloud API intensity estimation error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Cloud API intensity estimation error: {str(e)}")
 
 @router.post("/intensity")
 async def estimate_cyclone_intensity(
@@ -58,8 +54,7 @@ async def estimate_cyclone_intensity(
 ):
     """
     Estimate maximum sustained wind speed (Vmax in knots) and classify intensity (LOW, MEDIUM, SEVERE).
-    Primary Engine: Google Gemini 2.5 Flash Vision AI.
-    Fallback Engine: Local ML model.
+    Engine: Google Gemini Vision AI API (Exclusively).
     """
     # 1. Validate file format
     if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
@@ -72,39 +67,20 @@ async def estimate_cyclone_intensity(
         image_bytes = await image.read()
         mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
 
-        # 1. Primary Engine: Google Gemini 2.5 Flash Vision API
-        try:
-            import asyncio
-            result = await asyncio.to_thread(
-                cloud_vision_service.estimate_with_gemini,
-                image_bytes=image_bytes,
-                mime_type=mime_type,
-                api_key=api_key
-            )
-            return result
-        except Exception as g_err:
-            logger.warning(f"[Intensity API] Gemini engine notice ({g_err}), utilizing fallback model.")
-
-        # 2. Fallback Engine: Local ML Model
-        img_bgr = ml_service.decode_image_bytes(image_bytes)
-        try:
-            result, t_prep, t_infer, t_class = ml_service.run_intensity_and_classification(img_bgr)
-            return result
-        except Exception as ex:
-            logger.warning(f"Intensity estimation model notice: {ex}. Using safe fallback estimation.")
-            classification_result = ml_service.classifier.classify(45.0)
-            return {
-                "success": True,
-                "predicted_wind_speed_kt": 45.0,
-                "wind_speed_kt": 45.0,
-                "wind_speed_kmh": 83.3,
-                "classification": classification_result["classification"],
-                "category": classification_result.get("category", "Tropical Storm (TS)"),
-                "category_code": classification_result.get("category_code", "TS"),
-                "wmo_range": classification_result.get("wmo_range", "34 kt <= Vmax < 64 kt (62-118 km/h)"),
-                "description": classification_result["description"],
-                "model": "EfficientNetB0-TCIR-Intensity (Safe Fallback)"
-            }
+        import asyncio
+        result = await asyncio.to_thread(
+            cloud_vision_service.estimate_with_gemini,
+            image_bytes=image_bytes,
+            mime_type=mime_type,
+            api_key=api_key
+        )
+        return result
+    except Exception as g_err:
+        logger.error(f"[Intensity API] Gemini engine error: {g_err}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Google Gemini Vision API intensity estimation error: {str(g_err)}. Please verify your API key."
+        )
 
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
