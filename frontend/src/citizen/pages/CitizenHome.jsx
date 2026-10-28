@@ -5,250 +5,273 @@ import {
   ArrowRight, 
   ShieldCheck, 
   Volume2, 
-  CheckCircle2, 
   PhoneCall,
   User,
   Anchor,
-  LogIn
+  LogIn,
+  CloudSun,
+  AlertTriangle,
+  WifiOff,
+  Waves
 } from 'lucide-react';
-import { useCycloneData } from '../hooks/useCycloneData';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { fetchOfficialAdvisories } from '../services/citizenApi';
-import OfflineStatusBanner from '../components/OfflineStatusBanner';
-import LastUpdatedIndicator from '../components/LastUpdatedIndicator';
-import SafetyStatusCard from '../components/SafetyStatusCard';
-import CycloneSummaryCard from '../components/CycloneSummaryCard';
 import VoiceAlertButton from '../components/VoiceAlertButton';
 
 const CitizenHome = ({ onNavigate }) => {
   const { t, i18n } = useTranslation();
   const { isOnline } = useNetworkStatus();
-  const { metadata, loading, isCached, freshness, refresh } = useCycloneData();
   const [advisory, setAdvisory] = useState({
     available: false,
     active: false,
     level: null,
-    title: '',
+    cyclone_name: null,
     message: '',
     fishermen_directive: '',
+    wind_speed_kmh: null,
     area: '',
-    source: '',
     issued_at: null,
-    coordinates: null
+    siren_active: false
   });
 
   useEffect(() => {
     let isMounted = true;
-
     const loadAdvisory = async () => {
       const res = await fetchOfficialAdvisories();
       if (!isMounted) return;
-
       if (res.success && res.data) {
         setAdvisory(res.data);
       }
     };
 
     loadAdvisory();
-    const pollInterval = setInterval(loadAdvisory, 1500);
-
+    const pollInterval = setInterval(loadAdvisory, 2000);
     return () => {
       isMounted = false;
       clearInterval(pollInterval);
     };
   }, []);
 
-  const isAlertActive = Boolean(advisory?.active && advisory?.cyclone_name);
+  // Check if there is an actual active cyclone hazard
+  const isRealCyclone = Boolean(
+    advisory?.active && 
+    advisory?.cyclone_name && 
+    !advisory.cyclone_name.toLowerCase().includes('no cyclone') &&
+    !advisory.cyclone_name.toLowerCase().includes('clear') &&
+    !advisory.cyclone_name.toLowerCase().includes('normal') &&
+    (advisory.level === 'RED' || advisory.level === 'ORANGE' || advisory.level === 'YELLOW' || advisory.level === 'DANGER')
+  );
 
-  // Derive active cyclone strictly from live Admin broadcast without hardcoded fallback coordinates
-  const activeCyclone = isAlertActive
-    ? {
-        name: advisory.cyclone_name,
-        status: advisory.level === 'RED' ? 'Severe Cyclone (Live Broadcast)' : 'Cyclone Alert',
-        latitude: advisory.coordinates?.lat ?? null,
-        longitude: advisory.coordinates?.lng ?? null,
-        wind_speed: advisory.wind_speed_kmh,
-        last_updated: advisory.issued_at,
-        description: advisory.message,
-        source: advisory.source,
-        forecast: advisory.forecast || []
-      }
-    : null;
+  // Text for audio broadcast
+  const voiceText = isRealCyclone
+    ? `Warning: Active cyclone alert for ${advisory.cyclone_name}. ${advisory.fishermen_directive || advisory.message || 'All vessels return to harbor immediately.'}`
+    : 'Coastal waters safe and normal. No cyclonic storms active.';
 
-  // Text for voice alert - only speaks active live warnings
-  const voiceText = isAlertActive
-    ? `${advisory.title || 'Cyclone Alert'}. ${advisory.message || ''}. Fishermen advisory: ${advisory.fishermen_directive || ''}`
-    : t('safety.status_unavailable');
+  // Current logged in user info
+  let currentUser = null;
+  try {
+    currentUser = JSON.parse(localStorage.getItem('cyclosafe_current_citizen_user'));
+  } catch (_) {}
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-5 select-none">
       
-      {/* Active Coastal Lighthouse Siren Emergency Banner */}
+      {/* 1. Emergency Siren Alarm Banner (Shown only when admin sounds the siren) */}
       {advisory?.siren_active && (
-        <div className="p-4 rounded-2xl bg-red-600 text-white shadow-xl animate-pulse flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-2 border-red-400">
+        <div className="p-4 rounded-2xl bg-red-600 text-white shadow-lg animate-pulse flex flex-col sm:flex-row items-center justify-between gap-3 border-2 border-red-300">
           <div className="flex items-center gap-3">
-            <Volume2 size={30} className="animate-bounce shrink-0" />
+            <Volume2 size={26} className="animate-bounce shrink-0" />
             <div>
-              <h3 className="text-sm sm:text-base font-black tracking-wide uppercase flex items-center gap-2">
-                <span>{t('siren.siren_banner_title')}</span>
-                <span className="px-2 py-0.5 rounded-sm bg-white text-red-700 text-[10px] font-black">{t('safety.badge_red')}</span>
+              <h3 className="text-sm font-black uppercase tracking-wide">
+                {i18n.language === 'kn' ? 'ತುರ್ತು ಕರಾವಳಿ ಸೈರನ್ ಸಕ್ರಿಯವಾಗಿದೆ' : 'Coastal Emergency Siren Active'}
               </h3>
-              <p className="text-xs font-semibold opacity-95 mt-0.5">
-                {t('siren.siren_banner_desc')}
+              <p className="text-xs font-semibold opacity-95">
+                {i18n.language === 'kn' ? 'ಎಲ್ಲಾ ದೋಣಿಗಳು ತಕ್ಷಣ ಬಂದರಿಗೆ ಹಿಂತಿರುಗಿ!' : 'All vessels must return to harbor immediately!'}
               </p>
             </div>
           </div>
           <button
             onClick={() => onNavigate('/lighthouse')}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white text-red-700 font-bold text-xs uppercase tracking-wider shrink-0 shadow-sm hover:bg-slate-100 transition-colors cursor-pointer text-center"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white text-red-700 font-black text-xs uppercase tracking-wider shrink-0 cursor-pointer shadow-xs hover:bg-slate-100"
           >
-            {t('siren.open_lighthouse')}
+            {i18n.language === 'kn' ? 'ಲೈಟ್‌ಹೌಸ್ ಪರದೆ ತೆರೆಯಿರಿ →' : 'Open Lighthouse →'}
           </button>
         </div>
       )}
-      
-      {/* 1. Offline & Stale Data Warning Banner */}
-      <OfflineStatusBanner 
-        isOnline={isOnline}
-        isCached={isCached}
-        freshness={freshness}
-        metadata={metadata}
-      />
 
-      {/* 2. Freshness & Last Updated Bar */}
-      <LastUpdatedIndicator 
-        freshness={freshness}
-        timestamp={metadata?.updated_at || metadata?.cached_at}
-        onRefresh={refresh}
-        loading={loading}
-      />
+      {/* 2. Offline Warning (Shown ONLY when actual network is disconnected) */}
+      {!isOnline && (
+        <div className="px-3.5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs font-medium flex items-center gap-2">
+          <WifiOff size={14} className="text-amber-600 shrink-0" />
+          <span>{i18n.language === 'kn' ? 'ಆಫ್‌ಲೈನ್ ಮೋಡ್: ಉಳಿಸಲಾದ ಡೇಟಾ ಪ್ರದರ್ಶಿಸಲಾಗುತ್ತಿದೆ' : 'Offline Mode: Displaying saved local data'}</span>
+        </div>
+      )}
 
-      {/* DYNAMIC SECTIONS: Rendered only when an active cyclone alert is live */}
-      {isAlertActive ? (
-        <>
-          {/* Active Coastal Safety Warning Indicator */}
-          <section aria-label="Marine Safety Advisory">
-            <SafetyStatusCard advisory={advisory} />
-          </section>
-
-          {/* Voice Advisory Broadcast Button (Hands-free for fishermen) */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <Volume2 size={18} className="text-emerald-500" />
-                <span>{t('home.listen_advisory')}</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {t('home.hands_free_sub')}
-              </p>
-            </div>
-            <VoiceAlertButton textToRead={voiceText} />
-          </div>
-
-          {/* Active Cyclone Telemetry Information */}
-          {activeCyclone && (
-            <section aria-label="Active Cyclone Overview">
-              <CycloneSummaryCard cyclone={activeCyclone} isCached={isCached} />
-            </section>
-          )}
-
-          {/* Map Quick Action for Active Threat */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-red-500/10 via-white to-amber-500/10 dark:from-red-950/40 dark:via-slate-800 dark:to-amber-950/40 border border-red-500/20 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="p-3 rounded-xl bg-red-500 text-white shadow-xs">
-                <MapIcon size={24} />
+      {/* 3. Primary Safety Status Card (Simple, bold, instant clarity) */}
+      {isRealCyclone ? (
+        /* ACTIVE CYCLONE HAZARD CARD */
+        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-red-600/15 via-rose-500/10 to-white dark:to-slate-900 border-2 border-red-500 shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
+                <AlertTriangle size={26} />
               </div>
               <div>
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
-                  {t('home.map_preview_title')}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5 max-w-md">
-                  {t('home.map_preview_sub')}
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white">
+                    {advisory.level || 'CYCLONE ALERT'}
+                  </span>
+                  <span className="text-xs font-bold text-red-600">Active Threat</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-50 mt-1">
+                  {advisory.cyclone_name} {advisory.wind_speed_kmh ? `(${Math.round(advisory.wind_speed_kmh)} km/h)` : ''}
+                </h2>
+                <p className="text-xs sm:text-sm font-bold text-red-700 dark:text-red-300 mt-1">
+                  {advisory.fishermen_directive || advisory.message || 'Boats at sea must return to harbor immediately.'}
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={() => onNavigate('/citizen/map')}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
-            >
-              <span>{t('home.open_full_map')}</span>
-              <ArrowRight size={18} />
-            </button>
+            <div className="shrink-0 flex items-center gap-2">
+              <VoiceAlertButton textToRead={voiceText} />
+              <button
+                onClick={() => onNavigate('/citizen/map')}
+                className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <span>Track on Map</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       ) : (
-        /* Normal Conditions / No Active Alert Dynamic Banner */
-        <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-emerald-500/15 text-emerald-500 mx-auto flex items-center justify-center">
-            <CheckCircle2 size={26} />
-          </div>
-          <div>
-            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
-              {i18n.language === 'kn' ? 'ಯಾವುದೇ ಸಕ್ರಿಯ ಚಂಡಮಾರುತ ಎಚ್ಚರಿಕೆ ಇಲ್ಲ' : 'No Active Cyclone Advisory'}
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-md mx-auto">
-              {i18n.language === 'kn' 
-                ? 'ಕರಾವಳಿ ಮತ್ತು ಸಾಗರ ವಲಯಗಳಲ್ಲಿ ಪರಿಸ್ಥಿತಿ ಸಹಜವಾಗಿದೆ. ಅಧಿಕೃತ ಎಚ್ಚರಿಕೆ ಪ್ರಸಾರವಾದಾಗ ಇಲ್ಲಿ ನೇರವಾಗಿ ಪ್ರದರ್ಶಿಸಲಾಗುತ್ತದೆ.'
-                : 'Monitored coastal maritime sectors report normal conditions. Official warnings will appear here dynamically when broadcasted by the early warning center.'}
-            </p>
-          </div>
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={() => onNavigate('/citizen/map')}
-              className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <MapIcon size={14} />
-              <span>{t('home.open_full_map')}</span>
-            </button>
-            <button
-              onClick={() => onNavigate('/citizen/emergency')}
-              className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-semibold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <PhoneCall size={14} />
-              <span>{t('home.quick_emergency')}</span>
-            </button>
+        /* NORMAL / SAFE SEA CARD (Simple, Clean, Reassuring) */
+        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-white dark:to-slate-800/90 border border-emerald-500/30 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <ShieldCheck size={26} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                    {i18n.language === 'kn' ? 'ಸುರಕ್ಷಿತ ಸ್ಥಿತಿ' : 'All Clear • Safe'}
+                  </span>
+                  <span className="text-xs text-slate-400">Live Observation</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-50 mt-0.5">
+                  {i18n.language === 'kn' ? 'ಕರಾವಳಿ ಸಮುದ್ರ ಸುರಕ್ಷಿತವಾಗಿದೆ' : 'Coastal Waters Safe & Normal'}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {i18n.language === 'kn'
+                    ? 'ಯಾವುದೇ ಚಂಡಮಾರುತದ ಅಪಾಯವಿಲ್ಲ. ಮೀನುಗಾರಿಕೆಗೆ ಪರಿಸ್ಥಿತಿ ಸಹಜವಾಗಿದೆ.'
+                    : 'No active cyclone threats. Normal conditions for maritime and coastal operations.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="shrink-0 self-start sm:self-auto">
+              <VoiceAlertButton textToRead={voiceText} />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Community Profile & User Login Card */}
-      {(() => {
-        let currentUser = null;
-        try {
-          currentUser = JSON.parse(localStorage.getItem('cyclosafe_current_citizen_user'));
-        } catch (_) {}
-
-        return (
-          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-500 border border-sky-500/25 flex items-center justify-center shrink-0">
-                {currentUser?.user_type === 'fisherman' ? <Anchor size={20} /> : <User size={20} />}
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                  {currentUser 
-                    ? `${currentUser.name} (${currentUser.user_type === 'fisherman' ? 'Fisherman' : 'Coastal Citizen'})`
-                    : (i18n.language === 'kn' ? 'ಕರಾವಳಿ ನಾಗರಿಕ ಮತ್ತು ಮೀನುಗಾರರ ಲಾಗಿನ್' : 'Coastal Community Safety Registry')}
-                </h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                  {currentUser 
-                    ? `Status: ${currentUser.status || 'Active'} • Connected to MongoDB`
-                    : (i18n.language === 'kn' ? 'ನೇರ ಚಂಡಮಾರುತ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಪಡೆಯಲು ಮೊಬೈಲ್ ಅಥವಾ ಇಮೇಲ್ ಮೂಲಕ ಲಾಗಿನ್ ಮಾಡಿ' : 'Sign in or register with Mobile Number or Email for direct cyclone warnings')}
-                </p>
-              </div>
+      {/* 4. Quick Action Tiles (Simple 3-card grid - No Walls of Text) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Tile 1: Live Interactive Map */}
+        <button
+          type="button"
+          onClick={() => onNavigate('/citizen/map')}
+          className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs hover:border-sky-500 hover:shadow-sm transition-all text-left flex items-center justify-between group cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <MapIcon size={20} />
             </div>
-
-            <button
-              onClick={() => onNavigate('/login')}
-              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-            >
-              <LogIn size={13} />
-              <span>{currentUser ? 'Switch User / Login' : (i18n.language === 'kn' ? 'ಬಳಕೆದಾರ ಲಾಗಿನ್' : 'User Login / Register')}</span>
-            </button>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                {i18n.language === 'kn' ? 'ಕರಾವಳಿ ನಕ್ಷೆ' : 'Live Coastal Map'}
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {i18n.language === 'kn' ? 'ಲೈವ್ ಟ್ರ್ಯಾಕಿಂಗ್ & ಹಾರ್ಬರ್‌ಗಳು' : 'Live radar & coastal tracking'}
+              </p>
+            </div>
           </div>
-        );
-      })()}
+          <ArrowRight size={16} className="text-slate-400 group-hover:text-sky-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
+
+        {/* Tile 2: Weather & Sea */}
+        <button
+          type="button"
+          onClick={() => onNavigate('/citizen/weather')}
+          className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs hover:border-emerald-500 hover:shadow-sm transition-all text-left flex items-center justify-between group cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <CloudSun size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                {i18n.language === 'kn' ? 'ಹವಾಮಾನ ಮತ್ತು ಸಮುದ್ರ' : 'Weather & Sea'}
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {i18n.language === 'kn' ? '೭ ದಿನಗಳ ಮುನ್ಸೂಚನೆ & ಅಲೆಗಳು' : '7-day daily forecast & waves'}
+              </p>
+            </div>
+          </div>
+          <ArrowRight size={16} className="text-slate-400 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
+
+        {/* Tile 3: Emergency SOS */}
+        <button
+          type="button"
+          onClick={() => onNavigate('/citizen/emergency')}
+          className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs hover:border-rose-500 hover:shadow-sm transition-all text-left flex items-center justify-between group cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <PhoneCall size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                {i18n.language === 'kn' ? 'ತುರ್ತು ಸಂಪರ್ಕ (SOS)' : 'Emergency SOS'}
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {i18n.language === 'kn' ? 'ಕೋಸ್ಟ್‌ಗಾರ್ಡ್ & ೧೧೨ ಸಹಾಯವಾಣಿ' : 'Coast Guard & 112 Helplines'}
+              </p>
+            </div>
+          </div>
+          <ArrowRight size={16} className="text-slate-400 group-hover:text-rose-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
+      </div>
+
+      {/* 5. Minimalist User Profile Status Bar */}
+      <div className="px-4 py-3 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-sky-500/15 text-sky-500 flex items-center justify-center shrink-0">
+            {currentUser?.user_type === 'fisherman' ? <Anchor size={14} /> : <User size={14} />}
+          </div>
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
+            {currentUser ? (
+              <>
+                <strong className="text-slate-900 dark:text-slate-100">{currentUser.name}</strong> • {currentUser.user_type === 'fisherman' ? 'Fisherman' : 'Coastal Citizen'} ({currentUser.district || 'Coastal District'})
+              </>
+            ) : (
+              i18n.language === 'kn' ? 'ನಾಗರಿಕ ಲಾಗಿನ್ ಆಗಿಲ್ಲ' : 'Direct Alerts Active in MongoDB'
+            )}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onNavigate('/login')}
+          className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer self-end sm:self-auto shrink-0"
+        >
+          <LogIn size={13} />
+          <span>{currentUser ? 'Switch User' : 'Sign In / Register'}</span>
+        </button>
+      </div>
 
     </div>
   );
