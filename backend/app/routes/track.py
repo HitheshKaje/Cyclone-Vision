@@ -459,8 +459,8 @@ async def extract_image_coordinates(image: UploadFile = File(...)):
     Uses AI vision to inspect coordinate grids, axis tick marks, and pinpoint the cyclone eyewall.
     Falls back to CV Hough circles and graticule analysis if offline.
     """
-    if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif', '.webp')):
-        raise HTTPException(status_code=400, detail="Invalid image format.")
+    if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
+        raise HTTPException(status_code=400, detail="Unsupported file format. Please upload a valid satellite image (JPG, PNG, TIFF).")
 
     try:
         content = await image.read()

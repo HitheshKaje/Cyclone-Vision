@@ -148,8 +148,46 @@ const AnalyzePage = ({
     }
   };
 
+  const isValidCycloneImage = (file) => {
+    if (!file) return { valid: false, error: 'No file selected.' };
+    const fileName = (file.name || '').toLowerCase();
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.tiff', '.tif'];
+    const hasValidExt = allowedExtensions.some(ext => fileName.endsWith(ext));
+    const fileType = (file.type || '').toLowerCase();
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/tiff', 'image/x-tiff'];
+    const hasValidMime = !fileType || allowedMimes.includes(fileType) || (fileType.startsWith('image/') && hasValidExt);
+
+    if (!hasValidExt || (!hasValidMime && fileType !== '')) {
+      return {
+        valid: false,
+        error: 'Only JPG, PNG, and TIFF images are allowed (.jpg, .jpeg, .png, .tiff, .tif). Other file formats cannot be uploaded.'
+      };
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      return {
+        valid: false,
+        error: 'Image file size exceeds the 15 MB limit. Please select a smaller satellite image.'
+      };
+    }
+
+    return { valid: true };
+  };
+
   const processSelectedFile = (selectedFile) => {
     if (!selectedFile) return;
+
+    const validation = isValidCycloneImage(selectedFile);
+    if (!validation.valid) {
+      setFile(null);
+      setPreviewUrl(null);
+      setErrorMessage(validation.error);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     setFile(selectedFile);
     setErrorMessage(null);
     setAnalysisStatus('idle');
@@ -436,7 +474,7 @@ const AnalyzePage = ({
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
-                accept="image/jpeg, image/png, image/tiff"
+                accept=".jpg,.jpeg,.png,.tiff,.tif,image/jpeg,image/png,image/tiff"
                 className="hidden"
               />
 
