@@ -62,10 +62,16 @@ const CitizenHome = ({ onNavigate }) => {
     (advisory.level === 'RED' || advisory.level === 'ORANGE' || advisory.level === 'YELLOW' || advisory.level === 'DANGER')
   );
 
-  // Text for audio broadcast
-  const voiceText = isRealCyclone
-    ? `Warning: Active cyclone alert for ${advisory.cyclone_name}. ${advisory.fishermen_directive || advisory.message || 'All vessels return to harbor immediately.'}`
-    : 'Coastal waters safe and normal. No cyclonic storms active.';
+  // Text for audio broadcast (Bilingual with fallback)
+  const englishAdvisory = isRealCyclone
+    ? `Warning! Active cyclone alert for ${advisory.cyclone_name}. ${advisory.wind_speed_kmh ? `Wind speeds up to ${Math.round(advisory.wind_speed_kmh)} kilometers per hour.` : ''} ${advisory.fishermen_directive || advisory.message || 'All vessels return to harbor immediately.'}`
+    : 'Coastal waters safe and normal. No active cyclone threats. Normal conditions for maritime and coastal operations.';
+
+  const kannadaAdvisory = isRealCyclone
+    ? `ಎಚ್ಚರಿಕೆ! ${advisory.cyclone_name} ಚಂಡಮಾರುತದ ಮುನ್ಸೂಚನೆ. ${advisory.fishermen_directive || advisory.message || 'ಎಲ್ಲಾ ದೋಣಿಗಳು ತಕ್ಷಣ ಬಂದರಿಗೆ ಹಿಂತಿರುಗಿ.'}`
+    : 'ಕರಾವಳಿ ಸಮುದ್ರ ಸುರಕ್ಷಿತವಾಗಿದೆ. ಯಾವುದೇ ಚಂಡಮಾರುತದ ಅಪಾಯವಿಲ್ಲ. ಪರಿಸ್ಥಿತಿ ಸಹಜವಾಗಿದೆ.';
+
+  const voiceText = i18n.language === 'kn' ? kannadaAdvisory : englishAdvisory;
 
   // Current logged in user info
   let currentUser = null;
@@ -133,7 +139,11 @@ const CitizenHome = ({ onNavigate }) => {
             </div>
 
             <div className="shrink-0 flex items-center gap-2">
-              <VoiceAlertButton textToRead={voiceText} />
+              <VoiceAlertButton
+                textToRead={voiceText}
+                englishText={englishAdvisory}
+                kannadaText={kannadaAdvisory}
+              />
               <button
                 onClick={() => onNavigate('/citizen/map')}
                 className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm"
@@ -171,7 +181,11 @@ const CitizenHome = ({ onNavigate }) => {
             </div>
 
             <div className="shrink-0 self-start sm:self-auto">
-              <VoiceAlertButton textToRead={voiceText} />
+              <VoiceAlertButton
+                textToRead={voiceText}
+                englishText={englishAdvisory}
+                kannadaText={kannadaAdvisory}
+              />
             </div>
           </div>
         </div>
