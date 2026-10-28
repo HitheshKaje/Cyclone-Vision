@@ -160,9 +160,6 @@ const AnalyzePage = ({
       setPreviewUrl(e.target.result);
     };
     reader.readAsDataURL(selectedFile);
-
-    // Auto-extract eyewall coordinates as soon as image is selected/uploaded
-    extractCoordinatesFromImage(selectedFile);
   };
 
   const handleFileChange = (e) => {
@@ -249,7 +246,7 @@ const AnalyzePage = ({
 
     try {
       const apiBase = getApiBaseUrl();
-      // Step 1: Objective 1 Cyclone Detection
+      // Step 1: Objective 1 Cyclone Detection (Single-pass fast analysis)
       const formData = new FormData();
       formData.append('image', file);
 
@@ -307,19 +304,25 @@ const AnalyzePage = ({
           }
         }
 
-        const intensityFormData = new FormData();
-        intensityFormData.append('image', file);
+        // Fast Single-Pass Intensity: Check if backend already included intensity in detection
+        if (detectData.intensity) {
+          intensityData = detectData.intensity;
+        } else {
+          // Hits in-memory cache in backend (< 1ms)
+          const intensityFormData = new FormData();
+          intensityFormData.append('image', file);
 
-        const intensityResponse = await fetch(`${apiBase}/api/intensity`, {
-          method: 'POST',
-          body: intensityFormData,
-        });
+          const intensityResponse = await fetch(`${apiBase}/api/intensity`, {
+            method: 'POST',
+            body: intensityFormData,
+          });
 
-        if (!intensityResponse.ok) {
-          throw new Error(`Intensity estimation request failed with status ${intensityResponse.status}`);
+          if (!intensityResponse.ok) {
+            throw new Error(`Intensity estimation request failed with status ${intensityResponse.status}`);
+          }
+
+          intensityData = await intensityResponse.json();
         }
-
-        intensityData = await intensityResponse.json();
 
         if (intensityData && intensityData.classification) {
           classificationData = {

@@ -180,20 +180,22 @@ class MLService:
         self.classifier = get_cyclone_classifier()
         logger.info(f"Objective 3 Classifier initialized (Low Max: {self.classifier.low_max} kt, Med Max: {self.classifier.medium_max} kt)")
 
-        # 4. Pre-warm models with dummy batch to compile TensorFlow computational graphs
-        # WARMUP IS DISABLED for local development so the backend starts in 5 seconds instead of 90 seconds.
-        # The only tradeoff is that the VERY FIRST image prediction will take a bit longer.
-        PERFORM_WARMUP = False
-        if PERFORM_WARMUP:
-            t0 = time.perf_counter()
-            logger.info("Pre-warming models to eliminate cold-start inference latency...")
-            dummy_input = np.zeros((1, TARGET_SIZE[0], TARGET_SIZE[1], 3), dtype=np.float32)
-            _ = self.detection_model.predict(dummy_input, verbose=0)
-            _ = self.intensity_model.predict(dummy_input, verbose=0)
-            t_warmup = time.perf_counter() - t0
-            logger.info(f"-> Computational graphs pre-warmed in {t_warmup:.2f}s")
-        else:
-            logger.info("Skipping graph pre-warming for faster startup times.")
+        # 4. Pre-warm models asynchronously in background thread so startup is instant
+        # while first inference latency is completely eliminated
+        import threading
+        def _async_warmup():
+            try:
+                t_w0 = time.perf_counter()
+                dummy_input = np.zeros((1, TARGET_SIZE[0], TARGET_SIZE[1], 3), dtype=np.float32)
+                if self.detection_model is not None:
+                    _ = self.detection_model.predict(dummy_input, verbose=0)
+                if self.intensity_model is not None:
+                    _ = self.intensity_model.predict(dummy_input, verbose=0)
+                logger.info(f"-> Background computational graph pre-warming completed in {time.perf_counter() - t_w0:.2f}s")
+            except Exception as e:
+                logger.warning(f"Background pre-warm note: {e}")
+
+        threading.Thread(target=_async_warmup, daemon=True).start()
 
         total_init_time = time.perf_counter() - t_start
         self.is_loaded = True

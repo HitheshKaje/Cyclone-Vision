@@ -659,37 +659,47 @@ class MarineSectorsService:
             "}"
         )
 
-        try:
-            parsed, used_model = cloud_vision_service._call_gemini_json(
-                prompt=prompt,
-                image_bytes=image_bytes
-            )
-            if parsed and isinstance(parsed, dict):
-                used_model_label = f"Gemini Vision AI ({used_model})"
-                ai_summary = parsed.get("coastal_directive")
-                if parsed.get("recommended_signal"):
-                    ai_recommended_signal = parsed["recommended_signal"]
-                if parsed.get("risk_level"):
-                    ai_risk_level = parsed["risk_level"]
+        import time
+        now_ts = time.time()
+        has_active_gemini = any(
+            cloud_vision_service.model_cooldowns.get(m, 0) <= now_ts
+            for m in getattr(cloud_vision_service, "GEMINI_MODELS", ["gemini-2.5-flash"])
+        )
 
-                # If Gemini confirmed a specific primary sector/lighthouse, verify match
-                gemini_sector = parsed.get("primary_sector_name")
-                if gemini_sector:
-                    for s in sectors_with_dist:
-                        if s["name"].lower() in gemini_sector.lower() or gemini_sector.lower() in s["name"].lower():
-                            primary_sector = s
-                            break
+        if has_active_gemini:
+            try:
+                parsed, used_model = cloud_vision_service._call_gemini_json(
+                    prompt=prompt,
+                    image_bytes=image_bytes
+                )
+                if parsed and isinstance(parsed, dict):
+                    used_model_label = f"Gemini Vision AI ({used_model})"
+                    ai_summary = parsed.get("coastal_directive")
+                    if parsed.get("recommended_signal"):
+                        ai_recommended_signal = parsed["recommended_signal"]
+                    if parsed.get("risk_level"):
+                        ai_risk_level = parsed["risk_level"]
 
-                gemini_lh = parsed.get("primary_lighthouse_name")
-                if gemini_lh:
-                    for lh in lighthouses_with_dist:
-                        if lh["name"].lower() in gemini_lh.lower() or gemini_lh.lower() in lh["name"].lower():
-                            primary_lighthouse = lh
-                            break
+                    # If Gemini confirmed a specific primary sector/lighthouse, verify match
+                    gemini_sector = parsed.get("primary_sector_name")
+                    if gemini_sector:
+                        for s in sectors_with_dist:
+                            if s["name"].lower() in gemini_sector.lower() or gemini_sector.lower() in s["name"].lower():
+                                primary_sector = s
+                                break
 
-                logger.info(f"[Marine Sector AI] Identified {primary_sector['name']} & {primary_lighthouse['name']} via {used_model}")
-        except Exception as e:
-            logger.warning(f"[Marine Sector AI] Gemini notice: {e}. Utilizing geodesic meteorological calculation.")
+                    gemini_lh = parsed.get("primary_lighthouse_name")
+                    if gemini_lh:
+                        for lh in lighthouses_with_dist:
+                            if lh["name"].lower() in gemini_lh.lower() or gemini_lh.lower() in lh["name"].lower():
+                                primary_lighthouse = lh
+                                break
+
+                    logger.info(f"[Marine Sector AI] Identified {primary_sector['name']} & {primary_lighthouse['name']} via {used_model}")
+            except Exception as e:
+                logger.info(f"[Marine Sector AI] Geodesic calculation used: {e}")
+        else:
+            used_model_label = "Geodesic Meteorological Proximity Engine"
 
         if not ai_summary:
             ai_summary = (
