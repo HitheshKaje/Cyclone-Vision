@@ -68,19 +68,20 @@ async def estimate_cyclone_intensity(
         mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
 
         import asyncio
-        result = await asyncio.to_thread(
-            cloud_vision_service.estimate_with_gemini,
-            image_bytes=image_bytes,
-            mime_type=mime_type,
-            api_key=api_key
-        )
-        return result
-    except Exception as g_err:
-        logger.error(f"[Intensity API] Gemini engine error: {g_err}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"Google Gemini Vision API intensity estimation error: {str(g_err)}. Please verify your API key."
-        )
+        try:
+            result = await asyncio.to_thread(
+                cloud_vision_service.estimate_with_gemini,
+                image_bytes=image_bytes,
+                mime_type=mime_type,
+                api_key=api_key
+            )
+            return result
+        except Exception as g_err:
+            logger.error(f"[Intensity API] Gemini engine error: {g_err}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Google Gemini Vision API intensity estimation error: {str(g_err)}. Please add fresh API keys."
+            )
 
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))

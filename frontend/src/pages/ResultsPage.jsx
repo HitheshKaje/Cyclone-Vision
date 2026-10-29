@@ -85,6 +85,11 @@ const ResultsPage = ({
     ? detection.confidence_percent 
     : (detection?.confidence != null ? Number((detection.confidence * 100).toFixed(1)) : null);
 
+  const displayLat = currentAnalysis?.latitude != null ? currentAnalysis.latitude : currentAnalysis?.detection?.latitude;
+  const displayLon = currentAnalysis?.longitude != null ? currentAnalysis.longitude : currentAnalysis?.detection?.longitude;
+  const displayBasin = currentAnalysis?.subbasin || currentAnalysis?.detection?.subbasin || (displayLon != null ? (displayLon >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea') : 'North Indian Ocean');
+  const displayMethod = currentAnalysis?.coordMethod || currentAnalysis?.detection?.coordMethod || 'AI Georeferenced Eyewall Coordinates';
+
   const windKt = intensity?.wind_speed_kt != null ? intensity.wind_speed_kt : null;
   const windKmh = intensity?.wind_speed_kmh != null 
     ? intensity.wind_speed_kmh 
@@ -177,14 +182,14 @@ const ResultsPage = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {isCyclone && currentAnalysis?.latitude != null && (
+          {isCyclone && displayLat != null && (
             <>
               <button
                 onClick={() => setActiveTab('map')}
                 className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/20"
               >
                 <Map size={14} />
-                <span>View on Live Map ({currentAnalysis.latitude}°N, {currentAnalysis.longitude}°E)</span>
+                <span>View on Live Map ({displayLat}°N, {displayLon}°E)</span>
               </button>
 
               <button
@@ -277,24 +282,24 @@ const ResultsPage = ({
                     {timestamp}
                   </span>
                 </div>
-                {currentAnalysis?.latitude != null && (
+                {displayLat != null && (
                   <>
                     <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/30">
                       <span className="text-slate-500">Coordinates</span>
                       <span className="font-bold text-sky-400">
-                        {currentAnalysis.latitude}°N, {currentAnalysis.longitude}°E
+                        {displayLat}°N, {displayLon}°E
                       </span>
                     </div>
                     <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/30">
                       <span className="text-slate-500">Basin Location</span>
                       <span className="font-medium text-slate-800 dark:text-slate-200">
-                        {currentAnalysis.subbasin || 'North Indian Ocean'}
+                        {displayBasin}
                       </span>
                     </div>
                     <div className="flex justify-between py-1 border-b border-slate-200/50 dark:border-slate-700/30">
                       <span className="text-slate-500">Coordinate Method</span>
                       <span className="font-medium text-emerald-400 text-[11px] truncate max-w-[180px]">
-                        {currentAnalysis.coordMethod || 'Auto-Extracted from Image'}
+                        {displayMethod}
                       </span>
                     </div>
                   </>
@@ -357,7 +362,9 @@ const ResultsPage = ({
                     />
                     <RechartsTooltip 
                       formatter={(value) => [`${value}%`, 'Risk Level']}
-                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }}
+                      labelStyle={{ color: '#475569', fontWeight: 600 }}
+                      itemStyle={{ fontWeight: 600 }}
                     />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -458,8 +465,9 @@ const ResultsPage = ({
                     </Pie>
                     <RechartsTooltip 
                       formatter={(value, name) => [`${value}%`, name]}
-                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                      itemStyle={{ color: '#f8fafc', fontWeight: 'bold' }}
+                      contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }}
+                      itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                      labelStyle={{ color: '#475569', fontWeight: 600 }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -721,8 +729,10 @@ const ResultsPage = ({
                 <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <RechartsTooltip 
                   formatter={(value) => [`${value}%`, 'Score']}
-                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  cursor={{ fill: 'rgba(0, 0, 0, 0.04)' }}
+                  contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }}
+                  labelStyle={{ color: '#475569', fontWeight: 600 }}
+                  itemStyle={{ color: '#0f172a', fontWeight: 600 }}
                 />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
                   {performanceData.map((entry, index) => (
@@ -759,7 +769,9 @@ const ResultsPage = ({
                 </Pie>
                 <RechartsTooltip 
                   formatter={(value, name, props) => [props.payload.actualValue, name]}
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }}
+                  labelStyle={{ color: '#475569', fontWeight: 600 }}
+                  itemStyle={{ fontWeight: 600 }}
                 />
                 <Legend 
                   layout="horizontal" 
@@ -808,8 +820,10 @@ const ResultsPage = ({
                 />
                 <RechartsTooltip 
                   formatter={(value) => [value, 'Count']}
-                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  cursor={{ fill: 'rgba(0, 0, 0, 0.04)' }}
+                  contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }}
+                  labelStyle={{ color: '#475569', fontWeight: 600 }}
+                  itemStyle={{ color: '#0284c7', fontWeight: 600 }}
                 />
                 <Bar dataKey="count" fill="#0ea5e9" radius={[2, 2, 0, 0]} />
               </BarChart>

@@ -48,7 +48,7 @@ async def detect_cyclone(image: UploadFile = File(...)):
                 "inference_time_ms": round(t_total * 1000, 1)
             }
 
-        # 1. Primary Engine: High-Accuracy Google Gemini Vision AI API (Exclusively)
+        # 1. Engine: High-Accuracy Google Gemini Vision AI API (Exclusively)
         try:
             result = cloud_vision_service.detect_with_gemini(image_bytes, mime_type=mime_type)
             if result.get("is_valid_satellite") is False:
@@ -57,7 +57,7 @@ async def detect_cyclone(image: UploadFile = File(...)):
             logger.error(f"[Detect API] Gemini engine error: {g_err}")
             raise HTTPException(
                 status_code=502,
-                detail=f"Google Gemini Vision API detection error: {str(g_err)}. Please verify your API key."
+                detail=f"Google Gemini Vision API detection error: {str(g_err)}. Please add fresh API keys."
             )
 
         # 3. Ensure coordinates are attached if cyclone is detected

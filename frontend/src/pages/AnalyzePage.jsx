@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   UploadCloud, 
   RotateCcw, 
@@ -53,15 +53,28 @@ const AnalyzePage = ({
   const fileInputRef = useRef(null);
   const imageContainerRef = useRef(null);
 
-  // Cyclone Coordinates State (Auto-extracted from Radius Lines / Graticule or user-selected)
-  const [latitude, setLatitude] = useState('15.40');
-  const [longitude, setLongitude] = useState('86.20');
-  const [coordSubbasin, setCoordSubbasin] = useState('Bay of Bengal');
-  const [coordMethod, setCoordMethod] = useState('');
-  const [hasRadiusLines, setHasRadiusLines] = useState(false);
-  const [coordConfidence, setCoordConfidence] = useState(null);
+  // Cyclone Coordinates State (Synchronized with currentAnalysis)
+  const [latitude, setLatitude] = useState(() => currentAnalysis?.latitude != null ? String(currentAnalysis.latitude) : '15.40');
+  const [longitude, setLongitude] = useState(() => currentAnalysis?.longitude != null ? String(currentAnalysis.longitude) : '86.20');
+  const [coordSubbasin, setCoordSubbasin] = useState(() => currentAnalysis?.subbasin || 'Bay of Bengal');
+  const [coordMethod, setCoordMethod] = useState(() => currentAnalysis?.coordMethod || '');
+  const [hasRadiusLines, setHasRadiusLines] = useState(() => Boolean(currentAnalysis?.hasRadiusLines));
+  const [coordConfidence, setCoordConfidence] = useState(() => currentAnalysis?.coordConfidence || null);
   const [centerMarker, setCenterMarker] = useState(null);
   const [isExtractingCoords, setIsExtractingCoords] = useState(false);
+
+  // Synchronize local states whenever currentAnalysis changes (e.g. from history or tab navigation)
+  useEffect(() => {
+    if (currentAnalysis) {
+      if (currentAnalysis.latitude != null) setLatitude(String(currentAnalysis.latitude));
+      if (currentAnalysis.longitude != null) setLongitude(String(currentAnalysis.longitude));
+      if (currentAnalysis.subbasin) setCoordSubbasin(currentAnalysis.subbasin);
+      if (currentAnalysis.coordMethod) setCoordMethod(currentAnalysis.coordMethod);
+      if (currentAnalysis.hasRadiusLines != null) setHasRadiusLines(Boolean(currentAnalysis.hasRadiusLines));
+      if (currentAnalysis.coordConfidence != null) setCoordConfidence(currentAnalysis.coordConfidence);
+      if (currentAnalysis.imagePreview) setPreviewUrl(currentAnalysis.imagePreview);
+    }
+  }, [currentAnalysis]);
 
   const extractCoordinatesFromImage = async (selectedFile) => {
     if (!selectedFile) return { lat: '15.40', lon: '86.20', basin: 'Bay of Bengal', method: 'Default', hasRadius: false };
@@ -108,13 +121,22 @@ const AnalyzePage = ({
     const methodStr = presetName ? `Preset: ${presetName}` : 'Custom Coordinates Confirmed';
     setCoordMethod(methodStr);
 
-    // Synchronize with currentAnalysis state so Live Map & Broadcast update immediately
+    const parsedLat = parseFloat(newLat) || null;
+    const parsedLon = parseFloat(newLon) || null;
+
+    // Synchronize with currentAnalysis state so Live Map, Results, & Broadcast update immediately
     setCurrentAnalysis(prev => prev ? ({
       ...prev,
-      latitude: parseFloat(newLat) || prev.latitude,
-      longitude: parseFloat(newLon) || prev.longitude,
+      latitude: parsedLat !== null ? parsedLat : prev.latitude,
+      longitude: parsedLon !== null ? parsedLon : prev.longitude,
       subbasin: subbasin,
-      coordMethod: methodStr
+      coordMethod: methodStr,
+      detection: prev.detection ? {
+        ...prev.detection,
+        latitude: parsedLat !== null ? parsedLat : prev.detection.latitude,
+        longitude: parsedLon !== null ? parsedLon : prev.detection.longitude,
+        subbasin: subbasin
+      } : prev.detection
     }) : prev);
 
     // Synchronize history
@@ -122,8 +144,8 @@ const AnalyzePage = ({
       if (rec.id === currentAnalysis?.id) {
         return {
           ...rec,
-          latitude: parseFloat(newLat) || rec.latitude,
-          longitude: parseFloat(newLon) || rec.longitude,
+          latitude: parsedLat !== null ? parsedLat : rec.latitude,
+          longitude: parsedLon !== null ? parsedLon : rec.longitude,
           subbasin: subbasin,
           coordMethod: methodStr
         };
@@ -192,6 +214,11 @@ const AnalyzePage = ({
     setErrorMessage(null);
     setAnalysisStatus('idle');
     setCurrentStage(null);
+    setLatitude('');
+    setLongitude('');
+    setCoordSubbasin('');
+    setCoordMethod('');
+    setHasRadiusLines(false);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -303,44 +330,60 @@ const AnalyzePage = ({
       let classificationData = null;
       let extractedCoords = null;
 
+      let activeLat = null;
+      let activeLon = null;
+      let activeBasin = null;
+      let activeMethod = 'AI Georeferenced Eyewall Coordinates';
+      let activeHasRadius = true;
+      let activeConfidence = 96;
+
       // Step 2 & 3: Run Objective 2 & 3 and Coordinate Extraction ONLY if Cyclone is detected
       if (detectData.is_cyclone) {
         setCurrentStage('Intensity');
 
         // Check if coordinates were returned by detection API or need extraction
         if (detectData.latitude != null && detectData.longitude != null) {
-          const latStr = Number(detectData.latitude).toFixed(2);
-          const lonStr = Number(detectData.longitude).toFixed(2);
-          const basinStr = detectData.subbasin || (detectData.longitude >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea');
-          extractedCoords = {
-            lat: latStr,
-            lon: lonStr,
-            basin: basinStr,
-            method: 'AI Georeferenced Eyewall Coordinates',
-            hasRadius: true,
-            confidence: 96
-          };
-          setLatitude(latStr);
-          setLongitude(lonStr);
-          setCoordSubbasin(basinStr);
-          setCoordMethod('AI Georeferenced Eyewall Coordinates');
-          setHasRadiusLines(true);
-        } else if (!hasRadiusLines) {
+          activeLat = Number(detectData.latitude).toFixed(2);
+          activeLon = Number(detectData.longitude).toFixed(2);
+          activeBasin = detectData.subbasin || (Number(detectData.longitude) >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea');
+          activeMethod = 'AI Georeferenced Eyewall Coordinates';
+          activeHasRadius = true;
+          activeConfidence = 96;
+        } else {
           try {
             const autoCoords = await extractCoordinatesFromImage(file);
             if (autoCoords) {
-              extractedCoords = autoCoords;
-              setLatitude(autoCoords.lat);
-              setLongitude(autoCoords.lon);
-              setCoordSubbasin(autoCoords.basin);
-              setCoordMethod(autoCoords.method);
-              setHasRadiusLines(Boolean(autoCoords.hasRadius));
-              setCoordConfidence(autoCoords.confidence || 92);
+              activeLat = autoCoords.lat;
+              activeLon = autoCoords.lon;
+              activeBasin = autoCoords.basin;
+              activeMethod = autoCoords.method;
+              activeHasRadius = Boolean(autoCoords.hasRadius);
+              activeConfidence = autoCoords.confidence || 92;
             }
           } catch (cErr) {
             console.warn('Coordinate auto-extraction fallback:', cErr);
           }
         }
+
+        if (!activeLat) activeLat = latitude || '15.40';
+        if (!activeLon) activeLon = longitude || '86.20';
+        if (!activeBasin) activeBasin = coordSubbasin || (parseFloat(activeLon) >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea');
+
+        setLatitude(activeLat);
+        setLongitude(activeLon);
+        setCoordSubbasin(activeBasin);
+        setCoordMethod(activeMethod);
+        setHasRadiusLines(activeHasRadius);
+        setCoordConfidence(activeConfidence);
+
+        extractedCoords = {
+          lat: activeLat,
+          lon: activeLon,
+          basin: activeBasin,
+          method: activeMethod,
+          hasRadius: activeHasRadius,
+          confidence: activeConfidence
+        };
 
         // Fast Single-Pass Intensity: Check if backend already included intensity in detection
         if (detectData.intensity) {
@@ -378,15 +421,15 @@ const AnalyzePage = ({
       setAnalysisStatus('completed');
 
       const isSatValid = detectData.is_valid_satellite !== false;
-      const finalLat = (isSatValid && detectData.is_cyclone) 
-        ? (parseFloat(latitude) || (extractedCoords ? parseFloat(extractedCoords.lat) : (detectData.latitude != null ? parseFloat(detectData.latitude) : 15.30))) 
-        : null;
-      const finalLon = (isSatValid && detectData.is_cyclone) 
-        ? (parseFloat(longitude) || (extractedCoords ? parseFloat(extractedCoords.lon) : (detectData.longitude != null ? parseFloat(detectData.longitude) : 89.60))) 
-        : null;
-      const finalSubbasin = (isSatValid && detectData.is_cyclone) 
-        ? (coordSubbasin || extractedCoords?.basin || detectData.subbasin || (finalLon != null ? (finalLon >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea') : 'Bay of Bengal')) 
-        : null;
+      const finalLat = (isSatValid && detectData.is_cyclone && activeLat != null) ? parseFloat(activeLat) : null;
+      const finalLon = (isSatValid && detectData.is_cyclone && activeLon != null) ? parseFloat(activeLon) : null;
+      const finalSubbasin = (isSatValid && detectData.is_cyclone) ? activeBasin : null;
+
+      if (detectData && finalLat != null && finalLon != null) {
+        detectData.latitude = finalLat;
+        detectData.longitude = finalLon;
+        detectData.subbasin = finalSubbasin;
+      }
 
       const analysisRecord = {
         id: Date.now().toString(),
@@ -399,9 +442,9 @@ const AnalyzePage = ({
         latitude: finalLat,
         longitude: finalLon,
         subbasin: finalSubbasin,
-        hasRadiusLines: isSatValid ? (extractedCoords?.hasRadius || false) : false,
-        coordMethod: isSatValid ? (extractedCoords?.method || (detectData.is_cyclone ? 'Auto-Extracted from Image' : null)) : null,
-        coordConfidence: isSatValid ? (extractedCoords?.confidence || (detectData.is_cyclone ? 92 : null)) : null,
+        hasRadiusLines: isSatValid ? activeHasRadius : false,
+        coordMethod: isSatValid ? activeMethod : null,
+        coordConfidence: isSatValid ? activeConfidence : null,
         timestamp: new Date().toLocaleString([], {
           year: 'numeric',
           month: 'short',
@@ -620,6 +663,8 @@ const AnalyzePage = ({
                         ? 'Processing...' 
                         : isCompleted && !isValidSatellite
                         ? 'Invalid Satellite Image'
+                        : isCompleted && currentAnalysis?.detection
+                        ? (currentAnalysis.detection.is_cyclone ? `Cyclone Detected (${currentAnalysis.detection.confidence_percent != null ? currentAnalysis.detection.confidence_percent : 99}%)` : 'No Cyclone')
                         : (isCompleted || currentStage === 'Intensity' || currentStage === 'Classification') 
                         ? 'Completed' 
                         : 'Pending'}
@@ -655,8 +700,12 @@ const AnalyzePage = ({
                         ? 'Estimating...'
                         : isCompleted && !isValidSatellite
                         ? 'Skipped (Invalid Image)'
+                        : isCompleted && currentAnalysis?.detection?.is_cyclone === false
+                        ? 'Skipped (No Cyclone)'
+                        : isCompleted && currentAnalysis?.intensity?.wind_speed_kt != null
+                        ? `${currentAnalysis.intensity.wind_speed_kt} kt (~${currentAnalysis.intensity.wind_speed_kmh} km/h)`
                         : (isCompleted || currentStage === 'Classification')
-                        ? (currentAnalysis?.detection?.is_cyclone === false ? 'Skipped (No Cyclone)' : 'Completed')
+                        ? 'Completed'
                         : 'Pending'}
                     </p>
                   </div>
@@ -690,8 +739,12 @@ const AnalyzePage = ({
                         ? 'Categorizing...'
                         : isCompleted && !isValidSatellite
                         ? 'Skipped (Invalid Image)'
+                        : isCompleted && currentAnalysis?.detection?.is_cyclone === false
+                        ? 'Skipped (No Cyclone)'
+                        : isCompleted && (currentAnalysis?.classification?.classification || currentAnalysis?.intensity?.classification)
+                        ? `${currentAnalysis.classification?.classification || currentAnalysis.intensity?.classification} (${currentAnalysis?.intensity?.category_code || 'TD'})`
                         : isCompleted
-                        ? (currentAnalysis?.detection?.is_cyclone === false ? 'Skipped (No Cyclone)' : 'Completed')
+                        ? 'Completed'
                         : 'Pending'}
                     </p>
                   </div>
@@ -873,7 +926,28 @@ const AnalyzePage = ({
 
                         <button
                           type="button"
-                          onClick={() => setActiveTab('results')}
+                          onClick={() => {
+                            if (currentAnalysis) {
+                              const syncLat = parseFloat(latitude) || currentAnalysis.latitude;
+                              const syncLon = parseFloat(longitude) || currentAnalysis.longitude;
+                              const syncBasin = coordSubbasin || currentAnalysis.subbasin;
+                              const syncMethod = coordMethod || currentAnalysis.coordMethod;
+                              setCurrentAnalysis(prev => ({
+                                ...prev,
+                                latitude: syncLat,
+                                longitude: syncLon,
+                                subbasin: syncBasin,
+                                coordMethod: syncMethod,
+                                detection: prev.detection ? {
+                                  ...prev.detection,
+                                  latitude: syncLat,
+                                  longitude: syncLon,
+                                  subbasin: syncBasin
+                                } : prev.detection
+                              }));
+                            }
+                            setActiveTab('results');
+                          }}
                           className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0"
                         >
                           <span>Full Report</span>

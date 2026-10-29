@@ -39,14 +39,16 @@ load_simple_env(ENV_PATH)
 
 # Supported active Gemini models (strictly valid models, prioritized by speed & active quota)
 GEMINI_MODELS = [
-    "gemini-3-flash-preview",
-    "gemini-2.5-flash",
-    "gemini-flash-latest",
     "gemini-flash-lite-latest",
-    "gemini-3.1-flash-lite-preview",
+    "gemini-3-flash-preview",
     "gemini-3.5-flash",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-flash-latest",
+    "gemini-2.5-flash",
     "gemini-pro-latest"
 ]
+
+
 
 def optimize_image_for_api(image_bytes: bytes, max_dim: int = 800) -> Tuple[bytes, str]:
     """
@@ -194,15 +196,15 @@ class CloudVisionIntensityService:
                 continue
 
             if models_tried >= 3:
-                # Cap cloud retry budget to strictly guarantee total API latency <= 5 seconds
+                # Cap cloud retry budget to strictly guarantee total API latency <= 15 seconds
                 break
             models_tried += 1
 
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
 
-            # Set thinking budget to 0 for flash models to eliminate 5-8s thinking overhead
+            # Set thinking budget only for models that explicitly support thinking configs
             model_gen_config = dict(gen_config)
-            if "flash" in model_name.lower():
+            if model_name in ("gemini-2.5-flash", "gemini-2.0-flash-thinking-exp"):
                 model_gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
             payload = {
@@ -210,11 +212,16 @@ class CloudVisionIntensityService:
                 "generationConfig": model_gen_config
             }
 
-            # Try candidate keys for this model across the entire configured pool
+            # Try candidate keys for this model across the pool (try up to 10 healthy keys)
+            keys_tried = 0
             for active_key in candidate_keys:
+                if keys_tried >= 10:
+                    break
+
                 cooldown_exp = self.cooldowns.get((active_key, model_name), 0)
                 if cooldown_exp > now:
                     continue
+                keys_tried += 1
 
                 try:
                     key_idx = all_keys.index(active_key) + 1
@@ -228,8 +235,8 @@ class CloudVisionIntensityService:
                 }
 
                 try:
-                    # High-speed timeout: 4.5s maximum per request
-                    r = self.session.post(url, headers=headers, json=payload, timeout=4.5)
+                    # Robust timeout: 7.5s maximum per multimodal request
+                    r = self.session.post(url, headers=headers, json=payload, timeout=7.5)
                     if r.status_code == 200:
                         resp = r
                         used_model = model_name
@@ -246,7 +253,7 @@ class CloudVisionIntensityService:
                             self.active_key_index = (all_keys.index(active_key) + 1) % len(all_keys)
                         continue
 
-                    elif r.status_code in (400, 403) and ("api key" in r.text.lower() or "invalid" in r.text.lower()):
+                    elif r.status_code in (400, 403) and ("api_key_invalid" in r.text.lower() or "api key not valid" in r.text.lower() or ("api key" in r.text.lower() and "invalid" in r.text.lower())):
                         logger.warning(f"[Gemini Vision] {key_label} rejected (invalid key). Switching to next key...")
                         self.invalid_keys.add(active_key)
                         if active_key in all_keys:
@@ -303,14 +310,18 @@ class CloudVisionIntensityService:
             "georeferencing, and intensity estimation from authentic Earth satellite imagery.\n\n"
             "CRITICAL DOMAIN CHECK (RULE 1):\n"
             "First, strictly inspect whether this image is a genuine Earth meteorological weather satellite capture (e.g. INSAT-3D, GOES, NOAA, Himawari, Meteosat, weather radar scan, or meteorological map with coordinate grids).\n"
-            "- If the image is a person, human face, selfie, portrait (e.g. photo of a human):\n"
-            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Human portrait or non-satellite photo detected.'\n"
+            "- If the image is a chart, plot, graph, bar chart, line graph, diagram, table, spreadsheet, document, or presentation slide:\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Chart, graph, or diagram detected (not a satellite image).'\n"
+            "- If the image is a lake, pond, river, park, foliage, trees, or ground-level landscape photo:\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Ground-level landscape photo detected (lake, pond, or park).'\n"
             "- If the image is a coffee cup, tea cup, tableware, food, indoor furniture, or household scene:\n"
-            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Household object or tableware detected.'\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Household object, coffee cup, or tableware detected.'\n"
+            "- If the image is a person, human face, selfie, portrait, body, or photo of people:\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Human portrait or non-satellite photo detected.'\n"
             "- If the image is a drawing, digital artwork, CGI graphic, illustration, cartoon, whirlpool graphic, or meme:\n"
             "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Non-meteorological illustration or graphic detected.'\n"
-            "- If the image is an animal, vehicle, landscape photo, or regular non-orbital camera capture:\n"
-            "  -> You MUST set is_valid_satellite = false, is_cyclone = false.\n"
+            "- If the image is an animal, pet, vehicle, car, room interior, or regular non-orbital everyday photo:\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Non-satellite everyday photo detected.'\n"
             "ONLY set is_valid_satellite = true if the image is an authentic spaceborne Earth meteorological satellite observation or meteorological weather map.\n\n"
             "TASK 2: If is_valid_satellite is true, determine if a tropical cyclone, cyclonic vortex, or tropical storm is present (is_cyclone = true/false).\n"
             "TASK 3: If is_cyclone is true:\n"
@@ -351,13 +362,15 @@ class CloudVisionIntensityService:
             val_msg = parsed.get("validation_message", "Valid Earth meteorological satellite observation.")
             t_infer = time.perf_counter() - t0
 
-            # Scan Gemini text fields for non-satellite keywords (catches when Gemini identified it as a portrait, cup, or graphic in reasoning)
+            # Scan Gemini text fields for non-satellite keywords (catches when Gemini identified it as a chart, portrait, cup, or graphic in reasoning)
             combined_text = f"{parsed.get('reasoning', '')} {parsed.get('validation_message', '')} {parsed.get('features_observed', '')} {parsed.get('pattern_detected', '')}".lower()
             non_sat_indicators = [
                 "not a meteorological", "not a satellite", "not satellite", "portrait", "person", "selfie", "human",
                 "facial", "coffee cup", "tea cup", "cup rim", "cup handle", "tableware", "creative manipulation",
                 "non-meteorological", "everyday object", "illustration", "whirlpool", "graphic", "drawing", "artwork",
-                "not real-world meteorological", "does not contain real-world meteorological", "superimposed"
+                "not real-world meteorological", "does not contain real-world meteorological", "superimposed",
+                "chart", "graph", "diagram", "table", "plot", "spreadsheet", "document", "lake", "pond", "park",
+                "foliage", "landscape photo", "ground-level", "animal", "pet", "vehicle", "car", "room interior"
             ]
             if any(ind in combined_text for ind in non_sat_indicators):
                 is_valid_sat = False
@@ -573,14 +586,23 @@ class CloudVisionIntensityService:
         """
         Georeferences the uploaded satellite image.
         Instant cache hit (< 1ms) if image was analyzed by /api/detect.
-        Fast local OpenCV contour georeferencing (< 20ms) if called standalone.
+        Fast local computer-vision georeferencing fallback if Gemini is offline.
         """
         img_hash = hashlib.md5(image_bytes).hexdigest()
         cached = self._analysis_cache.get(img_hash)
         if cached and cached.get("coordinates") is not None:
             return cached["coordinates"]
 
-        # Fast local OpenCV extraction
+        # 1. Try Gemini Vision georeferencing if not cached
+        try:
+            det = self.detect_with_gemini(image_bytes, mime_type, api_key)
+            cached = self._analysis_cache.get(img_hash)
+            if cached and cached.get("coordinates") is not None:
+                return cached["coordinates"]
+        except Exception:
+            pass
+
+        # 2. High-precision local CV fallback
         try:
             arr = np.frombuffer(image_bytes, np.uint8)
             img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)

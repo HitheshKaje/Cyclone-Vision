@@ -87,10 +87,37 @@ async def analyze_cyclone_image(image: UploadFile = File(...)):
         image_bytes = await image.read()
         mime_type = image.content_type or ("image/png" if image.filename.lower().endswith(".png") else "image/jpeg")
 
+        # 0. Domain Ingestion Gate: Reject non-satellite images (human, chart, coffee, lake, random)
+        img_bgr = ml_service.decode_image_bytes(image_bytes)
+        is_valid_domain, domain_reason = ml_service.validate_satellite_domain(img_bgr)
+        if not is_valid_domain:
+            return {
+                "detection": {
+                    "success": True,
+                    "prediction": "Invalid Satellite Image",
+                    "status": "INVALID IMAGE (NOT A SATELLITE IMAGE)",
+                    "status_label": "Invalid Satellite Image",
+                    "is_cyclone": False,
+                    "is_valid_satellite": False,
+                    "confidence": 0.0,
+                    "confidence_percent": 0.0,
+                    "validation_message": domain_reason,
+                    "description": domain_reason,
+                    "source": "Satellite Domain Ingestion Gate"
+                },
+                "intensity": None,
+                "classification": None,
+                "total_time_ms": 0.0,
+                "source": "Satellite Domain Ingestion Gate"
+            }
+
         try:
             return cloud_vision_service.full_pipeline_with_gemini(image_bytes, mime_type=mime_type)
         except Exception as g_err:
-            raise HTTPException(status_code=502, detail=f"Google Gemini Vision API analysis error: {str(g_err)}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Google Gemini Vision API analysis error: {str(g_err)}. Please add fresh API keys."
+            )
 
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
