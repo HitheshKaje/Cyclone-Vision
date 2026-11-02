@@ -711,12 +711,26 @@ const FishermanHome = ({ onNavigate }) => {
                   Interactive Marine Cyclone Tracker Map
                 </h3>
               </div>
-              <span className="text-xs text-slate-400">
-                Centered at: {currentPort.name} ({currentPort.lat}°N, {currentPort.lng}°E)
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={toggleImdDemo}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                    isImdDemoActive 
+                      ? 'bg-sky-600 text-white border-sky-600 shadow-xs' 
+                      : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                  }`}
+                  title="Toggle Official IMD Track, Cone of Uncertainty, and Wind Warning contours"
+                >
+                  <span>📡 {isImdDemoActive ? 'IMD Official Track: Active' : 'Show IMD Track & Cone'}</span>
+                </button>
+                <span className="text-xs text-slate-400 hidden sm:inline">
+                  Base: {currentPort.name}
+                </span>
+              </div>
             </div>
 
-            <div className="w-full h-[360px] sm:h-[420px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 relative z-0">
+            <div className="w-full h-[380px] sm:h-[440px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 relative z-0">
               <MapContainer
                 center={[currentPort.lat, currentPort.lng]}
                 zoom={6}
@@ -749,6 +763,100 @@ const FishermanHome = ({ onNavigate }) => {
                   </Marker>
                 ))}
 
+                {/* IMD Cone of Uncertainty (COU) Polygon */}
+                {activeStorm?.cone_of_uncertainty?.coordinates && (
+                  <Polygon
+                    positions={activeStorm.cone_of_uncertainty.coordinates.map(pt => [pt[1], pt[0]])}
+                    pathOptions={{ color: '#f59e0b', fillColor: '#fbbf24', fillOpacity: 0.22, dashArray: '5, 5', weight: 2 }}
+                  />
+                )}
+
+                {/* IMD Wind Warning Radii (concentric circles) */}
+                {activeStorm?.wind_warning_radii && (
+                  <>
+                    {activeStorm.wind_warning_radii['27kt'] && (
+                      <Circle
+                        center={[activeStorm.latitude, activeStorm.longitude]}
+                        radius={activeStorm.wind_warning_radii['27kt'] * 1000}
+                        pathOptions={{ color: '#f59e0b', fillColor: '#fbbf24', fillOpacity: 0.07, weight: 1.5 }}
+                      />
+                    )}
+                    {activeStorm.wind_warning_radii['34kt'] && (
+                      <Circle
+                        center={[activeStorm.latitude, activeStorm.longitude]}
+                        radius={activeStorm.wind_warning_radii['34kt'] * 1000}
+                        pathOptions={{ color: '#f97316', fillColor: '#ea580c', fillOpacity: 0.09, weight: 1.5 }}
+                      />
+                    )}
+                    {activeStorm.wind_warning_radii['50kt'] && (
+                      <Circle
+                        center={[activeStorm.latitude, activeStorm.longitude]}
+                        radius={activeStorm.wind_warning_radii['50kt'] * 1000}
+                        pathOptions={{ color: '#e11d48', fillColor: '#e11d48', fillOpacity: 0.12, weight: 1.5 }}
+                      />
+                    )}
+                    {activeStorm.wind_warning_radii['64kt'] && (
+                      <Circle
+                        center={[activeStorm.latitude, activeStorm.longitude]}
+                        radius={activeStorm.wind_warning_radii['64kt'] * 1000}
+                        pathOptions={{ color: '#dc2626', fillColor: '#dc2626', fillOpacity: 0.18, weight: 2 }}
+                      />
+                    )}
+                  </>
+                )}
+
+                {/* IMD Observed Track Polyline & Observation Points */}
+                {Array.isArray(activeStorm?.observed_track) && activeStorm.observed_track.length > 0 && (
+                  <>
+                    <Polyline
+                      positions={activeStorm.observed_track.map(pt => [parseFloat(pt.lat), parseFloat(pt.lon)])}
+                      pathOptions={{ color: '#2563eb', weight: 3 }}
+                    />
+                    {activeStorm.observed_track.map((pt, idx) => (
+                      <Marker
+                        key={`obs-${idx}`}
+                        position={[parseFloat(pt.lat), parseFloat(pt.lon)]}
+                        icon={obsTrackIcon}
+                      >
+                        <Popup>
+                          <div className="p-1 text-xs">
+                            <strong className="text-blue-600">Observed: {pt.CYCLONE_NAME || activeStorm.name}</strong>
+                            <p>Time: {pt['Date/Time'] || pt.Hour}</p>
+                            <p>Category: {pt.Category}</p>
+                            <p>Sustained Wind: {pt['MSW (kt)'] || pt.msw_kt} kt ({pt['Mean MSW (kmph)'] || pt.msw_kmh} km/h)</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                  </>
+                )}
+
+                {/* IMD Forecast Track Polyline & Forecast Points */}
+                {Array.isArray(activeStorm?.forecast_track) && activeStorm.forecast_track.length > 0 && (
+                  <>
+                    <Polyline
+                      positions={activeStorm.forecast_track.map(pt => [parseFloat(pt.lat), parseFloat(pt.lon)])}
+                      pathOptions={{ color: '#ea580c', weight: 3, dashArray: '6, 6' }}
+                    />
+                    {activeStorm.forecast_track.map((pt, idx) => (
+                      <Marker
+                        key={`fc-${idx}`}
+                        position={[parseFloat(pt.lat), parseFloat(pt.lon)]}
+                        icon={fcTrackIcon}
+                      >
+                        <Popup>
+                          <div className="p-1 text-xs">
+                            <strong className="text-orange-600">Forecast: {pt.CYCLONE_NAME || activeStorm.name}</strong>
+                            <p>Projected: {pt['Date/Time'] || pt.Hour}</p>
+                            <p>Category: {pt.Category}</p>
+                            <p>Projected Wind: {pt['MSW (kt)'] || pt.msw_kt} kt ({pt['Mean MSW (kmph)'] || pt.msw_kmh} km/h)</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                  </>
+                )}
+
                 {/* Active Storm Marker if present */}
                 {activeStorm && activeStorm.latitude && activeStorm.longitude && (
                   <>
@@ -773,15 +881,41 @@ const FishermanHome = ({ onNavigate }) => {
                       dashArray="4, 8"
                     />
 
-                    {/* Warning Radius Circle */}
-                    <Circle
-                      center={[activeStorm.latitude, activeStorm.longitude]}
-                      radius={250000} // 250km danger radius
-                      pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.15 }}
-                    />
+                    {/* Default Danger Radius Circle if no explicit wind radii */}
+                    {!activeStorm?.wind_warning_radii && (
+                      <Circle
+                        center={[activeStorm.latitude, activeStorm.longitude]}
+                        radius={250000}
+                        pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.15 }}
+                      />
+                    )}
                   </>
                 )}
               </MapContainer>
+            </div>
+
+            {/* Map Layer Legend */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-slate-500 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block" /> Base Port
+                </span>
+                <span className="flex items-center gap-1 font-semibold text-blue-600">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" /> IMD Observed Track
+                </span>
+                <span className="flex items-center gap-1 font-semibold text-orange-600">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-600 inline-block" /> IMD Forecast Track
+                </span>
+                <span className="flex items-center gap-1 font-semibold text-amber-600">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-amber-400 inline-block" /> Cone of Uncertainty
+                </span>
+                <span className="flex items-center gap-1 font-semibold text-red-600">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block" /> Gale Wind Field (64 kt)
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400">
+                Source: {activeStorm?.source || 'IMD Official / Regional Meteorological Center'}
+              </span>
             </div>
           </div>
 
