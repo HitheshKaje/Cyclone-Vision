@@ -20,7 +20,7 @@ if APP_DIR not in sys.path:
 from services.ml_service import ml_service
 from services.cloud_vision_service import cloud_vision_service
 from services.db import init_db, get_db
-from routes import detection, intensity, classification, live_map, citizen, track, auth, analysis
+from routes import detection, intensity, classification, live_map, citizen, track, auth, analysis, fisherman
 
 
 @asynccontextmanager
@@ -68,6 +68,7 @@ app.include_router(live_map.router, prefix="/api")
 app.include_router(citizen.router, prefix="/api")
 app.include_router(track.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
+app.include_router(fisherman.router, prefix="/api")
 
 
 @app.post("/api/analyze")
