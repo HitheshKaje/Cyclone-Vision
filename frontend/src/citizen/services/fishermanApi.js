@@ -22,11 +22,14 @@ const fetchWithTimeout = async (url, options = {}) => {
 /**
  * Fetch Cyclone Information for selected coastal port
  */
-export const fetchCycloneIntel = async (portId = 'malpe', lat = null, lng = null) => {
+export const fetchCycloneIntel = async (portId = 'malpe', lat = null, lng = null, demoImd = false) => {
   const baseUrl = getApiBaseUrl();
   let query = `port_id=${encodeURIComponent(portId)}`;
   if (lat != null && lng != null) {
     query += `&lat=${lat}&lng=${lng}`;
+  }
+  if (demoImd) {
+    query += `&demo_imd=true`;
   }
 
   try {
