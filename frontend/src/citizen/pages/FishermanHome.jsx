@@ -9,7 +9,7 @@ import {
   AlertTriangle, 
   ShieldCheck, 
   Volume2, 
-  VolumeX,
+  VolumeX, 
   Compass, 
   Clock, 
   RefreshCw, 
@@ -24,15 +24,20 @@ import {
   Cloud, 
   CloudSun, 
   CloudFog, 
-  CloudLightning,
-  ChevronRight,
-  Target,
-  ArrowUpRight,
-  Shield,
-  Activity,
-  Calendar,
-  Layers,
-  Info
+  CloudLightning, 
+  ChevronRight, 
+  Target, 
+  ArrowUpRight, 
+  Shield, 
+  Activity, 
+  Calendar, 
+  Layers, 
+  Info,
+  Navigation,
+  Fish,
+  Ban,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, Polygon } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -57,7 +62,9 @@ import sirenService from '../services/sirenService';
 import { 
   fetchCycloneIntel, 
   fetchSeaConditions, 
-  fetchWeatherTelemetry 
+  fetchWeatherTelemetry,
+  fetchPotentialFishingZones,
+  fetchFishingBansAdvisory
 } from '../services/fishermanApi';
 
 // Fix Leaflet marker icons
@@ -103,6 +110,28 @@ const fcTrackIcon = new L.divIcon({
   iconAnchor: [5, 5]
 });
 
+// PFZ Hotspot Icons
+const pfzHighIcon = new L.divIcon({
+  html: `<div style="background-color: #059669; width: 26px; height: 26px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(5,150,105,0.9); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px;">🐟</div>`,
+  className: 'custom-pfz-high',
+  iconSize: [26, 26],
+  iconAnchor: [13, 13]
+});
+
+const pfzModIcon = new L.divIcon({
+  html: `<div style="background-color: #0284c7; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 8px rgba(2,132,199,0.8); display: flex; align-items: center; justify-content: center; color: white; font-size: 12px;">🐟</div>`,
+  className: 'custom-pfz-mod',
+  iconSize: [24, 24],
+  iconAnchor: [12, 12]
+});
+
+const pfzLowIcon = new L.divIcon({
+  html: `<div style="background-color: #64748b; width: 22px; height: 22px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 6px rgba(100,116,139,0.7); display: flex; align-items: center; justify-content: center; color: white; font-size: 11px;">🐟</div>`,
+  className: 'custom-pfz-low',
+  iconSize: [22, 22],
+  iconAnchor: [11, 11]
+});
+
 // WMO Code interpretation helper
 const getWmoIcon = (code) => {
   if (code === 0) return <Sun className="text-amber-500" size={20} />;
@@ -117,21 +146,61 @@ const getWmoIcon = (code) => {
 
 const getWmoLabel = (code) => {
   if (code === 0) return 'Clear Sky';
-  if (code <= 2) return 'Partly Cloudy';
+  if (code === 1) return 'Mainly Clear';
+  if (code === 2) return 'Partly Cloudy';
   if (code === 3) return 'Overcast';
-  if (code >= 51 && code <= 55) return 'Drizzle';
+  if (code >= 51 && code <= 55) return 'Light Drizzle';
   if (code >= 61 && code <= 65) return 'Rain Showers';
-  if (code >= 80 && code <= 82) return 'Heavy Rain';
-  if (code >= 95) return 'Thunderstorm Warning';
-  if (code >= 45 && code <= 48) return 'Foggy / Mist';
-  return 'Variable Marine Weather';
+  if (code >= 80 && code <= 82) return 'Squally Marine Rain';
+  if (code >= 95) return 'Severe Thunderstorm';
+  return 'Fair Coastal Weather';
 };
 
-const FishermanHome = ({ onNavigate }) => {
-  const { t, i18n } = useTranslation();
-  const { isOnline } = useNetworkStatus();
+// Safe Error Boundary
+class FishermanErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[FishermanErrorBoundary Caught Error]:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 rounded-3xl bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-sm">
+          <div className="flex items-center gap-2 font-black text-base text-rose-700 mb-1">
+            <AlertCircle size={20} />
+            <span>Fisherman Portal Display Recovery</span>
+          </div>
+          <p className="text-xs text-rose-600 dark:text-rose-300 mb-3">
+            An issue occurred while rendering marine components: {this.state.error?.message || 'Unexpected display error'}.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.reload();
+            }}
+            className="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-rose-700 transition-all cursor-pointer shadow-sm"
+          >
+            Reload Dashboard
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
-  // Logged in Fisherman Profile
+const FishermanDashboardContent = ({ onNavigate }) => {
+  const { i18n } = useTranslation();
+  const { isOnline, isBackendReachable } = useNetworkStatus();
+
+  // Current logged in fisherman user
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const raw = localStorage.getItem('cyclosafe_current_citizen_user');
@@ -141,17 +210,18 @@ const FishermanHome = ({ onNavigate }) => {
     }
   });
 
-  // Selected Coastal Port (Default to user's registered port or Malpe)
+  // Coastal port selection
   const [selectedPortId, setSelectedPortId] = useState(() => {
     try {
-      const user = JSON.parse(localStorage.getItem('cyclosafe_current_citizen_user'));
-      if (user?.port) {
-        const p = user.port.toLowerCase();
+      const savedUser = JSON.parse(localStorage.getItem('cyclosafe_current_citizen_user'));
+      if (savedUser?.port) {
+        const p = savedUser.port.toLowerCase();
+        if (p.includes('malpe')) return 'malpe';
         if (p.includes('mangalore')) return 'mangalore';
         if (p.includes('karwar')) return 'karwar';
-        if (p.includes('gangolli') || p.includes('kundapura')) return 'gangolli';
+        if (p.includes('gangolli')) return 'gangolli';
         if (p.includes('honnavar')) return 'honnavar';
-        if (p.includes('tadadi') || p.includes('kumta')) return 'tadadi';
+        if (p.includes('tadadi')) return 'tadadi';
         if (p.includes('bhatkal')) return 'bhatkal';
         if (p.includes('chennai')) return 'chennai';
         if (p.includes('visakhapatnam')) return 'visakhapatnam';
@@ -161,7 +231,7 @@ const FishermanHome = ({ onNavigate }) => {
     return 'malpe';
   });
 
-  // Main 3 Navigation Tabs (STRICTLY THREE: 'cyclone' | 'sea' | 'weather')
+  // Navigation Tabs: 'cyclone' | 'sea' | 'pfz' | 'bans' | 'weather'
   const [activeTab, setActiveTab] = useState('cyclone');
 
   // Real-time Clock
@@ -174,6 +244,8 @@ const FishermanHome = ({ onNavigate }) => {
   // Telemetry States
   const [cycloneIntel, setCycloneIntel] = useState(null);
   const [seaData, setSeaData] = useState(null);
+  const [pfzData, setPfzData] = useState(null);
+  const [bansData, setBansData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -184,13 +256,15 @@ const FishermanHome = ({ onNavigate }) => {
   const [adminBroadcast, setAdminBroadcast] = useState(null);
   const [isSirenSounding, setIsSirenSounding] = useState(false);
 
-  // Load All 3 Telemetry Services
+  // Load All Telemetry Services
   const loadDashboardData = useCallback(async (portId, demoImd = isImdDemoActive) => {
     setIsRefreshing(true);
     try {
-      const [cycRes, seaRes, wRes] = await Promise.allSettled([
+      const [cycRes, seaRes, pfzRes, bansRes, wRes] = await Promise.allSettled([
         fetchCycloneIntel(portId, null, null, demoImd),
         fetchSeaConditions(portId),
+        fetchPotentialFishingZones(portId),
+        fetchFishingBansAdvisory(portId),
         fetchWeatherTelemetry(portId)
       ]);
 
@@ -199,6 +273,12 @@ const FishermanHome = ({ onNavigate }) => {
       }
       if (seaRes.status === 'fulfilled' && seaRes.value.success) {
         setSeaData(seaRes.value.data);
+      }
+      if (pfzRes.status === 'fulfilled' && pfzRes.value.success) {
+        setPfzData(pfzRes.value.data);
+      }
+      if (bansRes.status === 'fulfilled' && bansRes.value.success) {
+        setBansData(bansRes.value.data);
       }
       if (wRes.status === 'fulfilled' && wRes.value.success) {
         setWeatherData(wRes.value.data);
@@ -221,7 +301,7 @@ const FishermanHome = ({ onNavigate }) => {
     loadDashboardData(selectedPortId, isImdDemoActive);
   }, [selectedPortId, loadDashboardData, isImdDemoActive]);
 
-  // Real-Time Admin Broadcast Poller (runs every 2 seconds for instant siren reaction)
+  // Real-Time Admin Broadcast Poller (every 2s for instant siren sync)
   useEffect(() => {
     let isMounted = true;
     const pollBroadcast = async () => {
@@ -239,7 +319,7 @@ const FishermanHome = ({ onNavigate }) => {
           sirenService.stopSiren();
         }
 
-        // If broadcast active state changes, refresh cyclone intel dynamically
+        // Dynamic status synchronization
         if (res.data.active) {
           setCycloneIntel(prev => {
             if (!prev) return prev;
@@ -296,13 +376,10 @@ const FishermanHome = ({ onNavigate }) => {
   ];
 
   const currentPort = availablePorts.find(p => p.id === selectedPortId) || availablePorts[0];
-
-  // Active storm coordinates or center
   const activeStorm = cycloneIntel?.active_cyclone;
-  const cycloneStatus = cycloneIntel?.status_indicator || 'GREEN'; // RED, ORANGE, GREEN
+  const cycloneStatus = cycloneIntel?.status_indicator || 'GREEN';
   const seaStatus = seaData?.sea_status || 'GREEN';
 
-  // Notification count
   const notificationCount = (cycloneStatus === 'RED' ? 1 : cycloneStatus === 'ORANGE' ? 1 : 0) +
     (seaStatus === 'RED' ? 1 : 0) +
     (isSirenSounding ? 1 : 0);
@@ -353,17 +430,11 @@ const FishermanHome = ({ onNavigate }) => {
 
       {/* =========================================================================
           DASHBOARD HEADER
-          - CycloSafe Logo & App Name
-          - Welcome message & Fisherman's Name
-          - Vessel Registration Number
-          - Real-Time Clock & Date
-          - Coastal Port Selector
-          - Notification indicator & Logout
           ========================================================================= */}
       <div className="p-4 sm:p-6 rounded-3xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 shadow-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           
-          {/* Left: Identity & Vessel Information */}
+          {/* Identity & Vessel Info */}
           <div className="flex items-start sm:items-center gap-3.5">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500/15 to-blue-600/15 border border-sky-400/30 flex items-center justify-center shrink-0 shadow-sm">
               <img 
@@ -374,58 +445,59 @@ const FishermanHome = ({ onNavigate }) => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-50 tracking-tight">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-50 tracking-tight">
                   Cyclo<span className="text-sky-500">Safe</span>
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
-                  ⚓ Fisherman Dashboard
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
+                  ⚓ FISHERMAN DASHBOARD
                 </span>
               </div>
-              <h1 className="text-sm sm:text-base font-bold text-slate-700 dark:text-slate-200 mt-0.5">
-                Welcome aboard, <strong className="text-slate-950 dark:text-white">{currentUser?.name || 'Captain Naik'}</strong>
+              <h1 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                Welcome aboard, <strong className="text-slate-900 dark:text-slate-100">{currentUser?.name || 'Fisherman'}</strong>
               </h1>
-              <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
-                <span className="flex items-center gap-1">
-                  <Ship size={13} className="text-sky-500" />
-                  <span>Vessel: <strong>{currentUser?.vessel_name || 'Sea Falcon'}</strong></span>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                <span className="flex items-center gap-1 font-semibold text-sky-600 dark:text-sky-400">
+                  <Ship size={13} />
+                  <span>Vessel: {currentUser?.vessel_name || 'Sea Falcon'}</span>
                 </span>
                 <span>•</span>
-                <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                  Reg: {currentUser?.vessel_reg || 'IND-KA-02-MM-1029'}
-                </span>
+                <span>Reg: <strong className="text-slate-700 dark:text-slate-300">{currentUser?.vessel_reg || 'IND-KA-02-MM-1029'}</strong></span>
               </div>
             </div>
           </div>
 
-          {/* Right: Port Selector, Live Clock, Notifications & Logout */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Right Header Controls */}
+          <div className="flex flex-wrap items-center gap-2.5">
             
-            {/* Coastal Location Selector */}
-            <div className="flex flex-col">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <MapPin size={11} className="text-sky-500" />
-                <span>Selected Coastal Port</span>
+            {/* Coastal Harbor Selector */}
+            <div className="relative">
+              <label htmlFor="port-select" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                Selected Coastal Port
               </label>
-              <select
-                value={selectedPortId}
-                onChange={(e) => setSelectedPortId(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-xs"
-              >
-                {availablePorts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative flex items-center">
+                <MapPin size={14} className="absolute left-2.5 text-sky-500 pointer-events-none" />
+                <select
+                  id="port-select"
+                  value={selectedPortId}
+                  onChange={(e) => setSelectedPortId(e.target.value)}
+                  className="pl-8 pr-7 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-sky-500 shadow-xs"
+                >
+                  {availablePorts.map((port) => (
+                    <option key={port.id} value={port.id}>
+                      {port.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Current Date & Live Clock */}
-            <div className="px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            {/* Live Clock (IST) */}
+            <div className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col items-end shrink-0">
+              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase">
                 <Clock size={11} className="text-sky-500" />
                 <span>IST Time</span>
               </div>
-              <div className="font-black text-slate-800 dark:text-slate-200 mt-0.5">
+              <div className="text-xs font-black text-slate-800 dark:text-slate-200">
                 {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </div>
               <div className="text-[10px] text-slate-500">
@@ -433,7 +505,7 @@ const FishermanHome = ({ onNavigate }) => {
               </div>
             </div>
 
-            {/* Notification Badge */}
+            {/* Notification Bell */}
             <div className="relative">
               <button
                 type="button"
@@ -485,44 +557,41 @@ const FishermanHome = ({ onNavigate }) => {
       </div>
 
       {/* =========================================================================
-          MAIN NAVIGATION: STRICTLY 3 PROMINENT TABS / CARDS
+          MAIN NAVIGATION TABS:
           1. 🌪️ Cyclone Information
           2. 🌊 Sea Information
-          3. 🌤️ Weather Information
+          3. 🐟 Potential Fishing Zones (PFZ)
+          4. 🐠 Breeding & Fishing Bans
+          5. 🌤️ Weather Information
           ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         
         {/* Tab 1: Cyclone Information */}
         <button
           type="button"
           onClick={() => setActiveTab('cyclone')}
-          className={`p-4 sm:p-5 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
             activeTab === 'cyclone'
               ? 'border-sky-500 bg-gradient-to-br from-sky-500/10 via-sky-500/5 to-white dark:to-slate-900 shadow-md ring-2 ring-sky-500/30'
               : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-slate-300'
           }`}
         >
-          <div className="flex items-center gap-3.5">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform ${
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform ${
               activeTab === 'cyclone' ? 'bg-sky-600 text-white scale-105' : 'bg-sky-500/15 text-sky-600 dark:text-sky-400'
             }`}>
-              <span className="text-xl">🌪️</span>
+              <span className="text-lg">🌪️</span>
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
-                  Cyclone Information
-                </h3>
-                {cycloneStatus === 'RED' && (
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                )}
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Storm tracking, winds & distance
+              <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100">
+                Cyclone Intel
+              </h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Storm track & winds
               </p>
             </div>
           </div>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
             cycloneStatus === 'RED'
               ? 'bg-red-500 text-white animate-pulse'
               : cycloneStatus === 'ORANGE'
@@ -537,30 +606,28 @@ const FishermanHome = ({ onNavigate }) => {
         <button
           type="button"
           onClick={() => setActiveTab('sea')}
-          className={`p-4 sm:p-5 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
             activeTab === 'sea'
               ? 'border-teal-500 bg-gradient-to-br from-teal-500/10 via-teal-500/5 to-white dark:to-slate-900 shadow-md ring-2 ring-teal-500/30'
               : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-slate-300'
           }`}
         >
-          <div className="flex items-center gap-3.5">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform ${
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform ${
               activeTab === 'sea' ? 'bg-teal-600 text-white scale-105' : 'bg-teal-500/15 text-teal-600 dark:text-teal-400'
             }`}>
-              <span className="text-xl">🌊</span>
+              <span className="text-lg">🌊</span>
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
-                  Sea Information
-                </h3>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Waves, period, currents & SST
+              <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100">
+                Sea Condition
+              </h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Waves, SST & currents
               </p>
             </div>
           </div>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
             seaStatus === 'RED'
               ? 'bg-red-500 text-white'
               : seaStatus === 'ORANGE'
@@ -571,34 +638,94 @@ const FishermanHome = ({ onNavigate }) => {
           </span>
         </button>
 
-        {/* Tab 3: Weather Information */}
+        {/* Tab 3: Potential Fishing Zones (PFZ) */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('pfz')}
+          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+            activeTab === 'pfz'
+              ? 'border-emerald-500 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white dark:to-slate-900 shadow-md ring-2 ring-emerald-500/30'
+              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform ${
+              activeTab === 'pfz' ? 'bg-emerald-600 text-white scale-105' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+            }`}>
+              <span className="text-lg">🐟</span>
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100">
+                Fishing Zones
+              </h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Chlorophyll & PFZ maps
+              </p>
+            </div>
+          </div>
+          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+            {pfzData?.zones ? `${pfzData.zones.length} Zones` : 'PFZ Live'}
+          </span>
+        </button>
+
+        {/* Tab 4: Breeding & Fishing Bans */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('bans')}
+          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+            activeTab === 'bans'
+              ? 'border-purple-500 bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-white dark:to-slate-900 shadow-md ring-2 ring-purple-500/30'
+              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform ${
+              activeTab === 'bans' ? 'bg-purple-600 text-white scale-105' : 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+            }`}>
+              <span className="text-lg">🐠</span>
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100">
+                Breeding & Bans
+              </h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Seasonal regulations
+              </p>
+            </div>
+          </div>
+          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+            bansData?.is_ban_active ? 'bg-red-500 text-white' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+          }`}>
+            {bansData?.is_ban_active ? 'Banned' : 'Open'}
+          </span>
+        </button>
+
+        {/* Tab 5: Weather Information */}
         <button
           type="button"
           onClick={() => setActiveTab('weather')}
-          className={`p-4 sm:p-5 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
             activeTab === 'weather'
               ? 'border-blue-500 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-white dark:to-slate-900 shadow-md ring-2 ring-blue-500/30'
               : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-slate-300'
           }`}
         >
-          <div className="flex items-center gap-3.5">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform ${
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform ${
               activeTab === 'weather' ? 'bg-blue-600 text-white scale-105' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
             }`}>
-              <span className="text-xl">🌤️</span>
+              <span className="text-lg">🌤️</span>
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
-                  Weather Information
-                </h3>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Current temp, rain & 7-day forecast
+              <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100">
+                Weather Intel
+              </h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Temp, rain & 7-day
               </p>
             </div>
           </div>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300">
+          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-500/15 text-blue-700 dark:text-blue-300">
             {weatherData?.current ? `${weatherData.current.temperature_c}°C` : 'Live'}
           </span>
         </button>
@@ -606,7 +733,7 @@ const FishermanHome = ({ onNavigate }) => {
       </div>
 
       {/* =========================================================================
-          FEATURE ONE: CYCLONE INFORMATION
+          TAB 1: CYCLONE INFORMATION
           ========================================================================= */}
       {activeTab === 'cyclone' && (
         <div className="space-y-4">
@@ -702,7 +829,7 @@ const FishermanHome = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Interactive Cyclone Map */}
+          {/* Interactive Cyclone Tracker Map */}
           <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -881,7 +1008,7 @@ const FishermanHome = ({ onNavigate }) => {
                       dashArray="4, 8"
                     />
 
-                    {/* Default Danger Radius Circle if no explicit wind radii */}
+                    {/* Default Danger Radius Circle */}
                     {!activeStorm?.wind_warning_radii && (
                       <Circle
                         center={[activeStorm.latitude, activeStorm.longitude]}
@@ -943,7 +1070,7 @@ const FishermanHome = ({ onNavigate }) => {
       )}
 
       {/* =========================================================================
-          FEATURE TWO: SEA INFORMATION (8 Marine Parameters & Douglas Scale)
+          TAB 2: SEA INFORMATION (8 Marine Parameters & Douglas Scale)
           ========================================================================= */}
       {activeTab === 'sea' && (
         <div className="space-y-4">
@@ -951,10 +1078,10 @@ const FishermanHome = ({ onNavigate }) => {
           {/* Sea Status & Douglas Rating Card */}
           <div className={`p-5 sm:p-6 rounded-3xl border transition-all ${
             seaStatus === 'RED'
-              ? 'bg-gradient-to-br from-red-600/15 via-rose-500/10 to-white dark:to-slate-900 border-red-500'
+              ? 'bg-gradient-to-br from-red-600/15 via-rose-500/10 to-white dark:to-slate-900 border-red-500 shadow-md'
               : seaStatus === 'ORANGE'
-              ? 'bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-white dark:to-slate-900 border-amber-500'
-              : 'bg-gradient-to-br from-teal-500/15 via-emerald-500/10 to-white dark:to-slate-900 border-teal-500/30'
+              ? 'bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-white dark:to-slate-900 border-amber-500 shadow-md'
+              : 'bg-gradient-to-br from-teal-500/15 via-emerald-500/10 to-white dark:to-slate-900 border-teal-500/30 shadow-xs'
           }`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3.5">
@@ -983,12 +1110,12 @@ const FishermanHome = ({ onNavigate }) => {
 
               <div className="shrink-0 text-right">
                 <div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Data Source</div>
-                <div className="text-xs font-bold text-slate-700 dark:text-slate-300">Copernicus Marine / Open-Meteo</div>
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-300">Copernicus Marine / INCOIS</div>
               </div>
             </div>
           </div>
 
-          {/* ALL 8 MARINE PARAMETERS IN CLEAR CARDS */}
+          {/* ALL 8 MARINE PARAMETERS (Slide 3) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             
             {/* 1. Wave Height */}
@@ -1003,50 +1130,24 @@ const FishermanHome = ({ onNavigate }) => {
               <div className="text-[11px] text-slate-500 mt-0.5">Significant wave height</div>
             </div>
 
-            {/* 2. Wave Direction */}
+            {/* 2. Marine Wind Speed */}
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center justify-between text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                <span>2. Wave Direction</span>
-                <Compass size={14} className="text-indigo-500" />
-              </div>
-              <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
-                {seaData?.parameters?.wave_direction_compass ?? 'SSW'}
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                {seaData?.parameters?.wave_direction_deg ?? 202}° Swell vector
-              </div>
-            </div>
-
-            {/* 3. Wave Period */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <div className="flex items-center justify-between text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                <span>3. Wave Period</span>
-                <Clock size={14} className="text-sky-500" />
-              </div>
-              <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
-                {seaData?.parameters?.wave_period_seconds ?? 6.8} <span className="text-sm font-normal text-slate-400">s</span>
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">Peak swell period</div>
-            </div>
-
-            {/* 4. Wind Speed */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <div className="flex items-center justify-between text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                <span>4. Marine Wind Speed</span>
+                <span>2. Wind Speed</span>
                 <Wind size={14} className="text-blue-500" />
               </div>
               <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
-                {seaData?.parameters?.wind_speed_kt ?? 8.5} <span className="text-sm font-normal text-slate-400">kt</span>
+                {seaData?.parameters?.wind_speed_kmh ?? 15.7} <span className="text-sm font-normal text-slate-400">km/h</span>
               </div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                ({seaData?.parameters?.wind_speed_kmh ?? 15.7} km/h)
+                ({seaData?.parameters?.wind_speed_kt ?? 8.5} knots)
               </div>
             </div>
 
-            {/* 5. Wind Direction */}
+            {/* 3. Wind Direction */}
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center justify-between text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                <span>5. Wind Direction</span>
+                <span>3. Wind Direction</span>
                 <Navigation size={14} className="text-amber-500" />
               </div>
               <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
@@ -1057,10 +1158,10 @@ const FishermanHome = ({ onNavigate }) => {
               </div>
             </div>
 
-            {/* 6. Sea Surface Temperature */}
+            {/* 4. Sea Surface Temperature */}
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center justify-between text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                <span>6. Sea Surface Temp</span>
+                <span>4. Sea Temperature</span>
                 <Thermometer size={14} className="text-rose-500" />
               </div>
               <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
@@ -1069,31 +1170,55 @@ const FishermanHome = ({ onNavigate }) => {
               <div className="text-[11px] text-slate-500 mt-0.5">Coastal oceanic SST</div>
             </div>
 
-            {/* 7. Ocean Current Speed */}
+            {/* 5. Wave Period */}
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center justify-between text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                <span>7. Ocean Current Speed</span>
-                <Activity size={14} className="text-emerald-500" />
+                <span>5. Wave Period</span>
+                <Clock size={14} className="text-sky-500" />
               </div>
               <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
-                {seaData?.parameters?.ocean_current_speed_ms ?? 0.38} <span className="text-sm font-normal text-slate-400">m/s</span>
+                {seaData?.parameters?.wave_period_seconds ?? 6.8} <span className="text-sm font-normal text-slate-400">s</span>
               </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                ({seaData?.parameters?.ocean_current_speed_kmh ?? 1.37} km/h)
-              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">Time between wave crests</div>
             </div>
 
-            {/* 8. Ocean Current Direction */}
+            {/* 6. Ocean Currents */}
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center justify-between text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                <span>8. Ocean Current Dir</span>
+                <span>6. Ocean Currents</span>
                 <Compass size={14} className="text-purple-500" />
               </div>
               <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
-                {seaData?.parameters?.ocean_current_direction_compass ?? 'N'}
+                {seaData?.parameters?.ocean_current_speed_kmh ?? 1.37} <span className="text-sm font-normal text-slate-400">km/h</span>
               </div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                {seaData?.parameters?.ocean_current_direction_deg ?? 0}° Eulerian drift
+                Heading {seaData?.parameters?.ocean_current_direction_compass ?? 'N'} ({seaData?.parameters?.ocean_current_speed_ms ?? 0.38} m/s)
+              </div>
+            </div>
+
+            {/* 7. Expected Rainfall */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                <span>7. Rainfall</span>
+                <CloudRain size={14} className="text-blue-500" />
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
+                {seaData?.parameters?.rainfall_mm ?? 0.0} <span className="text-sm font-normal text-slate-400">mm</span>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">Expected coastal rainfall</div>
+            </div>
+
+            {/* 8. Visibility Conditions */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                <span>8. Visibility</span>
+                <Eye size={14} className="text-emerald-500" />
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
+                {seaData?.parameters?.visibility_km ?? 10.0} <span className="text-sm font-normal text-slate-400">km</span>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                {seaData?.parameters?.visibility_condition ?? 'Good Visibility (>10 km)'}
               </div>
             </div>
 
@@ -1148,7 +1273,330 @@ const FishermanHome = ({ onNavigate }) => {
       )}
 
       {/* =========================================================================
-          FEATURE THREE: WEATHER INFORMATION
+          TAB 3: POTENTIAL FISHING ZONES (PFZ) (Slide 4)
+          ========================================================================= */}
+      {activeTab === 'pfz' && (
+        <div className="space-y-4">
+          
+          {/* Header & ML Science Card */}
+          <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-emerald-600/15 via-teal-500/10 to-white dark:to-slate-900 border border-emerald-500/30 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Fish size={26} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-600 text-white">
+                      Satellite Oceanic Convergence Analysis
+                    </span>
+                    <span className="text-xs text-slate-400">ML PFZ Model</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-50 mt-1">
+                    Potential Fishing Zones for {currentPort.name}
+                  </h2>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 mt-1 max-w-2xl">
+                    Satellite Chlorophyll-a concentration and Sea Surface Temperature (SST) thermal front mapping to identify high-density pelagic feeding zones.
+                  </p>
+                </div>
+              </div>
+
+              {/* Crucial Disclaimer from Slide 4 */}
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs max-w-xs shrink-0">
+                <div className="flex items-center gap-1.5 font-bold mb-1">
+                  <Info size={14} className="text-amber-600 shrink-0" />
+                  <span>Important Note</span>
+                </div>
+                <p className="text-[11px] leading-tight">
+                  {pfzData?.disclaimer || 'Remember: These are estimates based on satellite Chlorophyll-a and SST ocean fronts, not guaranteed fish locations.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* PFZ Interactive Leaflet Map */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🗺️</span>
+                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
+                  Potential Fishing Zones & Thermal Fronts Map
+                </h3>
+              </div>
+              <span className="text-xs text-slate-400">
+                Showing Zone A, Zone B & Zone C off {currentPort.name}
+              </span>
+            </div>
+
+            <div className="w-full h-[360px] sm:h-[400px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 relative z-0">
+              <MapContainer
+                center={[currentPort.lat, currentPort.lng]}
+                zoom={9}
+                scrollWheelZoom={false}
+                style={{ width: '100%', height: '100%' }}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; OpenStreetMap contributors'
+                />
+
+                {/* Selected Harbor Marker */}
+                <Marker position={[currentPort.lat, currentPort.lng]} icon={harborIcon}>
+                  <Popup>
+                    <div className="p-1 text-xs">
+                      <strong>{currentPort.name}</strong>
+                      <p className="text-[11px] text-slate-600 mt-0.5">Base Harbor Departure Point</p>
+                    </div>
+                  </Popup>
+                </Marker>
+
+                {/* PFZ Zone Markers */}
+                {(pfzData?.zones || []).map((zone) => {
+                  const icon = zone.fishing_potential === 'High' ? pfzHighIcon : zone.fishing_potential === 'Moderate' ? pfzModIcon : pfzLowIcon;
+                  const color = zone.fishing_potential === 'High' ? '#059669' : zone.fishing_potential === 'Moderate' ? '#0284c7' : '#64748b';
+                  return (
+                    <React.Fragment key={zone.zone_id}>
+                      <Marker position={[zone.latitude, zone.longitude]} icon={icon}>
+                        <Popup>
+                          <div className="p-1.5 text-xs max-w-xs">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="font-black text-slate-900">{zone.zone_id}: {zone.name}</span>
+                              <span className={`px-1.5 py-0.2 rounded text-[10px] font-black text-white ${
+                                zone.fishing_potential === 'High' ? 'bg-emerald-600' : zone.fishing_potential === 'Moderate' ? 'bg-sky-600' : 'bg-slate-500'
+                              }`}>
+                                {zone.fishing_potential}
+                              </span>
+                            </div>
+                            <p><strong>Distance:</strong> {zone.distance_km} km ({zone.distance_nm} NM) • {zone.bearing}</p>
+                            <p><strong>Chlorophyll-a:</strong> {zone.chlorophyll_concentration_mg_m3} mg/m³</p>
+                            <p><strong>SST:</strong> {zone.sea_surface_temperature_c} °C</p>
+                            <p><strong>Currents:</strong> {zone.ocean_current_speed_kmh} km/h ({zone.ocean_current_direction})</p>
+                            <p className="mt-1 text-[11px] text-slate-600"><strong>Target:</strong> {zone.target_species.join(', ')}</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+
+                      {/* Vector Polyline to Harbor */}
+                      <Polyline
+                        positions={[
+                          [currentPort.lat, currentPort.lng],
+                          [zone.latitude, zone.longitude]
+                        ]}
+                        color={color}
+                        dashArray="3, 6"
+                        weight={2}
+                      />
+
+                      {/* Convergence radius circle */}
+                      <Circle
+                        center={[zone.latitude, zone.longitude]}
+                        radius={zone.fishing_potential === 'High' ? 6000 : 4000}
+                        pathOptions={{ color: color, fillColor: color, fillOpacity: 0.15 }}
+                      />
+                    </React.Fragment>
+                  );
+                })}
+              </MapContainer>
+            </div>
+
+            {/* Map Legend */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-slate-500 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block" /> Zone A (High Potential)
+                </span>
+                <span className="flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-400">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block" /> Zone B (Moderate Potential)
+                </span>
+                <span className="flex items-center gap-1 font-semibold text-slate-600 dark:text-slate-400">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block" /> Zone C (Low Potential)
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400">
+                Satellite Chlorophyll-a / INCOIS Ocean Front Algorithm
+              </span>
+            </div>
+          </div>
+
+          {/* PFZ Detailed Parameter Table (Matching Slide 4 Example) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {(pfzData?.zones || []).map((zone) => (
+              <div
+                key={zone.zone_id}
+                className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                  zone.fishing_potential === 'High'
+                    ? 'border-emerald-400 bg-gradient-to-br from-emerald-500/10 via-white to-white dark:from-emerald-950/20 dark:via-slate-900 dark:to-slate-900 shadow-xs'
+                    : zone.fishing_potential === 'Moderate'
+                    ? 'border-sky-400 bg-gradient-to-br from-sky-500/10 via-white to-white dark:from-sky-950/20 dark:via-slate-900 dark:to-slate-900 shadow-xs'
+                    : 'border-slate-300 bg-white dark:bg-slate-900/80 shadow-xs'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    {zone.zone_id}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase text-white ${
+                    zone.fishing_potential === 'High' ? 'bg-emerald-600' : zone.fishing_potential === 'Moderate' ? 'bg-sky-600' : 'bg-slate-500'
+                  }`}>
+                    {zone.fishing_potential} Potential
+                  </span>
+                </div>
+
+                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 mt-1">
+                  {zone.name}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {zone.distance_km} km ({zone.distance_nm} NM) • {zone.bearing}
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Chlorophyll-a</span>
+                    <div className="font-black text-slate-800 dark:text-slate-200 mt-0.5">
+                      {zone.chlorophyll_concentration_mg_m3} <span className="text-[10px] font-normal text-slate-400">mg/m³</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Sea Temp (SST)</span>
+                    <div className="font-black text-slate-800 dark:text-slate-200 mt-0.5">
+                      {zone.sea_surface_temperature_c} <span className="text-[10px] font-normal text-slate-400">°C</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Current Speed</span>
+                    <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                      {zone.ocean_current_speed_kmh} km/h
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Bathymetry</span>
+                    <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                      {zone.depth_range}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[10px] font-bold uppercase text-slate-400">Target Pelagic Species:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {zone.target_species.map((sp, idx) => (
+                      <span key={idx} className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                        {sp}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      )}
+
+      {/* =========================================================================
+          TAB 4: FISH BREEDING & FISHING BAN INFORMATION (Slide 5)
+          ========================================================================= */}
+      {activeTab === 'bans' && (
+        <div className="space-y-4">
+          
+          {/* Government Fishing Ban Status Banner */}
+          <div className={`p-5 sm:p-6 rounded-3xl border transition-all ${
+            bansData?.is_ban_active
+              ? 'bg-gradient-to-br from-red-600/15 via-rose-500/10 to-white dark:to-slate-900 border-red-500 shadow-md'
+              : 'bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-white dark:to-slate-900 border-emerald-500/30 shadow-xs'
+          }`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-sm ${
+                  bansData?.is_ban_active ? 'bg-red-600 animate-pulse' : 'bg-emerald-600'
+                }`}>
+                  {bansData?.is_ban_active ? <Ban size={26} /> : <CheckCircle size={26} />}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase text-white ${
+                      bansData?.is_ban_active ? 'bg-red-600' : 'bg-emerald-600'
+                    }`}>
+                      {bansData?.ban_status_text || 'FISHING PERMITTED (REGULAR SEASON OPEN)'}
+                    </span>
+                    <span className="text-xs text-slate-400">Department of Fisheries</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-50 mt-1">
+                    {bansData?.government_order?.title || 'Karnataka Marine Fisheries Regulation Order'}
+                  </h2>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 mt-1 max-w-2xl">
+                    {bansData?.ban_summary || 'No general monsoon fishing ban is currently in force. Mechanized and motorized vessels permitted.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs shrink-0 max-w-xs">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Annual Uniform Monsoon Ban</span>
+                <strong className="text-slate-800 dark:text-slate-200">
+                  {bansData?.government_order?.annual_ban_period || 'June 1 to July 31 (61 Days)'}
+                </strong>
+                <p className="text-[11px] text-slate-500 mt-1 leading-tight">
+                  Enforced by: Coastal Security Police & Indian Coast Guard. Traditional non-mechanized craft exempted.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Species-Specific Breeding & Spawning Grid (Indian Oil Sardine, Mackerel, Prawns, Seer Fish) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {(bansData?.species_advisories || []).map((species) => (
+              <div 
+                key={species.id}
+                className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+                        {species.common_name}
+                      </h3>
+                      <p className="text-xs italic text-slate-400">
+                        {species.scientific_name} • {species.local_kannada_name}
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300">
+                      MLS: {species.minimum_legal_size_cm} cm
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Spawning Period</span>
+                      <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {species.spawning_period}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Breeding Classification</span>
+                      <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {species.breeding_status}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 text-xs text-slate-600 dark:text-slate-300">
+                    <strong className="text-slate-800 dark:text-slate-200 block mb-0.5 font-bold">Conservation Directive:</strong>
+                    {species.conservation_advisory}
+                  </div>
+                </div>
+
+                <div className="mt-2 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  ✓ {species.current_season_recommendation}
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      )}
+
+      {/* =========================================================================
+          TAB 5: WEATHER INFORMATION
           ========================================================================= */}
       {activeTab === 'weather' && (
         <div className="space-y-4">
@@ -1278,6 +1726,14 @@ const FishermanHome = ({ onNavigate }) => {
       )}
 
     </div>
+  );
+};
+
+const FishermanHome = (props) => {
+  return (
+    <FishermanErrorBoundary>
+      <FishermanDashboardContent {...props} />
+    </FishermanErrorBoundary>
   );
 };
 
