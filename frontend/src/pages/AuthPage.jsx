@@ -16,7 +16,7 @@ import {
   LogIn, 
   UserPlus, 
   KeyRound,
-  Shield
+  ArrowRight
 } from 'lucide-react';
 import cycloneLogo from '../assets/cyclone-logo.png';
 import { loginUser, registerUser } from '../utils/authService';
@@ -38,25 +38,33 @@ const DISTRICTS = [
   'Uttara Kannada'
 ];
 
+/**
+ * Dedicated AuthPage:
+ * portalType can be:
+ *   - 'citizen': STRICTLY Citizen Login / Register (NO Fisherman options)
+ *   - 'fisherman': STRICTLY Fisherman Login / Register (NO Citizen options)
+ *   - 'admin': STRICTLY Admin Login
+ */
 const AuthPage = ({ 
-  initialRole = 'user', 
+  portalType = 'citizen', 
   initialMode = 'login', 
-  initialUserType = 'citizen',
   onAdminSuccess, 
   onUserSuccess, 
   onNavigate 
 }) => {
-  // Role Selection: 'user' (Citizen/Fisherman) vs 'admin'
-  const [role, setRole] = useState(initialRole);
+  const isFishermanPortal = portalType === 'fisherman';
+  const isAdminPortal = portalType === 'admin';
+  const isCitizenPortal = portalType === 'citizen';
 
-  // User Mode: 'register' or 'login' (defaulting to 'login' for clean experience)
+  // Fixed role and userType based on portalType
+  const role = isAdminPortal ? 'admin' : 'user';
+  const userType = isFishermanPortal ? 'fisherman' : (isAdminPortal ? 'admin' : 'citizen');
+
+  // User Mode: 'login' or 'register'
   const [authMode, setAuthMode] = useState(initialMode);
 
   // Credential Type: 'mobile' vs 'email'
   const [loginType, setLoginType] = useState('mobile');
-
-  // Community User Type: 'fisherman' vs 'citizen'
-  const [userType, setUserType] = useState(initialUserType);
 
   // Form Fields
   const [identifier, setIdentifier] = useState('');
@@ -78,17 +86,6 @@ const AuthPage = ({
   const [successMessage, setSuccessMessage] = useState('');
   const [errors, setErrors] = useState({});
 
-  // Reset errors when switching role or mode
-  const handleRoleChange = (newRole, newUserType = null) => {
-    setRole(newRole);
-    if (newUserType) setUserType(newUserType);
-    setErrors({});
-    setErrorMessage('');
-    setSuccessMessage('');
-    setIdentifier('');
-    setPassword('');
-  };
-
   const handleModeChange = (newMode) => {
     setAuthMode(newMode);
     setErrors({});
@@ -99,7 +96,7 @@ const AuthPage = ({
   const validate = () => {
     const errs = {};
 
-    if (role === 'admin') {
+    if (isAdminPortal) {
       const cleanId = identifier.trim();
       if (!cleanId) {
         errs.identifier = loginType === 'email' ? 'Admin email address is required' : 'Admin mobile number is required';
@@ -119,7 +116,7 @@ const AuthPage = ({
         errs.password = 'Admin password is required';
       }
     } else {
-      // User Role validations
+      // Citizen or Fisherman Validations
       if (authMode === 'login') {
         const cleanId = identifier.trim();
         if (!cleanId) {
@@ -140,7 +137,7 @@ const AuthPage = ({
           errs.password = 'Password is required';
         }
       } else {
-        // User Register validation
+        // Register validation
         if (!name.trim() || name.trim().length < 2) {
           errs.name = 'Full name is required (min 2 characters)';
         }
@@ -171,7 +168,7 @@ const AuthPage = ({
           errs.confirmPassword = 'Passwords do not match';
         }
 
-        if (userType === 'fisherman' && !vesselName.trim()) {
+        if (isFishermanPortal && !vesselName.trim()) {
           errs.vesselName = 'Vessel or Boat name is required for fishermen';
         }
       }
@@ -194,7 +191,7 @@ const AuthPage = ({
 
     setIsSubmitting(true);
     try {
-      if (role === 'admin') {
+      if (isAdminPortal) {
         // Admin Login
         const res = await loginUser({
           loginType,
@@ -213,7 +210,7 @@ const AuthPage = ({
           setErrorMessage(res.error || 'Authentication failed. Please verify admin credentials.');
         }
       } else if (authMode === 'login') {
-        // User Login (Fisherman or Citizen)
+        // User Login
         const res = await loginUser({
           loginType,
           identifier: identifier.trim(),
@@ -222,20 +219,32 @@ const AuthPage = ({
         });
 
         if (res.success) {
-          // If the profile returned by backend has user_type, prioritize it; otherwise use selected tab
-          const effectiveType = res.user?.user_type || userType;
-          const destRoute = effectiveType === 'fisherman' ? '/fisherman' : '/citizen';
+          const userDoc = res.user || {};
+          const returnedType = userDoc.user_type || 'citizen';
 
-          setSuccessMessage(`Login successful! Entering ${effectiveType === 'fisherman' ? 'Fisherman' : 'Citizen'} dashboard...`);
+          // Strictly enforce portal isolation:
+          if (isCitizenPortal && returnedType === 'fisherman') {
+            setErrorMessage('Access denied: This is a Fisherman account. Please log in through the Fisherman Portal.');
+            setIsSubmitting(false);
+            return;
+          }
+          if (isFishermanPortal && returnedType === 'citizen') {
+            setErrorMessage('Access denied: This is a Citizen account. Please log in through the Citizen Portal.');
+            setIsSubmitting(false);
+            return;
+          }
+
+          const destRoute = isFishermanPortal ? '/fisherman' : '/citizen';
+          setSuccessMessage(`Login successful! Entering ${isFishermanPortal ? 'Fisherman' : 'Citizen'} dashboard...`);
           setTimeout(() => {
-            if (onUserSuccess) onUserSuccess(res.user || { user_type: effectiveType });
+            if (onUserSuccess) onUserSuccess(userDoc);
             else if (onNavigate) onNavigate(destRoute);
           }, 600);
         } else {
           setErrorMessage(res.error || 'Login failed. Please check credentials or register.');
         }
       } else {
-        // User Register
+        // Registration
         let cleanEmail = email.trim() || null;
         if (cleanEmail && cleanEmail.includes('@') && !cleanEmail.split('@')[1].includes('.')) {
           cleanEmail = `${cleanEmail}.com`;
@@ -252,17 +261,16 @@ const AuthPage = ({
           email: cleanEmail,
           password: savedPassword,
           user_type: userType,
-          status: userType === 'fisherman' ? 'IN_HARBOR' : 'ACTIVE',
+          status: isFishermanPortal ? 'IN_HARBOR' : 'ACTIVE',
           district,
-          port: userType === 'fisherman' ? port : null,
-          vessel_name: userType === 'fisherman' ? vesselName.trim() : null,
-          vessel_reg: userType === 'fisherman' ? vesselReg.trim() : null,
-          ward: userType === 'citizen' ? ward.trim() : null
+          port: isFishermanPortal ? port : null,
+          vessel_name: isFishermanPortal ? vesselName.trim() : null,
+          vessel_reg: isFishermanPortal ? vesselReg.trim() : null,
+          ward: isCitizenPortal ? ward.trim() : null
         };
 
         const res = await registerUser(payload, { autoLogin: false });
         if (res.success) {
-          // Switch to Sign In mode and pre-fill credentials
           setAuthMode('login');
           if (registeredLoginType === 'email' && cleanEmail) {
             setLoginType('email');
@@ -274,7 +282,7 @@ const AuthPage = ({
           setPassword(savedPassword);
           setConfirmPassword('');
           setErrors({});
-          setSuccessMessage(`Registration successful as ${userType === 'fisherman' ? 'Fisherman' : 'Citizen'}! Your credentials are pre-filled. Please click "Sign In" below.`);
+          setSuccessMessage(`Registration successful as ${isFishermanPortal ? 'Fisherman' : 'Citizen'}! Your credentials have been pre-filled. Click "Sign In" to enter.`);
         } else {
           setErrorMessage(res.error || 'Registration failed. Please check form details.');
         }
@@ -286,33 +294,22 @@ const AuthPage = ({
     }
   };
 
-  const fillQuickAdmin = () => {
-    setRole('admin');
-    setLoginType('email');
-    setIdentifier('admin@cyclosafe.org');
-    setPassword('Admin@123SecurePassword');
-    setErrors({});
-    setErrorMessage('');
-  };
-
-  const fillQuickFisherman = () => {
-    setRole('user');
-    setUserType('fisherman');
-    setAuthMode('login');
-    setLoginType('mobile');
-    setIdentifier('9845112233');
-    setPassword('Password@123');
-    setErrors({});
-    setErrorMessage('');
-  };
-
-  const fillQuickCitizen = () => {
-    setRole('user');
-    setUserType('citizen');
-    setAuthMode('login');
-    setLoginType('mobile');
-    setIdentifier('9876543210');
-    setPassword('Password@123');
+  const fillQuickDemo = () => {
+    if (isAdminPortal) {
+      setLoginType('email');
+      setIdentifier('admin@cyclosafe.org');
+      setPassword('Admin@123SecurePassword');
+    } else if (isFishermanPortal) {
+      setAuthMode('login');
+      setLoginType('mobile');
+      setIdentifier('9845112233');
+      setPassword('Password@123');
+    } else {
+      setAuthMode('login');
+      setLoginType('mobile');
+      setIdentifier('9876543210');
+      setPassword('Password@123');
+    }
     setErrors({});
     setErrorMessage('');
   };
@@ -329,7 +326,13 @@ const AuthPage = ({
         
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500/15 to-emerald-500/15 border border-sky-400/30 flex items-center justify-center shadow-sm mb-3">
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm mb-3 border ${
+            isAdminPortal
+              ? 'bg-rose-50 border-rose-200 text-rose-600'
+              : isFishermanPortal
+              ? 'bg-sky-50 border-sky-200 text-sky-600'
+              : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+          }`}>
             <img 
               src={cycloneLogo} 
               alt="CycloSafe Logo" 
@@ -339,76 +342,26 @@ const AuthPage = ({
 
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-              Cyclo<span className="text-sky-600">Safe</span>
+              Cyclo<span className={isFishermanPortal ? 'text-sky-600' : isCitizenPortal ? 'text-emerald-600' : 'text-rose-600'}>Safe</span>
             </h1>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-              role === 'admin' 
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+              isAdminPortal 
                 ? 'bg-rose-50 text-rose-700 border-rose-300'
-                : userType === 'fisherman'
+                : isFishermanPortal
                 ? 'bg-sky-50 text-sky-700 border-sky-300'
                 : 'bg-emerald-50 text-emerald-700 border-emerald-300'
             }`}>
-              {role === 'admin' ? 'Admin Portal' : userType === 'fisherman' ? '⚓ Fisherman Portal' : 'Citizen Portal'}
+              {isAdminPortal ? 'Admin Portal' : isFishermanPortal ? '⚓ Fisherman Portal' : '👤 Citizen Portal'}
             </span>
           </div>
 
           <p className="text-xs text-slate-500 font-medium mt-1">
-            {role === 'admin' 
+            {isAdminPortal 
               ? 'Command Center Operational Gateway' 
-              : userType === 'fisherman'
+              : isFishermanPortal
               ? 'Maritime Weather, Sea Safety & Vessel Operations'
               : 'Coastal Citizen Safety & Alert Gateway'}
           </p>
-        </div>
-
-        {/* 1. TOP PORTAL SWITCHER: Citizen vs Fisherman vs Admin */}
-        <div className="mb-5">
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-center">
-            Select Portal Access
-          </label>
-          <div className="grid grid-cols-3 p-1 bg-slate-100 rounded-xl border border-slate-200 gap-1">
-            {/* Option 1: Citizen */}
-            <button
-              type="button"
-              onClick={() => handleRoleChange('user', 'citizen')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                role === 'user' && userType === 'citizen'
-                  ? 'bg-white text-emerald-700 shadow-sm border border-slate-200'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <User size={13} className={role === 'user' && userType === 'citizen' ? 'text-emerald-600' : 'text-slate-400'} />
-              <span>Citizen</span>
-            </button>
-
-            {/* Option 2: Fisherman */}
-            <button
-              type="button"
-              onClick={() => handleRoleChange('user', 'fisherman')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                role === 'user' && userType === 'fisherman'
-                  ? 'bg-white text-sky-700 shadow-sm border border-slate-200'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Anchor size={13} className={role === 'user' && userType === 'fisherman' ? 'text-sky-600' : 'text-slate-400'} />
-              <span>Fisherman</span>
-            </button>
-
-            {/* Option 3: Admin */}
-            <button
-              type="button"
-              onClick={() => handleRoleChange('admin')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                role === 'admin'
-                  ? 'bg-white text-rose-700 shadow-sm border border-slate-200'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <ShieldCheck size={13} className={role === 'admin' ? 'text-rose-600' : 'text-slate-400'} />
-              <span>Admin</span>
-            </button>
-          </div>
         </div>
 
         {/* Status Alerts */}
@@ -426,15 +379,15 @@ const AuthPage = ({
           </div>
         )}
 
-        {/* 2. FOR USER (Citizen or Fisherman): Option to Sign In vs Register */}
-        {role === 'user' && (
+        {/* FOR CITIZEN OR FISHERMAN: Option to Sign In vs Register */}
+        {!isAdminPortal && (
           <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200 mb-4">
             <button
               type="button"
               onClick={() => handleModeChange('login')}
               className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 authMode === 'login'
-                  ? userType === 'fisherman' ? 'bg-sky-600 text-white shadow-sm' : 'bg-emerald-600 text-white shadow-sm'
+                  ? isFishermanPortal ? 'bg-sky-600 text-white shadow-sm' : 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -447,7 +400,7 @@ const AuthPage = ({
               onClick={() => handleModeChange('register')}
               className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 authMode === 'register'
-                  ? userType === 'fisherman' ? 'bg-sky-600 text-white shadow-sm' : 'bg-emerald-600 text-white shadow-sm'
+                  ? isFishermanPortal ? 'bg-sky-600 text-white shadow-sm' : 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -457,7 +410,7 @@ const AuthPage = ({
           </div>
         )}
 
-        {/* 3. OPTION SELECTOR: Mobile Number vs Email */}
+        {/* Credential Method: Mobile vs Email */}
         <div className="mb-4">
           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
             Login Credential Method
@@ -499,47 +452,11 @@ const AuthPage = ({
           </div>
         </div>
 
-        {/* FOR USER REGISTRATION: Quick toggle if registering */}
-        {role === 'user' && authMode === 'register' && (
-          <div className="mb-4">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Select Coastal Role
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setUserType('citizen')}
-                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  userType === 'citizen'
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <User size={14} className="text-emerald-600" />
-                <span>Coastal Citizen</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setUserType('fisherman')}
-                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  userType === 'fisherman'
-                    ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Anchor size={14} className="text-sky-600" />
-                <span>Fisherman</span>
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* DYNAMIC FORM */}
         <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
 
-          {/* ADMIN FORM */}
-          {role === 'admin' && (
+          {/* 1. ADMIN FORM */}
+          {isAdminPortal && (
             <>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -610,12 +527,12 @@ const AuthPage = ({
             </>
           )}
 
-          {/* USER SIGN IN FORM (CITIZEN OR FISHERMAN) */}
-          {role === 'user' && authMode === 'login' && (
+          {/* 2. SIGN IN FORM (CITIZEN OR FISHERMAN) */}
+          {!isAdminPortal && authMode === 'login' && (
             <>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  {userType === 'fisherman' ? 'Fisherman' : 'Citizen'} {loginType === 'email' ? 'Registered Email' : 'Registered Mobile Number'}
+                  {isFishermanPortal ? 'Fisherman' : 'Citizen'} {loginType === 'email' ? 'Registered Email' : 'Registered Mobile Number'}
                 </label>
                 <div className="relative flex items-center">
                   <span className="absolute left-3.5 text-slate-400 pointer-events-none">
@@ -628,11 +545,11 @@ const AuthPage = ({
                       setIdentifier(e.target.value);
                       if (errors.identifier) setErrors({ ...errors, identifier: null });
                     }}
-                    placeholder={loginType === 'email' ? 'user@gmail.com' : '9845112233'}
+                    placeholder={loginType === 'email' ? (isFishermanPortal ? 'fisherman@gmail.com' : 'citizen@gmail.com') : (isFishermanPortal ? '9845112233' : '9876543210')}
                     className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 transition-all ${
                       errors.identifier
                         ? 'border-rose-400 focus:ring-rose-200 bg-rose-50/50'
-                        : userType === 'fisherman'
+                        : isFishermanPortal
                         ? 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
                         : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20'
                     }`}
@@ -664,7 +581,7 @@ const AuthPage = ({
                     className={`w-full pl-10 pr-10 py-2.5 rounded-xl border text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 transition-all ${
                       errors.password
                         ? 'border-rose-400 focus:ring-rose-200 bg-rose-50/50'
-                        : userType === 'fisherman'
+                        : isFishermanPortal
                         ? 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
                         : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20'
                     }`}
@@ -686,8 +603,8 @@ const AuthPage = ({
             </>
           )}
 
-          {/* USER REGISTRATION FORM */}
-          {role === 'user' && authMode === 'register' && (
+          {/* 3. REGISTRATION FORM (CITIZEN ONLY OR FISHERMAN ONLY) */}
+          {!isAdminPortal && authMode === 'register' && (
             <>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -704,7 +621,7 @@ const AuthPage = ({
                       setName(e.target.value);
                       if (errors.name) setErrors({ ...errors, name: null });
                     }}
-                    placeholder={userType === 'fisherman' ? 'e.g. Ramesh Naik (Fisherman)' : 'e.g. Priya Sharma'}
+                    placeholder={isFishermanPortal ? 'e.g. Ramesh Naik (Fisherman)' : 'e.g. Priya Sharma'}
                     className={`w-full pl-10 pr-4 py-2 rounded-xl border text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 transition-all ${
                       errors.name ? 'border-rose-400 bg-rose-50/50' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
                     }`}
@@ -775,8 +692,8 @@ const AuthPage = ({
                 </div>
               </div>
 
-              {/* Fisherman Specific Registration Fields */}
-              {userType === 'fisherman' ? (
+              {/* Fisherman Fields ONLY for Fisherman Portal */}
+              {isFishermanPortal && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -836,8 +753,10 @@ const AuthPage = ({
                     />
                   </div>
                 </>
-              ) : (
-                /* Citizen Specific Registration Fields */
+              )}
+
+              {/* Citizen Fields ONLY for Citizen Portal */}
+              {isCitizenPortal && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -930,9 +849,9 @@ const AuthPage = ({
             type="submit"
             disabled={isSubmitting}
             className={`w-full mt-3 py-3 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-              role === 'admin'
+              isAdminPortal
                 ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 shadow-rose-500/20'
-                : userType === 'fisherman'
+                : isFishermanPortal
                 ? 'bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 shadow-sky-500/20'
                 : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/20'
             }`}
@@ -944,20 +863,20 @@ const AuthPage = ({
               </>
             ) : (
               <>
-                {role === 'admin' ? (
+                {isAdminPortal ? (
                   <>
                     <KeyRound size={16} />
                     <span>Authorize Admin Login</span>
                   </>
                 ) : authMode === 'login' ? (
                   <>
-                    {userType === 'fisherman' ? <Anchor size={16} /> : <LogIn size={16} />}
-                    <span>{userType === 'fisherman' ? 'Sign In to Fisherman Dashboard' : 'Sign In to Citizen Dashboard'}</span>
+                    {isFishermanPortal ? <Anchor size={16} /> : <LogIn size={16} />}
+                    <span>{isFishermanPortal ? 'Sign In to Fisherman Dashboard' : 'Sign In to Citizen Dashboard'}</span>
                   </>
                 ) : (
                   <>
                     <UserPlus size={16} />
-                    <span>Register as {userType === 'fisherman' ? 'Fisherman' : 'Citizen'}</span>
+                    <span>Register as {isFishermanPortal ? 'Fisherman' : 'Citizen'}</span>
                   </>
                 )}
               </>
@@ -965,32 +884,54 @@ const AuthPage = ({
           </button>
         </form>
 
-        {/* Quick Demo Fill Options */}
-        <div className="mt-5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-1.5">
-          <span>Quick Demo Fill:</span>
-          <div className="flex items-center gap-2">
+        {/* Footer Links & Quick Demo Fill */}
+        <div className="mt-5 pt-3 border-t border-slate-100 flex flex-col gap-2.5 text-xs text-slate-500">
+          <div className="flex items-center justify-between">
             <button
               type="button"
-              onClick={fillQuickFisherman}
-              className="text-sky-600 hover:text-sky-800 font-bold hover:underline cursor-pointer"
+              onClick={fillQuickDemo}
+              className={`font-bold hover:underline cursor-pointer ${
+                isAdminPortal 
+                  ? 'text-rose-600 hover:text-rose-800' 
+                  : isFishermanPortal 
+                  ? 'text-sky-600 hover:text-sky-800' 
+                  : 'text-emerald-600 hover:text-emerald-800'
+              }`}
             >
-              Fisherman
+              Fill Demo Credentials ({isAdminPortal ? 'Admin' : isFishermanPortal ? 'Fisherman: 9845112233' : 'Citizen: 9876543210'})
             </button>
-            <span>•</span>
+          </div>
+
+          {/* Quick Cross-Portal Switcher links */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-50 text-[11px] text-slate-400">
+            {isCitizenPortal && (
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('/fisherman/login')}
+                className="text-sky-600 hover:text-sky-800 font-semibold hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <span>Are you a Fisherman? Open Fisherman Portal</span>
+                <ArrowRight size={11} />
+              </button>
+            )}
+
+            {isFishermanPortal && (
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('/citizen/login')}
+                className="text-emerald-600 hover:text-emerald-800 font-semibold hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <span>Are you a Coastal Citizen? Open Citizen Portal</span>
+                <ArrowRight size={11} />
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={fillQuickCitizen}
-              className="text-emerald-600 hover:text-emerald-800 font-bold hover:underline cursor-pointer"
+              onClick={() => onNavigate && onNavigate(isAdminPortal ? '/citizen/login' : '/admin/login')}
+              className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer ml-auto"
             >
-              Citizen
-            </button>
-            <span>•</span>
-            <button
-              type="button"
-              onClick={fillQuickAdmin}
-              className="text-rose-600 hover:text-rose-800 font-bold hover:underline cursor-pointer"
-            >
-              Admin
+              {isAdminPortal ? 'Citizen Portal' : 'Admin Portal'}
             </button>
           </div>
         </div>

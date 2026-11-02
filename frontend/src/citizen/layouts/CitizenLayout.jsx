@@ -49,6 +49,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
 
   const isFishermanMode = currentPath.startsWith('/fisherman') || currentUser?.user_type === 'fisherman';
   const homePath = isFishermanMode ? '/fisherman' : '/citizen';
+  const loginPath = isFishermanMode ? '/fisherman/login' : '/citizen/login';
 
   const navItems = [
     { id: 'home', path: homePath, labelKey: 'nav.home', icon: isFishermanMode ? Anchor : Home },
@@ -60,7 +61,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
   const handleLogout = () => {
     logoutUser();
     setCurrentUser(null);
-    onNavigate('/login');
+    onNavigate(loginPath);
   };
 
   const handleLanguageChange = (e) => {
@@ -70,9 +71,8 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300 pb-20 sm:pb-0">
       
-      {/* STICKY TOP CONTAINER: Keeps Siren + Header + Navigation Bar ALWAYS visible at the top */}
+      {/* STICKY TOP CONTAINER */}
       <div className="sticky top-0 z-40 w-full shadow-xs">
-        {/* Real-time Emergency Audio Siren: Automatically sounds alarm on citizen mobile phones when admin activates it */}
         <EmergencySirenOverlay onNavigateToLighthouse={() => onNavigate('/lighthouse')} />
 
         {/* 1. TOP APP BAR */}
@@ -92,14 +92,14 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-50 tracking-tight leading-tight">
-                    Cyclo<span className="text-sky-500">Safe</span>
+                    Cyclo<span className={isFishermanMode ? 'text-sky-500' : 'text-emerald-500'}>Safe</span>
                   </span>
                   <span className={`hidden xs:inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${
                     isFishermanMode
                       ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30'
                       : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
                   }`}>
-                    {isFishermanMode ? '⚓ Fisherman Portal' : t('app.badge')}
+                    {isFishermanMode ? '⚓ Fisherman Portal' : '👤 Citizen Safety'}
                   </span>
                 </div>
                 <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[200px] sm:max-w-none">
@@ -108,7 +108,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
               </div>
             </div>
 
-            {/* Right Header Actions: Connectivity + Language + Admin Switcher */}
+            {/* Right Header Actions */}
             <div className="flex items-center gap-2 shrink-0">
               {/* Connectivity Badge */}
               <div 
@@ -166,12 +166,14 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
               ) : (
                 <button
                   type="button"
-                  onClick={() => onNavigate('/login')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-                  title="Sign In or Register with Mobile or Email"
+                  onClick={() => onNavigate(loginPath)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-bold shadow-xs transition-all cursor-pointer ${
+                    isFishermanMode ? 'bg-sky-600 hover:bg-sky-700' : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
+                  title="Sign In or Register"
                 >
                   <LogIn size={13} />
-                  <span>{i18n.language === 'kn' ? 'ಬಳಕೆದಾರ ಲಾಗಿನ್' : 'User Login'}</span>
+                  <span>{isFishermanMode ? 'Fisherman Login' : (i18n.language === 'kn' ? 'ನಾಗರಿಕ ಲಾಗಿನ್' : 'Citizen Login')}</span>
                 </button>
               )}
 
@@ -188,7 +190,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
           </div>
         </header>
 
-        {/* Top Desktop / Tablet Navigation Bar (Always visible at top) */}
+        {/* Top Desktop / Tablet Navigation Bar */}
         <nav 
           aria-label="Desktop Navigation"
           className="hidden sm:block border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md py-2 shadow-xs"
@@ -209,11 +211,11 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
                     onClick={() => onNavigate(item.path)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       isActive 
-                        ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30 shadow-xs' 
+                        ? (isFishermanMode ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30')
                         : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
                     } ${item.highlight ? 'text-red-600 dark:text-red-400' : ''}`}
                   >
-                    <Icon size={14} className={isActive ? 'text-sky-500' : ''} />
+                    <Icon size={14} className={isActive ? (isFishermanMode ? 'text-sky-500' : 'text-emerald-500') : ''} />
                     <span>{t(item.labelKey)}</span>
                     {item.highlight && (
                       <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -241,11 +243,13 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
             ) : (
               <button
                 type="button"
-                onClick={() => onNavigate('/login')}
-                className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700 font-bold hover:underline cursor-pointer flex items-center gap-1.5"
+                onClick={() => onNavigate(loginPath)}
+                className={`text-xs font-bold hover:underline cursor-pointer flex items-center gap-1.5 ${
+                  isFishermanMode ? 'text-sky-600 dark:text-sky-400 hover:text-sky-700' : 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-700'
+                }`}
               >
                 <LogIn size={13} />
-                <span>User Login / Register &rarr;</span>
+                <span>{isFishermanMode ? 'Fisherman Login &rarr;' : 'Citizen Login &rarr;'}</span>
               </button>
             )}
           </div>
@@ -257,7 +261,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
         {children}
       </main>
 
-      {/* 3. MOBILE BOTTOM NAVIGATION BAR (Thumb-friendly for Android phones) */}
+      {/* 3. MOBILE BOTTOM NAVIGATION BAR */}
       <nav 
         aria-label="Mobile Navigation"
         className="fixed bottom-0 inset-x-0 z-50 bg-white/95 dark:bg-[#0f172a]/95 border-t border-slate-200 dark:border-slate-800 backdrop-blur-md shadow-lg sm:hidden select-none"
@@ -277,14 +281,14 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
                 onClick={() => onNavigate(item.path)}
                 className={`flex flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer ${
                   isActive
-                    ? 'text-sky-500 font-bold'
+                    ? (isFishermanMode ? 'text-sky-500 font-bold' : 'text-emerald-500 font-bold')
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 } ${item.highlight ? 'relative' : ''}`}
               >
                 {item.highlight && (
                   <span className="absolute top-1.5 right-4 w-2 h-2 rounded-full bg-red-500 animate-ping" />
                 )}
-                <Icon size={20} className={isActive ? 'scale-110 text-sky-500' : ''} />
+                <Icon size={20} className={isActive ? `scale-110 ${isFishermanMode ? 'text-sky-500' : 'text-emerald-500'}` : ''} />
                 <span className="text-[10px] leading-tight truncate px-1 font-semibold">
                   {t(item.labelKey)}
                 </span>

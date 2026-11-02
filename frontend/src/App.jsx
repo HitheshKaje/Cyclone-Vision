@@ -111,7 +111,7 @@ function App() {
   if (currentPath === '/admin/login') {
     return (
       <AuthPage
-        initialRole="admin"
+        portalType="admin"
         initialMode="login"
         onAdminSuccess={() => {
           setAdminUser(getAdminAuth());
@@ -123,20 +123,12 @@ function App() {
     );
   }
 
-  // 2. ROUTE: User & Citizen / Fisherman Login & Register (/login, /register, /user/login, /citizen/login, /fisherman/login)
-  if (
-    currentPath === '/login' || 
-    currentPath === '/register' || 
-    currentPath === '/user/login' ||
-    currentPath === '/citizen/login' ||
-    currentPath === '/fisherman/login'
-  ) {
-    const isFishermanLogin = currentPath === '/fisherman/login';
+  // 2. ROUTE: Dedicated Fisherman Login & Register (/fisherman/login, /fisherman/register)
+  if (currentPath === '/fisherman/login' || currentPath === '/fisherman/register') {
     return (
       <AuthPage
-        initialRole="user"
-        initialUserType={isFishermanLogin ? 'fisherman' : 'citizen'}
-        initialMode={currentPath === '/login' || currentPath === '/citizen/login' || currentPath === '/fisherman/login' ? 'login' : 'register'}
+        portalType="fisherman"
+        initialMode={currentPath === '/fisherman/register' ? 'register' : 'login'}
         onAdminSuccess={() => {
           setAdminUser(getAdminAuth());
           navigateTo('/admin');
@@ -147,7 +139,29 @@ function App() {
     );
   }
 
-  // 3. ROUTE: Citizen & Fisherman Coastal Safety Portals (/citizen, /fisherman, /lighthouse)
+  // 3. ROUTE: Dedicated Citizen Login & Register (/citizen/login, /citizen/register, /login, /register, /user/login)
+  if (
+    currentPath === '/citizen/login' || 
+    currentPath === '/citizen/register' || 
+    currentPath === '/login' || 
+    currentPath === '/register' || 
+    currentPath === '/user/login'
+  ) {
+    return (
+      <AuthPage
+        portalType="citizen"
+        initialMode={currentPath === '/register' || currentPath === '/citizen/register' ? 'register' : 'login'}
+        onAdminSuccess={() => {
+          setAdminUser(getAdminAuth());
+          navigateTo('/admin');
+        }}
+        onUserSuccess={handleUserLoginSuccess}
+        onNavigate={navigateTo}
+      />
+    );
+  }
+
+  // 4. ROUTE: Citizen & Fisherman Coastal Safety Portals (/citizen, /fisherman, /lighthouse)
   if (
     currentPath.startsWith('/citizen') || 
     currentPath.startsWith('/fisherman') || 
@@ -167,12 +181,12 @@ function App() {
     );
   }
 
-  // 4. ROUTE: Protected Admin Command Center (/admin, /, or other admin routes)
+  // 5. ROUTE: Protected Admin Command Center (/admin, /, or other admin routes)
   // Enforces authentication: If unauthenticated, render AuthPage in Admin mode
   if (!adminUser) {
     return (
       <AuthPage
-        initialRole="admin"
+        portalType="admin"
         initialMode="login"
         onAdminSuccess={() => {
           setAdminUser(getAdminAuth());

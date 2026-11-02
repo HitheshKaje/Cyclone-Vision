@@ -279,7 +279,7 @@ const CitizenHome = ({ onNavigate }) => {
 
         <button
           type="button"
-          onClick={() => onNavigate('/login')}
+          onClick={() => onNavigate('/citizen/login')}
           className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer self-end sm:self-auto shrink-0"
         >
           <LogIn size={13} />
