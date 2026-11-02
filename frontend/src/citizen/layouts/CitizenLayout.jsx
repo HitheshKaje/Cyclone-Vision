@@ -7,25 +7,17 @@ import {
   PhoneCall, 
   Globe, 
   Wifi, 
-  WifiOff,
-  UserPlus,
-  Anchor,
-  User,
-  LogOut,
-  LogIn
+  WifiOff, 
+  Anchor, 
+  User, 
+  LogOut, 
+  LogIn 
 } from 'lucide-react';
 import cycloneLogo from '../../assets/cyclone-logo.png';
 import { changeLanguage } from '../i18n/config';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import EmergencySirenOverlay from '../components/EmergencySirenOverlay';
 import { logoutUser } from '../../utils/authService';
-
-const navItems = [
-  { id: 'home', path: '/citizen', labelKey: 'nav.home', icon: Home },
-  { id: 'map', path: '/citizen/map', labelKey: 'nav.map', icon: Map },
-  { id: 'weather', path: '/citizen/weather', labelKey: 'nav.weather', icon: CloudSun },
-  { id: 'emergency', path: '/citizen/emergency', labelKey: 'nav.emergency', icon: PhoneCall, highlight: true },
-];
 
 const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
   const { t, i18n } = useTranslation();
@@ -55,9 +47,20 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
     };
   }, []);
 
+  const isFishermanMode = currentPath.startsWith('/fisherman') || currentUser?.user_type === 'fisherman';
+  const homePath = isFishermanMode ? '/fisherman' : '/citizen';
+
+  const navItems = [
+    { id: 'home', path: homePath, labelKey: 'nav.home', icon: isFishermanMode ? Anchor : Home },
+    { id: 'map', path: isFishermanMode ? '/fisherman/map' : '/citizen/map', labelKey: 'nav.map', icon: Map },
+    { id: 'weather', path: isFishermanMode ? '/fisherman/weather' : '/citizen/weather', labelKey: 'nav.weather', icon: CloudSun },
+    { id: 'emergency', path: isFishermanMode ? '/fisherman/emergency' : '/citizen/emergency', labelKey: 'nav.emergency', icon: PhoneCall, highlight: true },
+  ];
+
   const handleLogout = () => {
     logoutUser();
     setCurrentUser(null);
+    onNavigate('/login');
   };
 
   const handleLanguageChange = (e) => {
@@ -78,7 +81,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
             
             {/* Logo & Portal Identity */}
             <div 
-              onClick={() => onNavigate('/citizen')}
+              onClick={() => onNavigate(homePath)}
               className="flex items-center gap-2.5 cursor-pointer min-w-0"
             >
               <img 
@@ -91,12 +94,16 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
                   <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-50 tracking-tight leading-tight">
                     Cyclo<span className="text-sky-500">Safe</span>
                   </span>
-                  <span className="hidden xs:inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                    {t('app.badge')}
+                  <span className={`hidden xs:inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                    isFishermanMode
+                      ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30'
+                      : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                  }`}>
+                    {isFishermanMode ? '⚓ Fisherman Portal' : t('app.badge')}
                   </span>
                 </div>
                 <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[200px] sm:max-w-none">
-                  {t('app.subtitle')}
+                  {isFishermanMode ? 'Maritime Weather & Vessel Safety Operations' : t('app.subtitle')}
                 </span>
               </div>
             </div>
@@ -190,7 +197,11 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
             <div className="flex items-center gap-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentPath === item.path || (item.path === '/citizen' && currentPath === '/citizen/');
+                const isActive = currentPath === item.path || 
+                  (item.id === 'home' && (currentPath === '/citizen' || currentPath === '/citizen/' || currentPath === '/fisherman' || currentPath === '/fisherman/')) ||
+                  (item.id === 'map' && (currentPath === '/citizen/map' || currentPath === '/fisherman/map')) ||
+                  (item.id === 'weather' && (currentPath === '/citizen/weather' || currentPath === '/fisherman/weather')) ||
+                  (item.id === 'emergency' && (currentPath === '/citizen/emergency' || currentPath === '/fisherman/emergency'));
 
                 return (
                   <button
@@ -216,7 +227,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
             {currentUser ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  User: <strong className="text-slate-800 dark:text-slate-200">{currentUser.name}</strong>
+                  {currentUser.user_type === 'fisherman' ? 'Fisherman:' : 'Citizen:'} <strong className="text-slate-800 dark:text-slate-200">{currentUser.name}</strong>
                 </span>
                 <button
                   type="button"
@@ -254,7 +265,11 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
         <div className="grid grid-cols-4 h-16">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentPath === item.path || (item.path === '/citizen' && currentPath === '/citizen/');
+            const isActive = currentPath === item.path || 
+              (item.id === 'home' && (currentPath === '/citizen' || currentPath === '/citizen/' || currentPath === '/fisherman' || currentPath === '/fisherman/')) ||
+              (item.id === 'map' && (currentPath === '/citizen/map' || currentPath === '/fisherman/map')) ||
+              (item.id === 'weather' && (currentPath === '/citizen/weather' || currentPath === '/fisherman/weather')) ||
+              (item.id === 'emergency' && (currentPath === '/citizen/emergency' || currentPath === '/fisherman/emergency'));
 
             return (
               <button

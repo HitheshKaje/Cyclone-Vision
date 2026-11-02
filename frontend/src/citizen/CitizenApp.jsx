@@ -8,6 +8,7 @@ const CycloneMap = lazy(() => import('./pages/CycloneMap'));
 const WeatherSafety = lazy(() => import('./pages/WeatherSafety'));
 const EmergencyInformation = lazy(() => import('./pages/EmergencyInformation'));
 const LighthouseStation = lazy(() => import('./pages/LighthouseStation'));
+const FishermanHome = lazy(() => import('./pages/FishermanHome'));
 
 const PageLoader = () => {
   const { i18n } = useTranslation();
@@ -22,37 +23,58 @@ const PageLoader = () => {
 };
 
 const CitizenApp = ({ currentPath, onNavigate }) => {
+  const isFishermanRoute = currentPath.startsWith('/fisherman');
+
   // Dedicated fullscreen Coastal Lighthouse Terminal (for user's secondary mobile phone)
-  if (currentPath === '/lighthouse' || currentPath === '/citizen/lighthouse') {
+  if (currentPath === '/lighthouse' || currentPath === '/citizen/lighthouse' || currentPath === '/fisherman/lighthouse') {
     return (
       <Suspense fallback={<PageLoader />}>
-        <LighthouseStation onNavigateBack={() => onNavigate('/citizen')} />
+        <LighthouseStation onNavigateBack={() => onNavigate(isFishermanRoute ? '/fisherman' : '/citizen')} />
       </Suspense>
     );
   }
-  const renderCitizenPage = () => {
+
+  const renderContentPage = () => {
     switch (currentPath) {
       case '/citizen/map':
+      case '/fisherman/map':
         return (
           <Suspense fallback={<PageLoader />}>
             <CycloneMap />
           </Suspense>
         );
       case '/citizen/weather':
+      case '/fisherman/weather':
         return (
           <Suspense fallback={<PageLoader />}>
             <WeatherSafety />
           </Suspense>
         );
       case '/citizen/emergency':
+      case '/fisherman/emergency':
         return (
           <Suspense fallback={<PageLoader />}>
             <EmergencyInformation />
           </Suspense>
         );
+      case '/fisherman':
+      case '/fisherman/':
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <FishermanHome onNavigate={onNavigate} />
+          </Suspense>
+        );
       case '/citizen':
       case '/citizen/':
       default:
+        // If currentPath starts with /fisherman, default to FishermanHome, otherwise CitizenHome
+        if (isFishermanRoute) {
+          return (
+            <Suspense fallback={<PageLoader />}>
+              <FishermanHome onNavigate={onNavigate} />
+            </Suspense>
+          );
+        }
         return <CitizenHome onNavigate={onNavigate} />;
     }
   };
@@ -62,7 +84,7 @@ const CitizenApp = ({ currentPath, onNavigate }) => {
       currentPath={currentPath}
       onNavigate={onNavigate}
     >
-      {renderCitizenPage()}
+      {renderContentPage()}
     </CitizenLayout>
   );
 };
