@@ -34,47 +34,48 @@ const CitizenApp = ({ currentPath, onNavigate }) => {
     );
   }
 
-  const renderContentPage = () => {
+  // DEDICATED FISHERMAN DASHBOARD
+  // Renders directly WITHOUT CitizenLayout wrapper to ensure:
+  // 1. Strictly the 3 required tabs: 1. Cyclone Info, 2. Sea Info, 3. Weather Info
+  // 2. Zero duplicate headers
+  // 3. Zero extra modules (No Emergency SOS, No Trip Planner, No Fish Breeding Advisory)
+  if (isFishermanRoute) {
+    return (
+      <div className="min-h-screen bg-slate-100 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
+        <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 py-4 sm:py-6 flex-1">
+          <Suspense fallback={<PageLoader />}>
+            <FishermanHome onNavigate={onNavigate} />
+          </Suspense>
+        </main>
+      </div>
+    );
+  }
+
+  // CITIZEN SAFETY PORTAL
+  // Renders within CitizenLayout for general coastal citizens
+  const renderCitizenContentPage = () => {
     switch (currentPath) {
       case '/citizen/map':
-      case '/fisherman/map':
         return (
           <Suspense fallback={<PageLoader />}>
             <CycloneMap />
           </Suspense>
         );
       case '/citizen/weather':
-      case '/fisherman/weather':
         return (
           <Suspense fallback={<PageLoader />}>
             <WeatherSafety />
           </Suspense>
         );
       case '/citizen/emergency':
-      case '/fisherman/emergency':
         return (
           <Suspense fallback={<PageLoader />}>
             <EmergencyInformation />
           </Suspense>
         );
-      case '/fisherman':
-      case '/fisherman/':
-        return (
-          <Suspense fallback={<PageLoader />}>
-            <FishermanHome onNavigate={onNavigate} />
-          </Suspense>
-        );
       case '/citizen':
       case '/citizen/':
       default:
-        // If currentPath starts with /fisherman, default to FishermanHome, otherwise CitizenHome
-        if (isFishermanRoute) {
-          return (
-            <Suspense fallback={<PageLoader />}>
-              <FishermanHome onNavigate={onNavigate} />
-            </Suspense>
-          );
-        }
         return <CitizenHome onNavigate={onNavigate} />;
     }
   };
@@ -84,7 +85,7 @@ const CitizenApp = ({ currentPath, onNavigate }) => {
       currentPath={currentPath}
       onNavigate={onNavigate}
     >
-      {renderContentPage()}
+      {renderCitizenContentPage()}
     </CitizenLayout>
   );
 };
