@@ -99,6 +99,14 @@ function App() {
     navigateTo('/admin/login');
   };
 
+  const handleUserLoginSuccess = (user) => {
+    if (user?.user_type === 'fisherman') {
+      navigateTo('/fisherman');
+    } else {
+      navigateTo('/citizen');
+    }
+  };
+
   // 1. ROUTE: Admin Dedicated Login Page (/admin/login)
   if (currentPath === '/admin/login') {
     return (
@@ -109,39 +117,42 @@ function App() {
           setAdminUser(getAdminAuth());
           navigateTo('/admin');
         }}
-        onUserSuccess={() => {
-          navigateTo('/citizen');
-        }}
+        onUserSuccess={handleUserLoginSuccess}
         onNavigate={navigateTo}
       />
     );
   }
 
-  // 2. ROUTE: User & Citizen / Fisherman Login & Register (/login, /register, /user/login)
+  // 2. ROUTE: User & Citizen / Fisherman Login & Register (/login, /register, /user/login, /citizen/login, /fisherman/login)
   if (
     currentPath === '/login' || 
     currentPath === '/register' || 
     currentPath === '/user/login' ||
-    currentPath === '/citizen/login'
+    currentPath === '/citizen/login' ||
+    currentPath === '/fisherman/login'
   ) {
+    const isFishermanLogin = currentPath === '/fisherman/login';
     return (
       <AuthPage
         initialRole="user"
-        initialMode={currentPath === '/login' ? 'login' : 'register'}
+        initialUserType={isFishermanLogin ? 'fisherman' : 'citizen'}
+        initialMode={currentPath === '/login' || currentPath === '/citizen/login' || currentPath === '/fisherman/login' ? 'login' : 'register'}
         onAdminSuccess={() => {
           setAdminUser(getAdminAuth());
           navigateTo('/admin');
         }}
-        onUserSuccess={() => {
-          navigateTo('/citizen');
-        }}
+        onUserSuccess={handleUserLoginSuccess}
         onNavigate={navigateTo}
       />
     );
   }
 
-  // 3. ROUTE: Citizen Coastal Safety Portal (/citizen, /citizen/map, etc.) & Lighthouse Terminal
-  if (currentPath.startsWith('/citizen') || currentPath === '/lighthouse') {
+  // 3. ROUTE: Citizen & Fisherman Coastal Safety Portals (/citizen, /fisherman, /lighthouse)
+  if (
+    currentPath.startsWith('/citizen') || 
+    currentPath.startsWith('/fisherman') || 
+    currentPath === '/lighthouse'
+  ) {
     return (
       <Suspense fallback={
         <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold text-sm">
@@ -167,9 +178,7 @@ function App() {
           setAdminUser(getAdminAuth());
           navigateTo('/admin');
         }}
-        onUserSuccess={() => {
-          navigateTo('/citizen');
-        }}
+        onUserSuccess={handleUserLoginSuccess}
         onNavigate={navigateTo}
       />
     );
