@@ -109,6 +109,8 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 def _fetch_url_json(url: str, headers: Optional[Dict[str, str]] = None, timeout: float = 6.0) -> Optional[Dict[str, Any]]:
+    if os.getenv("DEMO_MODE") == "true" or os.getenv("CYCLOSAFE_FAST_DEV") == "true":
+        return None
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
