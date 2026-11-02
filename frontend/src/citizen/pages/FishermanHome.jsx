@@ -462,37 +462,35 @@ const FishermanDashboardContent = ({ onNavigate }) => {
 
           {/* Identity & Vessel Info */}
           <div className="flex items-start sm:items-center gap-3.5">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500/15 to-blue-600/15 border border-sky-400/30 flex items-center justify-center shrink-0 shadow-sm">
-              <div className="flex items-center justify-center shrink-0">
-                <img
-                  src={cycloneLogo}
-                  alt="CycloSafe Logo"
-                  className="w-9 h-9 object-contain animate-cyclone-spin"
-                  className="w-11 h-11 sm:w-12 sm:h-12 object-contain animate-cyclone-spin shrink-0"
-                />
+            <div className="flex items-center justify-center shrink-0">
+              <img
+                src={cycloneLogo}
+                alt="CycloSafe Logo"
+                className="w-11 h-11 sm:w-12 sm:h-12 object-contain animate-cyclone-spin shrink-0"
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-50 tracking-tight">
+                  Cyclo<span className="text-sky-500">Safe</span>
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
+                  ⚓ FISHERMAN DASHBOARD
+                </span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-50 tracking-tight">
-                    Cyclo<span className="text-sky-500">Safe</span>
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
-                    ⚓ FISHERMAN DASHBOARD
-                  </span>
-                </div>
-                <h1 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 mt-0.5">
-                  Welcome aboard, <strong className="text-slate-900 dark:text-slate-100">{currentUser?.name || 'Fisherman'}</strong>
-                </h1>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  <span className="flex items-center gap-1 font-semibold text-sky-600 dark:text-sky-400">
-                    <Ship size={13} />
-                    <span>Vessel: {currentUser?.vessel_name || 'Sea Falcon'}</span>
-                  </span>
-                  <span>•</span>
-                  <span>Reg: <strong className="text-slate-700 dark:text-slate-300">{currentUser?.vessel_reg || 'IND-KA-02-MM-1029'}</strong></span>
-                </div>
+              <h1 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                Welcome aboard, <strong className="text-slate-900 dark:text-slate-100">{currentUser?.name || 'Fisherman'}</strong>
+              </h1>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                <span className="flex items-center gap-1 font-semibold text-sky-600 dark:text-sky-400">
+                  <Ship size={13} />
+                  <span>Vessel: {currentUser?.vessel_name || 'Sea Falcon'}</span>
+                </span>
+                <span>•</span>
+                <span>Reg: <strong className="text-slate-700 dark:text-slate-300">{currentUser?.vessel_reg || 'IND-KA-02-MM-1029'}</strong></span>
               </div>
             </div>
+          </div>
 
             {/* Right Header Controls */}
             <div className="flex flex-wrap items-center gap-2.5">
