@@ -130,7 +130,7 @@ const CitizenHome = ({ onNavigate }) => {
                   <span className="text-xs font-bold text-red-600">Active Threat</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-50 mt-1">
-                  {advisory.cyclone_name} {advisory.wind_speed_kmh ? `(${Math.round(advisory.wind_speed_kmh)} km/h)` : ''}
+                  {(/[0-9a-f]{8}-[0-9a-f]{4}/i.test(advisory.cyclone_name || '')) ? `Cyclone Severe Storm (System-${(advisory.cyclone_name.match(/[0-9a-f]{6}/i) || ['ALERT'])[0].toUpperCase()})` : advisory.cyclone_name} {advisory.wind_speed_kmh ? `(${Math.round(advisory.wind_speed_kmh)} km/h)` : ''}
                 </h2>
                 <p className="text-xs sm:text-sm font-bold text-red-700 dark:text-red-300 mt-1">
                   {advisory.fishermen_directive || advisory.message || 'Boats at sea must return to harbor immediately.'}
