@@ -58,6 +58,75 @@ export const fetchCycloneIntel = async (portId = 'malpe', lat = null, lng = null
 };
 
 /**
+ * Fetch Potential Fishing Zones (PFZ, Chlorophyll, SST & Ocean Currents)
+ */
+export const fetchPotentialFishingZones = async (portId = 'malpe', lat = null, lng = null) => {
+  const baseUrl = getApiBaseUrl();
+  let query = `port_id=${encodeURIComponent(portId)}`;
+  if (lat != null && lng != null) {
+    query += `&lat=${lat}&lng=${lng}`;
+  }
+
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/fisherman/potential-fishing-zones?${query}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    const data = await response.json();
+    try {
+      localStorage.setItem(`cyclosafe_pfz_${portId}`, JSON.stringify(data));
+    } catch (_) {}
+    return { success: true, data };
+  } catch (err) {
+    try {
+      const cached = localStorage.getItem(`cyclosafe_pfz_${portId}`);
+      if (cached) {
+        return { success: true, data: JSON.parse(cached), fromCache: true };
+      }
+    } catch (_) {}
+    return {
+      success: false,
+      error: err.name === 'AbortError' ? 'Connection timed out' : err.message
+    };
+  }
+};
+
+/**
+ * Fetch Government Fishing Ban Notifications & Fish Breeding Schedules
+ */
+export const fetchFishingBansAdvisory = async (portId = 'malpe', lat = null, lng = null) => {
+  const baseUrl = getApiBaseUrl();
+  let query = `port_id=${encodeURIComponent(portId)}`;
+  if (lat != null && lng != null) {
+    query += `&lat=${lat}&lng=${lng}`;
+  }
+
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/fisherman/fishing-bans-advisory?${query}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    const data = await response.json();
+    try {
+      localStorage.setItem(`cyclosafe_bans_${portId}`, JSON.stringify(data));
+    } catch (_) {}
+    return { success: true, data };
+  } catch (err) {
+    try {
+      const cached = localStorage.getItem(`cyclosafe_bans_${portId}`);
+      if (cached) {
+        return { success: true, data: JSON.parse(cached), fromCache: true };
+      }
+    } catch (_) {}
+    return {
+      success: false,
+      error: err.name === 'AbortError' ? 'Connection timed out' : err.message
+    };
+  }
+};
+};
+
+/**
  * Fetch Sea Information (8 marine parameters + Douglas Scale)
  */
 export const fetchSeaConditions = async (portId = 'malpe', lat = null, lng = null) => {
@@ -92,6 +161,75 @@ export const fetchSeaConditions = async (portId = 'malpe', lat = null, lng = nul
 };
 
 /**
+ * Fetch Potential Fishing Zones (PFZ, Chlorophyll, SST & Ocean Currents)
+ */
+export const fetchPotentialFishingZones = async (portId = 'malpe', lat = null, lng = null) => {
+  const baseUrl = getApiBaseUrl();
+  let query = `port_id=${encodeURIComponent(portId)}`;
+  if (lat != null && lng != null) {
+    query += `&lat=${lat}&lng=${lng}`;
+  }
+
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/fisherman/potential-fishing-zones?${query}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    const data = await response.json();
+    try {
+      localStorage.setItem(`cyclosafe_pfz_${portId}`, JSON.stringify(data));
+    } catch (_) {}
+    return { success: true, data };
+  } catch (err) {
+    try {
+      const cached = localStorage.getItem(`cyclosafe_pfz_${portId}`);
+      if (cached) {
+        return { success: true, data: JSON.parse(cached), fromCache: true };
+      }
+    } catch (_) {}
+    return {
+      success: false,
+      error: err.name === 'AbortError' ? 'Connection timed out' : err.message
+    };
+  }
+};
+
+/**
+ * Fetch Government Fishing Ban Notifications & Fish Breeding Schedules
+ */
+export const fetchFishingBansAdvisory = async (portId = 'malpe', lat = null, lng = null) => {
+  const baseUrl = getApiBaseUrl();
+  let query = `port_id=${encodeURIComponent(portId)}`;
+  if (lat != null && lng != null) {
+    query += `&lat=${lat}&lng=${lng}`;
+  }
+
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/fisherman/fishing-bans-advisory?${query}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    const data = await response.json();
+    try {
+      localStorage.setItem(`cyclosafe_bans_${portId}`, JSON.stringify(data));
+    } catch (_) {}
+    return { success: true, data };
+  } catch (err) {
+    try {
+      const cached = localStorage.getItem(`cyclosafe_bans_${portId}`);
+      if (cached) {
+        return { success: true, data: JSON.parse(cached), fromCache: true };
+      }
+    } catch (_) {}
+    return {
+      success: false,
+      error: err.name === 'AbortError' ? 'Connection timed out' : err.message
+    };
+  }
+};
+};
+
+/**
  * Fetch Weather Information & Forecasts
  */
 export const fetchWeatherTelemetry = async (portId = 'malpe', lat = null, lng = null) => {
@@ -123,4 +261,73 @@ export const fetchWeatherTelemetry = async (portId = 'malpe', lat = null, lng = 
       error: err.name === 'AbortError' ? 'Connection timed out' : err.message
     };
   }
+};
+
+/**
+ * Fetch Potential Fishing Zones (PFZ, Chlorophyll, SST & Ocean Currents)
+ */
+export const fetchPotentialFishingZones = async (portId = 'malpe', lat = null, lng = null) => {
+  const baseUrl = getApiBaseUrl();
+  let query = `port_id=${encodeURIComponent(portId)}`;
+  if (lat != null && lng != null) {
+    query += `&lat=${lat}&lng=${lng}`;
+  }
+
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/fisherman/potential-fishing-zones?${query}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    const data = await response.json();
+    try {
+      localStorage.setItem(`cyclosafe_pfz_${portId}`, JSON.stringify(data));
+    } catch (_) {}
+    return { success: true, data };
+  } catch (err) {
+    try {
+      const cached = localStorage.getItem(`cyclosafe_pfz_${portId}`);
+      if (cached) {
+        return { success: true, data: JSON.parse(cached), fromCache: true };
+      }
+    } catch (_) {}
+    return {
+      success: false,
+      error: err.name === 'AbortError' ? 'Connection timed out' : err.message
+    };
+  }
+};
+
+/**
+ * Fetch Government Fishing Ban Notifications & Fish Breeding Schedules
+ */
+export const fetchFishingBansAdvisory = async (portId = 'malpe', lat = null, lng = null) => {
+  const baseUrl = getApiBaseUrl();
+  let query = `port_id=${encodeURIComponent(portId)}`;
+  if (lat != null && lng != null) {
+    query += `&lat=${lat}&lng=${lng}`;
+  }
+
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/fisherman/fishing-bans-advisory?${query}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    const data = await response.json();
+    try {
+      localStorage.setItem(`cyclosafe_bans_${portId}`, JSON.stringify(data));
+    } catch (_) {}
+    return { success: true, data };
+  } catch (err) {
+    try {
+      const cached = localStorage.getItem(`cyclosafe_bans_${portId}`);
+      if (cached) {
+        return { success: true, data: JSON.parse(cached), fromCache: true };
+      }
+    } catch (_) {}
+    return {
+      success: false,
+      error: err.name === 'AbortError' ? 'Connection timed out' : err.message
+    };
+  }
+};
 };
