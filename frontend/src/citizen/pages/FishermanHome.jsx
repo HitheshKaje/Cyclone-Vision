@@ -34,7 +34,7 @@ import {
   Layers,
   Info
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, Polygon } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { 
@@ -85,6 +85,22 @@ const stormIcon = new L.divIcon({
   className: 'custom-storm-marker',
   iconSize: [36, 36],
   iconAnchor: [18, 18]
+});
+
+// IMD Observed Track Point Icon
+const obsTrackIcon = new L.divIcon({
+  html: `<div style="background-color: #2563eb; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 6px rgba(37,99,235,0.9);"></div>`,
+  className: 'custom-obs-marker',
+  iconSize: [10, 10],
+  iconAnchor: [5, 5]
+});
+
+// IMD Forecast Track Point Icon
+const fcTrackIcon = new L.divIcon({
+  html: `<div style="background-color: #ea580c; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 6px rgba(234,88,12,0.9);"></div>`,
+  className: 'custom-fc-marker',
+  iconSize: [10, 10],
+  iconAnchor: [5, 5]
 });
 
 // WMO Code interpretation helper
@@ -162,17 +178,18 @@ const FishermanHome = ({ onNavigate }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isImdDemoActive, setIsImdDemoActive] = useState(false);
 
   // Dynamic Siren and Real-time Broadcast State from Admin
   const [adminBroadcast, setAdminBroadcast] = useState(null);
   const [isSirenSounding, setIsSirenSounding] = useState(false);
 
   // Load All 3 Telemetry Services
-  const loadDashboardData = useCallback(async (portId) => {
+  const loadDashboardData = useCallback(async (portId, demoImd = isImdDemoActive) => {
     setIsRefreshing(true);
     try {
       const [cycRes, seaRes, wRes] = await Promise.allSettled([
-        fetchCycloneIntel(portId),
+        fetchCycloneIntel(portId, null, null, demoImd),
         fetchSeaConditions(portId),
         fetchWeatherTelemetry(portId)
       ]);
@@ -191,12 +208,18 @@ const FishermanHome = ({ onNavigate }) => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [isImdDemoActive]);
+
+  const toggleImdDemo = () => {
+    const nextState = !isImdDemoActive;
+    setIsImdDemoActive(nextState);
+    loadDashboardData(selectedPortId, nextState);
+  };
 
   // Load on mount and when port changes
   useEffect(() => {
-    loadDashboardData(selectedPortId);
-  }, [selectedPortId, loadDashboardData]);
+    loadDashboardData(selectedPortId, isImdDemoActive);
+  }, [selectedPortId, loadDashboardData, isImdDemoActive]);
 
   // Real-Time Admin Broadcast Poller (runs every 2 seconds for instant siren reaction)
   useEffect(() => {
