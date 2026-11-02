@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   Anchor, 
@@ -301,50 +301,43 @@ const FishermanDashboardContent = ({ onNavigate }) => {
     loadDashboardData(selectedPortId, isImdDemoActive);
   }, [selectedPortId, loadDashboardData, isImdDemoActive]);
 
-  // Real-Time Admin Broadcast Poller (every 2s for instant siren sync)
+  const lastAlertSignatureRef = useRef(null);
+
+  // Real-Time Admin Broadcast Poller (every 2s for instant siren & storm synchronization)
   useEffect(() => {
     let isMounted = true;
     const pollBroadcast = async () => {
-      const res = await fetchOfficialAdvisories();
-      if (!isMounted) return;
-      if (res.success && res.data) {
-        setAdminBroadcast(res.data);
-        const sirenState = res.data.siren_active === true;
-        setIsSirenSounding(sirenState);
+      try {
+        const res = await fetchOfficialAdvisories();
+        if (!isMounted) return;
+        if (res.success && res.data) {
+          setAdminBroadcast(res.data);
+          const sirenState = res.data.siren_active === true;
+          setIsSirenSounding(sirenState);
 
-        // Sound or mute acoustic siren dynamically
-        if (sirenState) {
-          sirenService.startSiren();
-        } else {
-          sirenService.stopSiren();
-        }
+          // Sound or mute acoustic siren dynamically
+          if (sirenState) {
+            sirenService.startSiren();
+          } else {
+            sirenService.stopSiren();
+          }
 
-        // Dynamic status synchronization
-        if (res.data.active) {
-          setCycloneIntel(prev => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              status_indicator: (res.data.level || 'RED').toUpperCase(),
-              status_text: `ACTIVE THREAT: ${res.data.cyclone_name || 'Tropical Cyclone'}`,
-              official_warning: res.data.fishermen_directive || res.data.message,
-              has_active_system: true,
-              active_cyclone: {
-                name: res.data.cyclone_name || 'Tropical Cyclone System',
-                latitude: res.data.coordinates?.lat || 15.4,
-                longitude: res.data.coordinates?.lng || 84.5,
-                category: res.data.classification || 'Severe Cyclonic Storm',
-                wind_speed_kt: res.data.wind_speed_kt || 75.0,
-                wind_speed_kmh: res.data.wind_speed_kmh || 140.0,
-                distance_km: 420.0,
-                distance_nm: 226.8,
-                expected_landfall: res.data.area || 'Coastal Zone',
-                siren_active: sirenState,
-                status: 'Admin Live Warning'
-              }
-            };
-          });
+          // Build signature of active state and cyclone details
+          const signature = res.data.active 
+            ? `${res.data.active}_${res.data.cyclone_name}_${res.data.coordinates?.lat}_${res.data.coordinates?.lng}_${res.data.level}_${res.data.wind_speed_kt}`
+            : 'INACTIVE';
+
+          if (lastAlertSignatureRef.current !== signature) {
+            lastAlertSignatureRef.current = signature;
+            // Instantly refresh cyclone intel from backend so the map, cards, and coordinates update live!
+            const cycRes = await fetchCycloneIntel(selectedPortId, null, null, isImdDemoActive);
+            if (isMounted && cycRes.success && cycRes.data) {
+              setCycloneIntel(cycRes.data);
+            }
+          }
         }
+      } catch (err) {
+        console.warn('[Fisherman poller error]:', err);
       }
     };
 
@@ -355,7 +348,7 @@ const FishermanDashboardContent = ({ onNavigate }) => {
       clearInterval(interval);
       sirenService.stopSiren();
     };
-  }, []);
+  }, [selectedPortId, isImdDemoActive]);
 
   const handleLogout = () => {
     sirenService.stopSiren();
