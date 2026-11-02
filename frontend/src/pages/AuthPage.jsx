@@ -38,18 +38,25 @@ const DISTRICTS = [
   'Uttara Kannada'
 ];
 
-const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSuccess, onUserSuccess, onNavigate }) => {
+const AuthPage = ({ 
+  initialRole = 'user', 
+  initialMode = 'login', 
+  initialUserType = 'citizen',
+  onAdminSuccess, 
+  onUserSuccess, 
+  onNavigate 
+}) => {
   // Role Selection: 'user' (Citizen/Fisherman) vs 'admin'
   const [role, setRole] = useState(initialRole);
 
-  // User Mode: 'register' first, or 'login'
-  const [authMode, setAuthMode] = useState(initialMode); // 'register' or 'login'
+  // User Mode: 'register' or 'login' (defaulting to 'login' for clean experience)
+  const [authMode, setAuthMode] = useState(initialMode);
 
   // Credential Type: 'mobile' vs 'email'
   const [loginType, setLoginType] = useState('mobile');
 
   // Community User Type: 'fisherman' vs 'citizen'
-  const [userType, setUserType] = useState('fisherman');
+  const [userType, setUserType] = useState(initialUserType);
 
   // Form Fields
   const [identifier, setIdentifier] = useState('');
@@ -72,8 +79,9 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
   const [errors, setErrors] = useState({});
 
   // Reset errors when switching role or mode
-  const handleRoleChange = (newRole) => {
+  const handleRoleChange = (newRole, newUserType = null) => {
     setRole(newRole);
+    if (newUserType) setUserType(newUserType);
     setErrors({});
     setErrorMessage('');
     setSuccessMessage('');
@@ -205,7 +213,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
           setErrorMessage(res.error || 'Authentication failed. Please verify admin credentials.');
         }
       } else if (authMode === 'login') {
-        // User Login
+        // User Login (Fisherman or Citizen)
         const res = await loginUser({
           loginType,
           identifier: identifier.trim(),
@@ -214,10 +222,14 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
         });
 
         if (res.success) {
-          setSuccessMessage('Login successful! Entering coastal dashboard...');
+          // If the profile returned by backend has user_type, prioritize it; otherwise use selected tab
+          const effectiveType = res.user?.user_type || userType;
+          const destRoute = effectiveType === 'fisherman' ? '/fisherman' : '/citizen';
+
+          setSuccessMessage(`Login successful! Entering ${effectiveType === 'fisherman' ? 'Fisherman' : 'Citizen'} dashboard...`);
           setTimeout(() => {
-            if (onUserSuccess) onUserSuccess();
-            else if (onNavigate) onNavigate('/citizen');
+            if (onUserSuccess) onUserSuccess(res.user || { user_type: effectiveType });
+            else if (onNavigate) onNavigate(destRoute);
           }, 600);
         } else {
           setErrorMessage(res.error || 'Login failed. Please check credentials or register.');
@@ -250,7 +262,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
 
         const res = await registerUser(payload, { autoLogin: false });
         if (res.success) {
-          // Do NOT direct login: switch to Sign In mode and pre-fill credentials
+          // Switch to Sign In mode and pre-fill credentials
           setAuthMode('login');
           if (registeredLoginType === 'email' && cleanEmail) {
             setLoginType('email');
@@ -262,7 +274,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
           setPassword(savedPassword);
           setConfirmPassword('');
           setErrors({});
-          setSuccessMessage('Registration successful! Your login credentials have been pre-filled. Please click "Sign In" below to enter.');
+          setSuccessMessage(`Registration successful as ${userType === 'fisherman' ? 'Fisherman' : 'Citizen'}! Your credentials are pre-filled. Please click "Sign In" below.`);
         } else {
           setErrorMessage(res.error || 'Registration failed. Please check form details.');
         }
@@ -283,11 +295,23 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
     setErrorMessage('');
   };
 
-  const fillQuickUser = () => {
+  const fillQuickFisherman = () => {
     setRole('user');
+    setUserType('fisherman');
     setAuthMode('login');
     setLoginType('mobile');
     setIdentifier('9845112233');
+    setPassword('Password@123');
+    setErrors({});
+    setErrorMessage('');
+  };
+
+  const fillQuickCitizen = () => {
+    setRole('user');
+    setUserType('citizen');
+    setAuthMode('login');
+    setLoginType('mobile');
+    setIdentifier('9876543210');
     setPassword('Password@123');
     setErrors({});
     setErrorMessage('');
@@ -300,7 +324,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
       <div className="absolute top-12 left-12 w-96 h-96 bg-sky-200/40 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-12 right-12 w-96 h-96 bg-emerald-200/40 rounded-full blur-3xl pointer-events-none" />
 
-      {/* PURE LIGHT CARD (NOT DARK) */}
+      {/* PURE LIGHT CARD */}
       <div className="w-full max-w-lg bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-sky-950/10 relative z-10 transition-all">
         
         {/* Brand Header */}
@@ -320,49 +344,69 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
               role === 'admin' 
                 ? 'bg-rose-50 text-rose-700 border-rose-300'
+                : userType === 'fisherman'
+                ? 'bg-sky-50 text-sky-700 border-sky-300'
                 : 'bg-emerald-50 text-emerald-700 border-emerald-300'
             }`}>
-              {role === 'admin' ? 'Admin Portal' : 'User Portal'}
+              {role === 'admin' ? 'Admin Portal' : userType === 'fisherman' ? '⚓ Fisherman Portal' : 'Citizen Portal'}
             </span>
           </div>
 
           <p className="text-xs text-slate-500 font-medium mt-1">
             {role === 'admin' 
               ? 'Command Center Operational Gateway' 
-              : 'Coastal Citizen & Fisherman Safety Gateway'}
+              : userType === 'fisherman'
+              ? 'Maritime Weather, Sea Safety & Vessel Operations'
+              : 'Coastal Citizen Safety & Alert Gateway'}
           </p>
         </div>
 
-        {/* 1. TOP ROLE SWITCHER: User vs Admin */}
+        {/* 1. TOP PORTAL SWITCHER: Citizen vs Fisherman vs Admin */}
         <div className="mb-5">
           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-center">
             Select Portal Access
           </label>
-          <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+          <div className="grid grid-cols-3 p-1 bg-slate-100 rounded-xl border border-slate-200 gap-1">
+            {/* Option 1: Citizen */}
             <button
               type="button"
-              onClick={() => handleRoleChange('user')}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                role === 'user'
+              onClick={() => handleRoleChange('user', 'citizen')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                role === 'user' && userType === 'citizen'
+                  ? 'bg-white text-emerald-700 shadow-sm border border-slate-200'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <User size={13} className={role === 'user' && userType === 'citizen' ? 'text-emerald-600' : 'text-slate-400'} />
+              <span>Citizen</span>
+            </button>
+
+            {/* Option 2: Fisherman */}
+            <button
+              type="button"
+              onClick={() => handleRoleChange('user', 'fisherman')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                role === 'user' && userType === 'fisherman'
                   ? 'bg-white text-sky-700 shadow-sm border border-slate-200'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <User size={14} className={role === 'user' ? 'text-sky-600' : 'text-slate-400'} />
-              <span>User / Citizen</span>
+              <Anchor size={13} className={role === 'user' && userType === 'fisherman' ? 'text-sky-600' : 'text-slate-400'} />
+              <span>Fisherman</span>
             </button>
 
+            {/* Option 3: Admin */}
             <button
               type="button"
               onClick={() => handleRoleChange('admin')}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 role === 'admin'
                   ? 'bg-white text-rose-700 shadow-sm border border-slate-200'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <ShieldCheck size={14} className={role === 'admin' ? 'text-rose-600' : 'text-slate-400'} />
-              <span>Admin Portal</span>
+              <ShieldCheck size={13} className={role === 'admin' ? 'text-rose-600' : 'text-slate-400'} />
+              <span>Admin</span>
             </button>
           </div>
         </div>
@@ -382,33 +426,33 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
           </div>
         )}
 
-        {/* 2. FOR USER: Option to Register first, or Login */}
+        {/* 2. FOR USER (Citizen or Fisherman): Option to Sign In vs Register */}
         {role === 'user' && (
           <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200 mb-4">
-            <button
-              type="button"
-              onClick={() => handleModeChange('register')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                authMode === 'register'
-                  ? 'bg-sky-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <UserPlus size={13} />
-              <span>New Registration</span>
-            </button>
-
             <button
               type="button"
               onClick={() => handleModeChange('login')}
               className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 authMode === 'login'
-                  ? 'bg-sky-600 text-white shadow-sm'
+                  ? userType === 'fisherman' ? 'bg-sky-600 text-white shadow-sm' : 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <LogIn size={13} />
               <span>Sign In</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleModeChange('register')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                authMode === 'register'
+                  ? userType === 'fisherman' ? 'bg-sky-600 text-white shadow-sm' : 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <UserPlus size={13} />
+              <span>New Registration</span>
             </button>
           </div>
         )}
@@ -428,7 +472,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
               }}
               className={`flex items-center justify-center gap-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 loginType === 'mobile'
-                  ? 'bg-white text-sky-700 shadow-xs border border-slate-200/80'
+                  ? 'bg-white text-slate-800 shadow-xs border border-slate-200/80'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -445,7 +489,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
               }}
               className={`flex items-center justify-center gap-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 loginType === 'email'
-                  ? 'bg-white text-sky-700 shadow-xs border border-slate-200/80'
+                  ? 'bg-white text-slate-800 shadow-xs border border-slate-200/80'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -455,26 +499,13 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
           </div>
         </div>
 
-        {/* FOR USER REGISTRATION: Role (Fisherman vs Citizen) */}
+        {/* FOR USER REGISTRATION: Quick toggle if registering */}
         {role === 'user' && authMode === 'register' && (
           <div className="mb-4">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
               Select Coastal Role
             </label>
             <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setUserType('fisherman')}
-                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  userType === 'fisherman'
-                    ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Anchor size={14} className="text-sky-600" />
-                <span>Fisherman</span>
-              </button>
-
               <button
                 type="button"
                 onClick={() => setUserType('citizen')}
@@ -486,6 +517,19 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
               >
                 <User size={14} className="text-emerald-600" />
                 <span>Coastal Citizen</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setUserType('fisherman')}
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  userType === 'fisherman'
+                    ? 'border-sky-500 bg-sky-50 text-sky-700 shadow-xs'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Anchor size={14} className="text-sky-600" />
+                <span>Fisherman</span>
               </button>
             </div>
           </div>
@@ -566,12 +610,12 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
             </>
           )}
 
-          {/* USER SIGN IN FORM */}
+          {/* USER SIGN IN FORM (CITIZEN OR FISHERMAN) */}
           {role === 'user' && authMode === 'login' && (
             <>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  {loginType === 'email' ? 'Registered Email' : 'Registered Mobile Number'}
+                  {userType === 'fisherman' ? 'Fisherman' : 'Citizen'} {loginType === 'email' ? 'Registered Email' : 'Registered Mobile Number'}
                 </label>
                 <div className="relative flex items-center">
                   <span className="absolute left-3.5 text-slate-400 pointer-events-none">
@@ -584,11 +628,13 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                       setIdentifier(e.target.value);
                       if (errors.identifier) setErrors({ ...errors, identifier: null });
                     }}
-                    placeholder={loginType === 'email' ? 'ramesh.naik@gmail.com' : '9845112233'}
+                    placeholder={loginType === 'email' ? 'user@gmail.com' : '9845112233'}
                     className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 transition-all ${
                       errors.identifier
                         ? 'border-rose-400 focus:ring-rose-200 bg-rose-50/50'
-                        : 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
+                        : userType === 'fisherman'
+                        ? 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
+                        : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20'
                     }`}
                   />
                 </div>
@@ -618,7 +664,9 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                     className={`w-full pl-10 pr-10 py-2.5 rounded-xl border text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 transition-all ${
                       errors.password
                         ? 'border-rose-400 focus:ring-rose-200 bg-rose-50/50'
-                        : 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
+                        : userType === 'fisherman'
+                        ? 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
+                        : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20'
                     }`}
                   />
                   <button
@@ -656,7 +704,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                       setName(e.target.value);
                       if (errors.name) setErrors({ ...errors, name: null });
                     }}
-                    placeholder="e.g. Ramesh Naik"
+                    placeholder={userType === 'fisherman' ? 'e.g. Ramesh Naik (Fisherman)' : 'e.g. Priya Sharma'}
                     className={`w-full pl-10 pr-4 py-2 rounded-xl border text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 transition-all ${
                       errors.name ? 'border-rose-400 bg-rose-50/50' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
                     }`}
@@ -727,13 +775,13 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                 </div>
               </div>
 
-              {/* Fisherman Fields */}
+              {/* Fisherman Specific Registration Fields */}
               {userType === 'fisherman' ? (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Base Port / Harbor
+                        Base Port / Fishery Harbor
                       </label>
                       <select
                         value={port}
@@ -789,7 +837,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                   </div>
                 </>
               ) : (
-                /* Citizen Fields */
+                /* Citizen Specific Registration Fields */
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -798,7 +846,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                     <select
                       value={district}
                       onChange={(e) => setDistrict(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50 text-slate-900 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-sky-500/20 cursor-pointer"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50 text-slate-900 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
                     >
                       {DISTRICTS.map((d) => (
                         <option key={d} value={d}>{d}</option>
@@ -819,7 +867,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                         value={ward}
                         onChange={(e) => setWard(e.target.value)}
                         placeholder="e.g. Malpe Beach Ward 3"
-                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-sky-500/20"
+                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
                       />
                     </div>
                   </div>
@@ -884,7 +932,9 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
             className={`w-full mt-3 py-3 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
               role === 'admin'
                 ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 shadow-rose-500/20'
-                : 'bg-gradient-to-r from-sky-500 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 shadow-sky-500/20'
+                : userType === 'fisherman'
+                ? 'bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 shadow-sky-500/20'
+                : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/20'
             }`}
           >
             {isSubmitting ? (
@@ -901,13 +951,13 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
                   </>
                 ) : authMode === 'login' ? (
                   <>
-                    <LogIn size={16} />
-                    <span>Sign In to Citizen Dashboard</span>
+                    {userType === 'fisherman' ? <Anchor size={16} /> : <LogIn size={16} />}
+                    <span>{userType === 'fisherman' ? 'Sign In to Fisherman Dashboard' : 'Sign In to Citizen Dashboard'}</span>
                   </>
                 ) : (
                   <>
                     <UserPlus size={16} />
-                    <span>Register into MongoDB</span>
+                    <span>Register as {userType === 'fisherman' ? 'Fisherman' : 'Citizen'}</span>
                   </>
                 )}
               </>
@@ -915,16 +965,24 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
           </button>
         </form>
 
-        {/* Quick Autofill Helper Buttons */}
-        <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+        {/* Quick Demo Fill Options */}
+        <div className="mt-5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-1.5">
           <span>Quick Demo Fill:</span>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={fillQuickUser}
+              onClick={fillQuickFisherman}
               className="text-sky-600 hover:text-sky-800 font-bold hover:underline cursor-pointer"
             >
-              Fill Fisherman (9845112233)
+              Fisherman
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={fillQuickCitizen}
+              className="text-emerald-600 hover:text-emerald-800 font-bold hover:underline cursor-pointer"
+            >
+              Citizen
             </button>
             <span>•</span>
             <button
@@ -932,7 +990,7 @@ const AuthPage = ({ initialRole = 'user', initialMode = 'register', onAdminSucce
               onClick={fillQuickAdmin}
               className="text-rose-600 hover:text-rose-800 font-bold hover:underline cursor-pointer"
             >
-              Fill Admin
+              Admin
             </button>
           </div>
         </div>
