@@ -924,6 +924,68 @@ const FishermanDashboardContent = ({ onNavigate }) => {
                   />
                 )}
 
+                {/* IMD Wind Warning MultiPolygons (Official GeoJSON from https://api.imd.gov.in/api/v1/cyclone_wind) */}
+                {activeStorm?.wind_warning && (
+                  <>
+                    {activeStorm.wind_warning['27kt'] && parseGeoJsonToLeafletPositions(activeStorm.wind_warning['27kt']).map((positions, idx) => (
+                      <Polygon
+                        key={`imd-wind-27kt-${idx}`}
+                        positions={positions}
+                        pathOptions={{ color: '#f59e0b', fillColor: '#fbbf24', fillOpacity: 0.16, weight: 1.5 }}
+                      >
+                        <Popup>
+                          <div className="p-1 text-xs">
+                            <strong className="text-amber-600">IMD 27 kt (50 km/h) Wind Warning</strong>
+                            <p className="text-[11px] text-slate-600">Moderate gale force area. Small crafts stay in port.</p>
+                          </div>
+                        </Popup>
+                      </Polygon>
+                    ))}
+                    {activeStorm.wind_warning['34kt'] && parseGeoJsonToLeafletPositions(activeStorm.wind_warning['34kt']).map((positions, idx) => (
+                      <Polygon
+                        key={`imd-wind-34kt-${idx}`}
+                        positions={positions}
+                        pathOptions={{ color: '#ea580c', fillColor: '#f97316', fillOpacity: 0.20, weight: 1.5 }}
+                      >
+                        <Popup>
+                          <div className="p-1 text-xs">
+                            <strong className="text-orange-600">IMD 34 kt (63 km/h) Gale Warning</strong>
+                            <p className="text-[11px] text-slate-600">Gale force winds. Fishermen strictly prohibited.</p>
+                          </div>
+                        </Popup>
+                      </Polygon>
+                    ))}
+                    {activeStorm.wind_warning['50kt'] && parseGeoJsonToLeafletPositions(activeStorm.wind_warning['50kt']).map((positions, idx) => (
+                      <Polygon
+                        key={`imd-wind-50kt-${idx}`}
+                        positions={positions}
+                        pathOptions={{ color: '#e11d48', fillColor: '#f43f5e', fillOpacity: 0.25, weight: 2 }}
+                      >
+                        <Popup>
+                          <div className="p-1 text-xs">
+                            <strong className="text-rose-600">IMD 50 kt (93 km/h) Storm Force Zone</strong>
+                            <p className="text-[11px] text-slate-600">Violent storm conditions. Severe damage risk to vessels.</p>
+                          </div>
+                        </Popup>
+                      </Polygon>
+                    ))}
+                    {activeStorm.wind_warning['64kt'] && parseGeoJsonToLeafletPositions(activeStorm.wind_warning['64kt']).map((positions, idx) => (
+                      <Polygon
+                        key={`imd-wind-64kt-${idx}`}
+                        positions={positions}
+                        pathOptions={{ color: '#dc2626', fillColor: '#b91c1c', fillOpacity: 0.30, weight: 2 }}
+                      >
+                        <Popup>
+                          <div className="p-1 text-xs">
+                            <strong className="text-red-700">IMD 64 kt (118 km/h) Hurricane Core</strong>
+                            <p className="text-[11px] text-slate-600">Hurricane force eyewall. Phenomenal seas.</p>
+                          </div>
+                        </Popup>
+                      </Polygon>
+                    ))}
+                  </>
+                )}
+
                 {/* IMD Wind Warning Radii (concentric circles) */}
                 {activeStorm?.wind_warning_radii && (
                   <>
@@ -958,55 +1020,79 @@ const FishermanDashboardContent = ({ onNavigate }) => {
                   </>
                 )}
 
-                {/* IMD Observed Track Polyline & Observation Points */}
+                {/* Observed Track Polyline & Observation Points */}
                 {Array.isArray(activeStorm?.observed_track) && activeStorm.observed_track.length > 0 && (
                   <>
                     <Polyline
-                      positions={activeStorm.observed_track.map(pt => [parseFloat(pt.lat), parseFloat(pt.lon)])}
+                      positions={activeStorm.observed_track
+                        .map(pt => {
+                          const lat = parseFloat(pt.lat ?? pt.latitude);
+                          const lon = parseFloat(pt.lon ?? pt.longitude ?? pt.lng);
+                          return (!isNaN(lat) && !isNaN(lon)) ? [lat, lon] : null;
+                        })
+                        .filter(Boolean)
+                      }
                       pathOptions={{ color: '#2563eb', weight: 3 }}
                     />
-                    {activeStorm.observed_track.map((pt, idx) => (
-                      <Marker
-                        key={`obs-${idx}`}
-                        position={[parseFloat(pt.lat), parseFloat(pt.lon)]}
-                        icon={obsTrackIcon}
-                      >
-                        <Popup>
-                          <div className="p-1 text-xs">
-                            <strong className="text-blue-600">Observed: {pt.CYCLONE_NAME || activeStorm.name}</strong>
-                            <p>Time: {pt['Date/Time'] || pt.Hour}</p>
-                            <p>Category: {pt.Category}</p>
-                            <p>Sustained Wind: {pt['MSW (kt)'] || pt.msw_kt} kt ({pt['Mean MSW (kmph)'] || pt.msw_kmh} km/h)</p>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    ))}
+                    {activeStorm.observed_track.map((pt, idx) => {
+                      const lat = parseFloat(pt.lat ?? pt.latitude);
+                      const lon = parseFloat(pt.lon ?? pt.longitude ?? pt.lng);
+                      if (isNaN(lat) || isNaN(lon)) return null;
+                      return (
+                        <Marker
+                          key={`obs-${idx}`}
+                          position={[lat, lon]}
+                          icon={obsTrackIcon}
+                        >
+                          <Popup>
+                            <div className="p-1 text-xs">
+                              <strong className="text-blue-600">Observed: {pt.CYCLONE_NAME || activeStorm.name}</strong>
+                              <p>Time: {pt['Date/Time'] || pt.Hour || pt.arrival_time}</p>
+                              <p>Category: {pt.Category || pt.stage || activeStorm.category}</p>
+                              <p>Sustained Wind: {pt['MSW (kt)'] || pt.msw_kt || activeStorm.wind_speed_kt} kt ({pt['Mean MSW (kmph)'] || pt.msw_kmh || activeStorm.wind_speed_kmh} km/h)</p>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
                   </>
                 )}
 
-                {/* IMD Forecast Track Polyline & Forecast Points */}
+                {/* Forecast Track Polyline & Forecast Points */}
                 {Array.isArray(activeStorm?.forecast_track) && activeStorm.forecast_track.length > 0 && (
                   <>
                     <Polyline
-                      positions={activeStorm.forecast_track.map(pt => [parseFloat(pt.lat), parseFloat(pt.lon)])}
+                      positions={activeStorm.forecast_track
+                        .map(pt => {
+                          const lat = parseFloat(pt.lat ?? pt.latitude);
+                          const lon = parseFloat(pt.lon ?? pt.longitude ?? pt.lng);
+                          return (!isNaN(lat) && !isNaN(lon)) ? [lat, lon] : null;
+                        })
+                        .filter(Boolean)
+                      }
                       pathOptions={{ color: '#ea580c', weight: 3, dashArray: '6, 6' }}
                     />
-                    {activeStorm.forecast_track.map((pt, idx) => (
-                      <Marker
-                        key={`fc-${idx}`}
-                        position={[parseFloat(pt.lat), parseFloat(pt.lon)]}
-                        icon={fcTrackIcon}
-                      >
-                        <Popup>
-                          <div className="p-1 text-xs">
-                            <strong className="text-orange-600">Forecast: {pt.CYCLONE_NAME || activeStorm.name}</strong>
-                            <p>Projected: {pt['Date/Time'] || pt.Hour}</p>
-                            <p>Category: {pt.Category}</p>
-                            <p>Projected Wind: {pt['MSW (kt)'] || pt.msw_kt} kt ({pt['Mean MSW (kmph)'] || pt.msw_kmh} km/h)</p>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    ))}
+                    {activeStorm.forecast_track.map((pt, idx) => {
+                      const lat = parseFloat(pt.lat ?? pt.latitude);
+                      const lon = parseFloat(pt.lon ?? pt.longitude ?? pt.lng);
+                      if (isNaN(lat) || isNaN(lon)) return null;
+                      return (
+                        <Marker
+                          key={`fc-${idx}`}
+                          position={[lat, lon]}
+                          icon={fcTrackIcon}
+                        >
+                          <Popup>
+                            <div className="p-1 text-xs">
+                              <strong className="text-orange-600">Forecast (+{pt.horizon_hours ? `${pt.horizon_hours}h` : pt.Hour}): {pt.CYCLONE_NAME || activeStorm.name}</strong>
+                              <p>Projected: {pt['Date/Time'] || (pt.arrival_time ? new Date(pt.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : `${pt.horizon_hours || pt.Hour}h`)}</p>
+                              <p>Category: {pt.Category || pt.stage || 'Projected Severe Cyclone'}</p>
+                              <p>Projected Wind: {pt['MSW (kt)'] || pt.msw_kt || activeStorm.wind_speed_kt} kt ({pt['Mean MSW (kmph)'] || pt.msw_kmh || activeStorm.wind_speed_kmh} km/h)</p>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
                   </>
                 )}
 

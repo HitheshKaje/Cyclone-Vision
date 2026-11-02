@@ -111,7 +111,10 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
   const cycloneLat = currentAnalysis?.latitude != null ? parseFloat(currentAnalysis.latitude) : 15.4;
   const cycloneLng = currentAnalysis?.longitude != null ? parseFloat(currentAnalysis.longitude) : 86.2;
   const subbasin = currentAnalysis?.subbasin || (cycloneLng >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea');
-  const cycloneName = `Cyclone ${fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ')}`;
+  const cleanStormRaw = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+  const cycloneName = (/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(cleanStormRaw) || /^[0-9a-f]{16,}/i.test(cleanStormRaw))
+    ? `Cyclone Alert (System-${cleanStormRaw.slice(0, 6).toUpperCase()})`
+    : `Cyclone ${cleanStormRaw.replace(/^Cyclone\s+/i, '')}`;
 
   // Automatically detect threatened marine sector and lighthouse station using Google Gemini API pool
   const triggerMarineDetection = async (lat, lon, windSpeed, stormName, basin) => {
