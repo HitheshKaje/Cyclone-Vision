@@ -902,36 +902,14 @@ const AuthPage = ({
             </button>
           </div>
 
-          {/* Quick Cross-Portal Switcher links */}
-          <div className="flex items-center justify-between pt-1 border-t border-slate-50 text-[11px] text-slate-400">
-            {isCitizenPortal && (
-              <button
-                type="button"
-                onClick={() => onNavigate && onNavigate('/fisherman/login')}
-                className="text-sky-600 hover:text-sky-800 font-semibold hover:underline cursor-pointer flex items-center gap-1"
-              >
-                <span>Are you a Fisherman? Open Fisherman Portal</span>
-                <ArrowRight size={11} />
-              </button>
-            )}
-
-            {isFishermanPortal && (
-              <button
-                type="button"
-                onClick={() => onNavigate && onNavigate('/citizen/login')}
-                className="text-emerald-600 hover:text-emerald-800 font-semibold hover:underline cursor-pointer flex items-center gap-1"
-              >
-                <span>Are you a Coastal Citizen? Open Citizen Portal</span>
-                <ArrowRight size={11} />
-              </button>
-            )}
-
+          {/* Secure Admin Portal Link */}
+          <div className="flex items-center justify-end pt-1 border-t border-slate-50 text-[11px] text-slate-400">
             <button
               type="button"
               onClick={() => onNavigate && onNavigate(isAdminPortal ? '/citizen/login' : '/admin/login')}
-              className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer ml-auto"
+              className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer"
             >
-              {isAdminPortal ? 'Citizen Portal' : 'Admin Portal'}
+              {isAdminPortal ? '← Return to Portal' : 'Admin Gateway →'}
             </button>
           </div>
         </div>
