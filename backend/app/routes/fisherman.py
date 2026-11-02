@@ -249,6 +249,14 @@ async def get_cyclone_information(
 
     # 1. Check live broadcast published dynamically by Admin (Top Priority)
     active_broadcast = get_active_alert()
+    if not active_broadcast or not active_broadcast.get("active"):
+        try:
+            from routes.citizen import ACTIVE_BROADCAST
+            if ACTIVE_BROADCAST and ACTIVE_BROADCAST.get("active"):
+                active_broadcast = ACTIVE_BROADCAST
+        except Exception:
+            pass
+
     has_admin_alert = False
     admin_alert_data = None
 
@@ -337,16 +345,22 @@ async def get_cyclone_information(
         c_name = admin_alert_data.get("cyclone_name") or "Tropical Cyclone Disturbance"
         if "Cyclone Cyclone" in c_name:
             c_name = c_name.replace("Cyclone Cyclone", "Cyclone")
-        if len(c_name) > 30 and "-" in c_name:
-            c_name = "Tropical Cyclone System (Monitored Sector)"
+        import re
+        if re.search(r'[0-9a-f]{8}-[0-9a-f]{4}', c_name, re.I) or (len(c_name) > 25 and "-" in c_name):
+            clean_id = re.search(r'[0-9a-f]{6}', c_name, re.I)
+            id_tag = clean_id.group(0).upper() if clean_id else "ALERT"
+            c_name = f"Cyclone Severe Storm (System-{id_tag})"
+
+        wind_kt = float(admin_alert_data.get("wind_speed_kt") or 75.0)
+        wind_kmh = float(admin_alert_data.get("wind_speed_kmh") or round(wind_kt * 1.852, 1))
 
         active_cyclone = {
             "name": c_name,
             "latitude": c_lat,
             "longitude": c_lon,
             "category": admin_alert_data.get("classification") or "Severe Cyclonic Storm",
-            "wind_speed_kt": admin_alert_data.get("wind_speed_kt") or 75.0,
-            "wind_speed_kmh": admin_alert_data.get("wind_speed_kmh") or 140.0,
+            "wind_speed_kt": wind_kt,
+            "wind_speed_kmh": wind_kmh,
             "movement_direction": "North-West (315°)",
             "movement_speed_kmh": 18.0,
             "distance_km": dist_km,
@@ -355,6 +369,15 @@ async def get_cyclone_information(
             "status": "Active Cyclone Threat",
             "siren_active": admin_alert_data.get("siren_active", False),
             "forecast_track": admin_alert_data.get("forecast") or [],
+            "wind_warning_radii": {
+                "27kt": 300,
+                "34kt": 220,
+                "50kt": 130,
+                "64kt": 70
+            } if wind_kt >= 64 else {
+                "27kt": 240,
+                "34kt": 150
+            },
             "source": admin_alert_data.get("source") or "Admin Command Center Live Broadcast"
         }
         status_text = f"ACTIVE THREAT: {c_name}"
@@ -395,6 +418,7 @@ async def get_cyclone_information(
             "observed_track": sample_obs,
             "forecast_track": sample_fc,
             "cone_of_uncertainty": IMD_SAMPLE_BULBUL_DATA["cone_of_uncertainty"],
+            "wind_warning": IMD_SAMPLE_BULBUL_DATA["wind_warning"],
             "wind_warning_radii": IMD_SAMPLE_BULBUL_DATA["wind_warning_radii"],
             "source": "India Meteorological Department (IMD) API"
         }
