@@ -275,31 +275,31 @@ async def get_cyclone_information(
         try:
             url = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventtypes=TC"
             gdacs_res = await asyncio.to_thread(_fetch_url_json, url, None, 6.0)
-        if gdacs_res and "features" in gdacs_res:
-            for feat in gdacs_res["features"]:
-                props = feat.get("properties", {})
-                geom = feat.get("geometry", {})
-                coords = geom.get("coordinates", [])
-                if len(coords) >= 2 and props.get("iscurrent") == "true":
-                    c_lat = coords[1]
-                    c_lon = coords[0]
-                    dist_km = _haversine_distance(harbor_lat, harbor_lng, c_lat, c_lon)
-                    wind_kt = props.get("severitydata", {}).get("severity") or 45.0
-                    gdacs_cyclones.append({
-                        "id": str(props.get("eventid", "")),
-                        "name": props.get("eventname", "Active Tropical Cyclone"),
-                        "latitude": c_lat,
-                        "longitude": c_lon,
-                        "wind_speed_kt": float(wind_kt),
-                        "wind_speed_kmh": round(float(wind_kt) * 1.852, 1),
-                        "distance_km": dist_km,
-                        "distance_nm": round(dist_km / 1.852, 1),
-                        "alert_level": props.get("alertlevel", "Orange").upper(),
-                        "status": "Active System",
-                        "source": "GDACS / WMO Official Feed"
-                    })
-    except Exception:
-        pass
+            if gdacs_res and "features" in gdacs_res:
+                for feat in gdacs_res["features"]:
+                    props = feat.get("properties", {})
+                    geom = feat.get("geometry", {})
+                    coords = geom.get("coordinates", [])
+                    if len(coords) >= 2 and props.get("iscurrent") == "true":
+                        c_lat = coords[1]
+                        c_lon = coords[0]
+                        dist_km = _haversine_distance(harbor_lat, harbor_lng, c_lat, c_lon)
+                        wind_kt = props.get("severitydata", {}).get("severity") or 45.0
+                        gdacs_cyclones.append({
+                            "id": str(props.get("eventid", "")),
+                            "name": props.get("eventname", "Active Tropical Cyclone"),
+                            "latitude": c_lat,
+                            "longitude": c_lon,
+                            "wind_speed_kt": float(wind_kt),
+                            "wind_speed_kmh": round(float(wind_kt) * 1.852, 1),
+                            "distance_km": dist_km,
+                            "distance_nm": round(dist_km / 1.852, 1),
+                            "alert_level": props.get("alertlevel", "Orange").upper(),
+                            "status": "Active System",
+                            "source": "GDACS / WMO Official Feed"
+                        })
+        except Exception:
+            pass
 
     # 4. Check latest AI Satellite analysis from MongoDB
     latest_ai_cyclone = None
