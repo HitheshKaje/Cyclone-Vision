@@ -132,6 +132,39 @@ const pfzLowIcon = new L.divIcon({
   iconAnchor: [11, 11]
 });
 
+// Helper to parse GeoJSON Polygon/MultiPolygon to Leaflet positions [[lat, lng], ...]
+const parseGeoJsonToLeafletPositions = (geom) => {
+  if (!geom || !geom.coordinates) return [];
+  const coords = geom.coordinates;
+  const result = [];
+  try {
+    if (geom.type === 'MultiPolygon') {
+      coords.forEach(poly => {
+        poly.forEach(ring => {
+          const ringPositions = ring
+            .map(pt => [parseFloat(pt[1]), parseFloat(pt[0])])
+            .filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+          if (ringPositions.length >= 3) {
+            result.push(ringPositions);
+          }
+        });
+      });
+    } else if (geom.type === 'Polygon') {
+      coords.forEach(ring => {
+        const ringPositions = ring
+          .map(pt => [parseFloat(pt[1]), parseFloat(pt[0])])
+          .filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+        if (ringPositions.length >= 3) {
+          result.push(ringPositions);
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('[parseGeoJsonToLeafletPositions error]:', err);
+  }
+  return result;
+};
+
 // WMO Code interpretation helper
 const getWmoIcon = (code) => {
   if (code === 0) return <Sun className="text-amber-500" size={20} />;
@@ -324,8 +357,8 @@ const FishermanDashboardContent = ({ onNavigate }) => {
 
           // Build signature of active state and cyclone details
           const signature = res.data.active 
-            ? `${res.data.active}_${res.data.cyclone_name}_${res.data.coordinates?.lat}_${res.data.coordinates?.lng}_${res.data.level}_${res.data.wind_speed_kt}`
-            : 'INACTIVE';
+            ? `${res.data.active}_${res.data.siren_active}_${res.data.cyclone_name}_${res.data.coordinates?.lat}_${res.data.coordinates?.lng}_${res.data.level}_${res.data.wind_speed_kt}`
+            : `INACTIVE_${res.data.siren_active}`;
 
           if (lastAlertSignatureRef.current !== signature) {
             lastAlertSignatureRef.current = signature;
