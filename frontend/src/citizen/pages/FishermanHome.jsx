@@ -289,6 +289,21 @@ const FishermanDashboardContent = ({ onNavigate }) => {
   const [adminBroadcast, setAdminBroadcast] = useState(null);
   const [isSirenSounding, setIsSirenSounding] = useState(false);
 
+  // Live Notification Dropdown State
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const notifRef = useRef(null);
+
+  // Close notification popover on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setIsNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Load All Telemetry Services
   const loadDashboardData = useCallback(async (portId, demoImd = isImdDemoActive) => {
     setIsRefreshing(true);
@@ -531,14 +546,18 @@ const FishermanDashboardContent = ({ onNavigate }) => {
                 </div>
               </div>
 
-              {/* Notification Bell */}
-              <div className="relative">
+              {/* Live Updating Notification Center (Interactive Popover - NOT a static button!) */}
+              <div className="relative" ref={notifRef}>
                 <button
                   type="button"
-                  className={`p-2.5 rounded-xl border flex items-center justify-center transition-all ${notificationCount > 0
-                      ? 'border-red-400 bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300'
-                      : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800'
-                    }`}
+                  onClick={() => setIsNotifOpen(prev => !prev)}
+                  className={`p-2.5 rounded-xl border flex items-center justify-center transition-all cursor-pointer relative ${
+                    isNotifOpen
+                      ? 'border-sky-500 bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300 ring-2 ring-sky-400/30'
+                      : notificationCount > 0
+                      ? 'border-red-400 bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300 shadow-sm'
+                      : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700'
+                  }`}
                   title={`${notificationCount} Active Marine Notifications`}
                 >
                   <Bell size={18} />
@@ -548,11 +567,162 @@ const FishermanDashboardContent = ({ onNavigate }) => {
                     </span>
                   )}
                   {notificationCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white font-black text-[10px] flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white font-black text-[10px] flex items-center justify-center shadow-xs">
                       {notificationCount}
                     </span>
                   )}
                 </button>
+
+                {/* Marine Notification Popover Menu */}
+                {isNotifOpen && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                    <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/60">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                          Marine Safety Alerts
+                        </span>
+                        {notificationCount > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30 animate-pulse">
+                            {notificationCount} Active
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+                        Live Feed
+                      </span>
+                    </div>
+
+                    <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {/* 1. Siren Alert */}
+                      {isSirenSounding && (
+                        <div className="p-3.5 bg-red-500/10 hover:bg-red-500/15 transition-colors flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-red-600 text-white shrink-0 flex items-center justify-center animate-bounce shadow-xs">
+                            <Volume2 size={16} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <h4 className="text-xs font-bold text-red-700 dark:text-red-300">
+                                Harbor Siren Broadcast Active
+                              </h4>
+                              <span className="text-[10px] font-bold text-red-500">Live Alert</span>
+                            </div>
+                            <p className="text-[11px] text-red-600 dark:text-red-200 mt-0.5 font-medium leading-snug">
+                              {adminBroadcast?.fishermen_directive || 'IMD Emergency Gale Warning: Strict ban on all fishing vessels. Return to harbor.'}
+                            </p>
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  sirenService.stopSiren();
+                                  setIsSirenSounding(false);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-xs cursor-pointer"
+                              >
+                                <VolumeX size={11} />
+                                <span>Silence Harbor Siren</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. Cyclone Warning */}
+                      {activeStorm && (
+                        <div className={`p-3.5 transition-colors flex items-start gap-3 ${
+                          cycloneStatus === 'RED' ? 'bg-rose-500/10 hover:bg-rose-500/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                        }`}>
+                          <div className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center ${
+                            cycloneStatus === 'RED' ? 'bg-red-600 text-white' : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                          }`}>
+                            <AlertTriangle size={16} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                                {cycloneStatus} ALERT: {activeStorm.name}
+                              </h4>
+                              <span className="text-[10px] font-bold text-slate-400">
+                                {activeStorm.distance_km} km away
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+                              {activeStorm.category} • Sustained Winds: {activeStorm.wind_speed_kt} kt ({activeStorm.wind_speed_kmh} km/h).
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveTab('cyclone');
+                                setIsNotifOpen(false);
+                              }}
+                              className="mt-1.5 text-[10px] font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <span>Track Storm on Radar</span>
+                              <ChevronRight size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 3. Sea Condition Alert */}
+                      {(seaStatus === 'RED' || seaStatus === 'ORANGE') && (
+                        <div className="p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-600 dark:text-sky-400 shrink-0 flex items-center justify-center">
+                            <Waves size={16} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                                High Sea Condition Warning
+                              </h4>
+                              <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400">
+                                {seaData?.current?.wave_height_m || 2.4}m Swell
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+                              {seaData?.safety_assessment || 'Dangerous sea state for small craft and mechanized trawlers.'}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveTab('sea');
+                                setIsNotifOpen(false);
+                              }}
+                              className="mt-1.5 text-[10px] font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <span>View Sea Telemetry</span>
+                              <ChevronRight size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 4. Normal Status Card if no active threats */}
+                      {notificationCount === 0 && (
+                        <div className="p-4 text-center space-y-1">
+                          <div className="w-8 h-8 rounded-full bg-emerald-500/15 text-emerald-500 mx-auto flex items-center justify-center">
+                            <CheckCircle size={16} />
+                          </div>
+                          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            Normal Harbor Sea State
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            No active cyclone threats or gale bans at {currentPort.name}.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-3">
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        Port: {currentPort.name}
+                      </span>
+                      <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
+                        ● Live Sync (2s)
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Refresh Button */}
