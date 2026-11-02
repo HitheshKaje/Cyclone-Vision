@@ -475,3 +475,4 @@ const FishermanHome = ({ onNavigate }) => {
 };
 
 export default FishermanHome;
+
