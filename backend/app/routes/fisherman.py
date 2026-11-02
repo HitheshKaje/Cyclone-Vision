@@ -265,13 +265,16 @@ async def get_cyclone_information(
         admin_alert_data = active_broadcast
 
     # 2. Check live IMD Official API
-    imd_cyclone = await _fetch_imd_official_cyclone(harbor_lat, harbor_lng)
+    imd_cyclone = None
+    if not demo_imd and not has_admin_alert:
+        imd_cyclone = await _fetch_imd_official_cyclone(harbor_lat, harbor_lng)
 
     # 3. Check GDACS Global Disaster Alert feed
     gdacs_cyclones = []
-    try:
-        url = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventtypes=TC"
-        gdacs_res = await asyncio.to_thread(_fetch_url_json, url, None, 6.0)
+    if not demo_imd and not has_admin_alert and not imd_cyclone:
+        try:
+            url = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventtypes=TC"
+            gdacs_res = await asyncio.to_thread(_fetch_url_json, url, None, 6.0)
         if gdacs_res and "features" in gdacs_res:
             for feat in gdacs_res["features"]:
                 props = feat.get("properties", {})
