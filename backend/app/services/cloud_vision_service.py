@@ -309,9 +309,10 @@ class CloudVisionIntensityService:
             "You are an expert meteorological vision system specializing in tropical cyclone detection, "
             "georeferencing, and intensity estimation from authentic Earth satellite imagery.\n\n"
             "CRITICAL DOMAIN CHECK (RULE 1):\n"
-            "First, strictly inspect whether this image is a genuine Earth meteorological weather satellite capture (e.g. INSAT-3D, GOES, NOAA, Himawari, Meteosat, weather radar scan, or meteorological map with coordinate grids).\n"
-            "- If the image is a chart, plot, graph, bar chart, line graph, diagram, table, spreadsheet, document, or presentation slide:\n"
-            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Chart, graph, or diagram detected (not a satellite image).'\n"
+            "First, inspect whether this image is a genuine Earth meteorological weather satellite capture (e.g. INSAT-3D, GOES, NOAA, Himawari, Meteosat, synoptic weather satellite maps, or satellite captures with coordinate grid lines / map projections).\n"
+            "- CRITICAL RULE FOR SATELLITE MAPS: Earth meteorological satellite observations frequently display latitude/longitude coordinate grid lines (e.g. 80°E, 82°E, 20°N, 18°N), coastal boundaries, or synoptic map overlays. These ARE 100% VALID Earth meteorological satellite observations! You MUST set is_valid_satellite = true.\n"
+            "- If the image is a non-meteorological business chart, financial bar/line graph, spreadsheet, table, document, or presentation slide:\n"
+            "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Non-meteorological chart or document detected.'\n"
             "- If the image is a lake, pond, river, park, foliage, trees, or ground-level landscape photo:\n"
             "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Ground-level landscape photo detected (lake, pond, or park).'\n"
             "- If the image is a coffee cup, tea cup, tableware, food, indoor furniture, or household scene:\n"
@@ -362,19 +363,41 @@ class CloudVisionIntensityService:
             val_msg = parsed.get("validation_message", "Valid Earth meteorological satellite observation.")
             t_infer = time.perf_counter() - t0
 
-            # Scan Gemini text fields for non-satellite keywords (catches when Gemini identified it as a chart, portrait, cup, or graphic in reasoning)
+            # Scan Gemini text fields for non-satellite keywords
             combined_text = f"{parsed.get('reasoning', '')} {parsed.get('validation_message', '')} {parsed.get('features_observed', '')} {parsed.get('pattern_detected', '')}".lower()
-            non_sat_indicators = [
+
+            # Check for authentic cyclone / meteorological system evidence (including coordinate grids)
+            has_cyclone_evidence = bool(
+                parsed.get("is_cyclone") or
+                any(k in combined_text for k in [
+                    "cyclone", "cyclonic", "vortex", "eye wall", "eye of the storm", "curved band",
+                    "tropical storm", "tropical depression", "convective bands", "spiral bands",
+                    "dvorak", "meteorological satellite", "satellite observation", "satellite imagery",
+                    "satellite view", "coordinate grid", "lat/lon", "synoptic map", "weather satellite"
+                ])
+            )
+
+            strict_non_sat_indicators = [
                 "not a meteorological", "not a satellite", "not satellite", "portrait", "person", "selfie", "human",
                 "facial", "coffee cup", "tea cup", "cup rim", "cup handle", "tableware", "creative manipulation",
-                "non-meteorological", "everyday object", "illustration", "whirlpool", "graphic", "drawing", "artwork",
-                "not real-world meteorological", "does not contain real-world meteorological", "superimposed",
-                "chart", "graph", "diagram", "table", "plot", "spreadsheet", "document", "lake", "pond", "park",
-                "foliage", "landscape photo", "ground-level", "animal", "pet", "vehicle", "car", "room interior"
+                "non-meteorological everyday", "household object", "illustration", "whirlpool graphic",
+                "drawing of a whirlpool", "cartoon", "meme", "not real-world meteorological",
+                "does not contain real-world meteorological", "spreadsheet", "business presentation",
+                "financial chart", "bar chart", "line graph", "lake photo", "pond foliage", "park foliage",
+                "ground-level photo", "animal", "pet", "dog", "cat", "vehicle", "car photo", "room interior"
             ]
-            if any(ind in combined_text for ind in non_sat_indicators):
+
+            is_everyday_non_sat = any(ind in combined_text for ind in strict_non_sat_indicators)
+
+            if has_cyclone_evidence:
+                # Authentic cyclone / satellite map observation - always valid
+                is_valid_sat = True
+                val_msg = parsed.get("validation_message") or "Valid Earth meteorological satellite observation."
+            elif is_everyday_non_sat or parsed.get("is_valid_satellite") is False:
                 is_valid_sat = False
                 val_msg = parsed.get("reasoning") or parsed.get("validation_message") or "Non-satellite image detected. CycloneVision only analyzes Earth meteorological satellite imagery."
+            else:
+                is_valid_sat = True
 
             if not is_valid_sat:
                 res = {

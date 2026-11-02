@@ -324,7 +324,7 @@ class MLService:
         # =========================================================================
         # FILTER 1: Charts, Plots, Graphs, Diagrams, Tables, White Canvas Documents
         # =========================================================================
-        if pure_white_frac > 0.35:
+        if pure_white_frac > 0.35 and cloud_std < 10.0 and ocean_frac < 0.05:
             return False, "Chart, plot, or document detected (white canvas/background). CycloneVision only analyzes Earth meteorological satellite imagery."
 
         dark_bg_frac = float(np.mean(gray < 30))
@@ -394,7 +394,7 @@ class MLService:
             return True, "Valid Earth satellite domain (Atmospheric cloud formation over Earth/ocean)."
 
         # C. Meteorological Satellite Map with Lat/Lon Grid lines over clouds/ocean
-        if line_count >= 4 and (cloud_frac > 0.05 or ocean_frac > 0.05):
+        if line_count >= 4 and (cloud_frac > 0.03 or ocean_frac > 0.03 or cloud_std > 10.0):
             return True, "Valid Earth satellite domain (Meteorological map with coordinate grid)."
 
         # D. Infrared (IR) or Radiometric Satellite Channel
@@ -405,6 +405,9 @@ class MLService:
         # GENERAL REJECTION: Any other random everyday image
         # (pets, cars, indoor furniture, rooms, appliances, street photos)
         # =========================================================================
+        if line_count >= 4 and (cloud_frac > 0.03 or ocean_frac > 0.03 or cloud_std > 10.0):
+            return True, "Valid Earth satellite domain (Meteorological map with coordinate grid)."
+
         if cloud_frac < 0.08 and ocean_frac < 0.05:
             return False, "Non-satellite image detected. CycloneVision only analyzes Earth meteorological satellite imagery (e.g. INSAT-3D, NOAA, GOES)."
 
