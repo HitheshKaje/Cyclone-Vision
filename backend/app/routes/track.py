@@ -292,9 +292,12 @@ async def predict_track_with_api(
 
     api_weather = None
     try:
-        api_weather = await asyncio.to_thread(_fetch_url_json, weather_api_url, None, 4.0)
+        api_weather = await asyncio.wait_for(
+            asyncio.to_thread(_fetch_url_json, weather_api_url, None, 2.0),
+            timeout=2.5
+        )
     except Exception:
-        pass
+        api_weather = None
 
     # Extract atmospheric steering vectors from API
     daily_speeds = api_weather.get("daily", {}).get("wind_speed_10m_max", []) if api_weather else []
