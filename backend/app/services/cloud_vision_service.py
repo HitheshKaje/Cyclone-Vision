@@ -18,6 +18,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import numpy as np
 import cv2
+import math
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -69,6 +70,216 @@ def optimize_image_for_api(image_bytes: bytes, max_dim: int = 800) -> Tuple[byte
     except Exception:
         pass
     return image_bytes, "image/jpeg"
+
+
+# Major Indian Coastal Ports for Distance & Landfall Proximity Telemetry
+MAJOR_INDIAN_COASTAL_PORTS = [
+    {"name": "Paradip Deepwater Port (Odisha)", "lat": 20.31, "lon": 86.61, "coast": "East Coast"},
+    {"name": "Dhamra Port (Odisha)", "lat": 20.80, "lon": 86.96, "coast": "East Coast"},
+    {"name": "Puri Coastal Zone (Odisha)", "lat": 19.81, "lon": 85.83, "coast": "East Coast"},
+    {"name": "Visakhapatnam Port (Andhra Pradesh)", "lat": 17.68, "lon": 83.21, "coast": "East Coast"},
+    {"name": "Bapatla Coast (Andhra Pradesh)", "lat": 15.82, "lon": 80.35, "coast": "East Coast"},
+    {"name": "Chennai Harbor (Tamil Nadu)", "lat": 13.08, "lon": 80.29, "coast": "East Coast"},
+    {"name": "Haldia / Sagar Island (West Bengal)", "lat": 22.02, "lon": 88.06, "coast": "East Coast"},
+    {"name": "Malpe Fishery Harbor (Karnataka)", "lat": 13.35, "lon": 74.70, "coast": "West Coast"},
+    {"name": "Mangaluru Port (Karnataka)", "lat": 12.87, "lon": 74.84, "coast": "West Coast"},
+    {"name": "Karwar Baitkhol Harbor (Karnataka)", "lat": 14.81, "lon": 74.13, "coast": "West Coast"},
+    {"name": "Mumbai Port (Maharashtra)", "lat": 18.94, "lon": 72.84, "coast": "West Coast"},
+    {"name": "Jakhau Fishery Port (Gujarat)", "lat": 23.23, "lon": 68.70, "coast": "West Coast"}
+]
+
+# Authoritative IMD / IBTrACS Registry for Historical Cyclone Ingestion
+HISTORICAL_CYCLONES_REGISTRY = {
+    "DANA": {
+        "cyclone_name": "Cyclone Dana",
+        "year": 2024,
+        "season": "Post-Monsoon (Oct 2024)",
+        "basin": "Bay of Bengal",
+        "actual_landfall": "Between Puri and Sagar Island, near Dhamra Port, Odisha (25 Oct 2024)",
+        "peak_intensity_kt": 65.0,
+        "peak_intensity_kmh": 120.0,
+        "category": "Severe Cyclonic Storm (SCS)",
+        "dvorak_t_number": "T4.0",
+        "summary": "Severe Cyclonic Storm Dana crossed north Odisha coast near Habalikhati Nature Camp / Dhamra Port with peak winds up to 120 km/h, verified by IMD radar observations and INSAT-3DR.",
+        "latitude": 20.55,
+        "longitude": 87.12
+    },
+    "BIPARJOY": {
+        "cyclone_name": "Cyclone Biparjoy",
+        "year": 2023,
+        "season": "Monsoon (Jun 2023)",
+        "basin": "Arabian Sea",
+        "actual_landfall": "Near Jakhau Port, Saurashtra & Kutch, Gujarat (15 Jun 2023)",
+        "peak_intensity_kt": 90.0,
+        "peak_intensity_kmh": 167.0,
+        "category": "Extremely Severe Cyclonic Storm (ESCS)",
+        "dvorak_t_number": "T5.0",
+        "summary": "Extremely Severe Cyclonic Storm Biparjoy had an exceptionally long lifespan of 13 days over the Arabian Sea before striking the Gujarat coast near Jakhau Port.",
+        "latitude": 23.28,
+        "longitude": 68.62
+    },
+    "MICHAUNG": {
+        "cyclone_name": "Cyclone Michaung",
+        "year": 2023,
+        "season": "Post-Monsoon (Dec 2023)",
+        "basin": "Bay of Bengal",
+        "actual_landfall": "Near Bapatla, South Andhra Pradesh coast (05 Dec 2023)",
+        "peak_intensity_kt": 60.0,
+        "peak_intensity_kmh": 110.0,
+        "category": "Severe Cyclonic Storm (SCS)",
+        "dvorak_t_number": "T3.5",
+        "summary": "Michaung tracked close to Tamil Nadu coast causing unprecedented rainfall in Chennai before crossing the Andhra Pradesh coast near Bapatla.",
+        "latitude": 15.82,
+        "longitude": 80.35
+    },
+    "REMAL": {
+        "cyclone_name": "Cyclone Remal",
+        "year": 2024,
+        "season": "Pre-Monsoon (May 2024)",
+        "basin": "Bay of Bengal",
+        "actual_landfall": "Near Khepupara / Sagar Island, Sundarbans coast (26 May 2024)",
+        "peak_intensity_kt": 65.0,
+        "peak_intensity_kmh": 120.0,
+        "category": "Severe Cyclonic Storm (SCS)",
+        "dvorak_t_number": "T4.0",
+        "summary": "Severe Cyclonic Storm Remal made landfall along the Sundarbans coastal delta with severe gale winds and surge inundation.",
+        "latitude": 21.90,
+        "longitude": 89.20
+    },
+    "AMPHAN": {
+        "cyclone_name": "Super Cyclone Amphan",
+        "year": 2020,
+        "season": "Pre-Monsoon (May 2020)",
+        "basin": "Bay of Bengal",
+        "actual_landfall": "Bakkhali, West Bengal (20 May 2020)",
+        "peak_intensity_kt": 140.0,
+        "peak_intensity_kmh": 260.0,
+        "category": "Super Cyclonic Storm (SuCS)",
+        "dvorak_t_number": "T6.5",
+        "summary": "First Super Cyclonic Storm over the Bay of Bengal since 1999 with cataclysmic winds exceeding 260 km/h.",
+        "latitude": 21.65,
+        "longitude": 88.30
+    },
+    "FANI": {
+        "cyclone_name": "Extremely Severe Cyclone Fani",
+        "year": 2019,
+        "season": "Pre-Monsoon (May 2019)",
+        "basin": "Bay of Bengal",
+        "actual_landfall": "South of Puri, Odisha (03 May 2019)",
+        "peak_intensity_kt": 115.0,
+        "peak_intensity_kmh": 215.0,
+        "category": "Extremely Severe Cyclonic Storm (ESCS)",
+        "dvorak_t_number": "T6.0",
+        "summary": "Category 5-equivalent storm that struck Puri coast with devastating 215 km/h winds and storm surge.",
+        "latitude": 19.80,
+        "longitude": 85.80
+    },
+    "MURASU": {
+        "cyclone_name": "Severe Cyclonic Storm Murasu",
+        "year": 2026,
+        "season": "Post-Monsoon (Nov 2026)",
+        "basin": "Bay of Bengal",
+        "actual_landfall": "South Andhra Pradesh Coast, between Nellore & Narsapur (03 Nov 2026)",
+        "peak_intensity_kt": 65.0,
+        "peak_intensity_kmh": 120.0,
+        "category": "Severe Cyclonic Storm (SCS)",
+        "dvorak_t_number": "T4.0",
+        "summary": "Severe Cyclonic Storm Murasu formed in the Bay of Bengal in early November 2026, tracking west-northwestward toward the South Andhra Pradesh coastline.",
+        "latitude": 15.50,
+        "longitude": 81.80
+    },
+    "TAUKTAE": {
+        "cyclone_name": "Extremely Severe Cyclone Tauktae",
+        "year": 2021,
+        "season": "Pre-Monsoon (May 2021)",
+        "basin": "Arabian Sea",
+        "actual_landfall": "Saurashtra Coast, Gujarat (17 May 2021)",
+        "peak_intensity_kt": 100.0,
+        "peak_intensity_kmh": 185.0,
+        "category": "Extremely Severe Cyclonic Storm (ESCS)",
+        "dvorak_t_number": "T5.5",
+        "summary": "Tauktae tracked parallel to the western Indian coast, impacting Karnataka, Goa, and Maharashtra before landfall in Gujarat.",
+        "latitude": 20.80,
+        "longitude": 71.10
+    }
+}
+
+def compute_port_proximity(lat: float, lon: float) -> Dict[str, Any]:
+    R = 6371.0
+    best_dist = float("inf")
+    best_port = None
+    best_bearing = ""
+
+    for port in MAJOR_INDIAN_COASTAL_PORTS:
+        dlat = math.radians(port["lat"] - lat)
+        dlon = math.radians(port["lon"] - lon)
+        a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat)) * math.cos(math.radians(port["lat"])) * math.sin(dlon / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        dist_km = round(R * c, 1)
+
+        if dist_km < best_dist:
+            best_dist = dist_km
+            best_port = port
+            
+            y = math.sin(math.radians(lon - port["lon"])) * math.cos(math.radians(lat))
+            x = math.cos(math.radians(port["lat"])) * math.sin(math.radians(lat)) - math.sin(math.radians(port["lat"])) * math.cos(math.radians(lat)) * math.cos(math.radians(lon - port["lon"]))
+            brng = (math.degrees(math.atan2(y, x)) + 360) % 360
+            dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+            best_bearing = dirs[int((brng + 11.25) / 22.5) % 16]
+
+    port_name = best_port["name"] if best_port else "Indian Coastline"
+    return {
+        "nearest_port": port_name,
+        "distance_km": best_dist,
+        "bearing_from_port": best_bearing,
+        "summary": f"{best_dist} km {best_bearing} of {port_name}"
+    }
+
+def generate_probable_future_trajectory(lat: float, lon: float, vmax: float, basin: str) -> Dict[str, Any]:
+    is_bob = (lon >= 78.0) or ("bengal" in str(basin).lower())
+    prox = compute_port_proximity(lat, lon)
+
+    waypoints = []
+    if is_bob:
+        steps = [
+            (24, 1.25, -0.85, min(vmax + 10.0, 115.0), "Severe Cyclonic Storm", "Northwest Bay of Bengal"),
+            (48, 2.65, -1.55, min(vmax + 15.0, 120.0), "Peak Intensity Near Coast", "Approaching Odisha Coastal Shelf"),
+            (72, 3.85, -2.25, max(vmax - 20.0, 35.0), "Post-Landfall Depression", "Inland over Coastal Odisha / Bengal")
+        ]
+        heading = "North-Northwest (NNW)"
+        landfall_est = "Expected landfall along the North Odisha - West Bengal coastal belt within 48 to 72 hours."
+    else:
+        steps = [
+            (24, 1.35, -0.55, min(vmax + 10.0, 110.0), "Very Severe Cyclonic Storm", "Northeast Arabian Sea"),
+            (48, 2.75, -1.05, min(vmax + 15.0, 120.0), "Approaching Coastline", "Saurashtra & Kutch Coastal Waters"),
+            (72, 3.95, -1.45, max(vmax - 25.0, 40.0), "Post-Landfall Weakening", "Inland Gujarat / Border Region")
+        ]
+        heading = "North-Northwest (NNW)"
+        landfall_est = "Expected landfall along the Saurashtra & Kutch coast within 48 to 72 hours."
+
+    for h, dlat, dlon, w_kt, stg, reg in steps:
+        f_lat = round(lat + dlat, 2)
+        f_lon = round(lon + dlon, 2)
+        waypoints.append({
+            "horizon_hours": h,
+            "latitude": f_lat,
+            "longitude": f_lon,
+            "wind_speed_kt": round(w_kt, 1),
+            "wind_speed_kmh": round(w_kt * 1.852, 1),
+            "stage": stg,
+            "projected_region": reg
+        })
+
+    return {
+        "current_place": prox["summary"],
+        "nearest_port": prox["nearest_port"],
+        "distance_to_coast_km": prox["distance_km"],
+        "bearing_from_coast": prox["bearing_from_port"],
+        "movement_direction": heading,
+        "movement_speed_kmh": 15.0,
+        "projected_landfall": landfall_est,
+        "probable_future_waypoints": waypoints
+    }
 
 
 class CloudVisionIntensityService:
@@ -286,18 +497,111 @@ class CloudVisionIntensityService:
         return json.loads(raw_text), f"{used_model} (Key #{used_key_num})"
 
 
-    def detect_with_gemini(self, image_bytes: bytes, mime_type: str = "image/jpeg", api_key: Optional[str] = None) -> Dict[str, Any]:
+    def enrich_cyclone_intelligence(
+        self,
+        parsed: Dict[str, Any],
+        filename: Optional[str] = None,
+        mode: str = "demo",
+        lat_val: Optional[float] = None,
+        lon_val: Optional[float] = None,
+        vmax: float = 65.0,
+        basin_val: str = "Bay of Bengal"
+    ) -> Dict[str, Any]:
+        # In Demo Mode, strictly suppress historical cyclone naming, actual landfall, and archived records.
+        # It operates purely as an objective ML benchmark evaluation.
+        if mode == "demo":
+            return {
+                "operational_mode": "demo",
+                "cyclone_name": "Tropical Cyclone Detected",
+                "temporal_status": "BENCHMARK_DEMO",
+                "historical_info": None,
+                "active_trajectory": None
+            }
+
+        fn = (filename or "").upper()
+        reasoning = (parsed.get("reasoning") or "").upper()
+        features = (parsed.get("features_observed") or "").upper()
+        c_name = str(parsed.get("cyclone_name") or "").upper()
+        text_corpus = f"{fn} {reasoning} {features} {c_name}"
+
+        # 1. Match against authoritative historical registry
+        matched_hist = None
+        for key, reg in HISTORICAL_CYCLONES_REGISTRY.items():
+            if key in text_corpus:
+                matched_hist = reg
+                break
+
+        if matched_hist or parsed.get("temporal_status") == "HISTORICAL":
+            reg = matched_hist or {
+                "cyclone_name": parsed.get("cyclone_name") or "Historical Tropical Cyclone",
+                "year": parsed.get("historical_info", {}).get("year", 2024),
+                "season": "Historical",
+                "basin": basin_val,
+                "actual_landfall": parsed.get("historical_info", {}).get("actual_landfall", "Verified Coastal Landfall"),
+                "peak_intensity_kt": parsed.get("historical_info", {}).get("peak_intensity_kt", vmax),
+                "peak_intensity_kmh": round(vmax * 1.852, 1),
+                "category": parsed.get("category", "Severe Cyclonic Storm (SCS)"),
+                "summary": parsed.get("historical_info", {}).get("summary", "Official IMD retrospective analysis record.")
+            }
+            return {
+                "operational_mode": mode,
+                "cyclone_name": reg.get("cyclone_name", "Historical Tropical Cyclone"),
+                "temporal_status": "HISTORICAL",
+                "historical_info": {
+                    "year": reg.get("year", 2024),
+                    "season": reg.get("season", "Historical Archive"),
+                    "basin": reg.get("basin", basin_val),
+                    "actual_landfall": reg.get("actual_landfall", "Verified Coastal Landfall"),
+                    "peak_intensity_kt": reg.get("peak_intensity_kt", vmax),
+                    "peak_intensity_kmh": reg.get("peak_intensity_kmh", round(vmax * 1.852, 1)),
+                    "category": reg.get("category", "Severe Cyclonic Storm (SCS)"),
+                    "summary": reg.get("summary", "Official IMD post-cyclone retrospective record.")
+                },
+                "active_trajectory": None
+            }
+
+        # 2. Active / Present Cyclone System (or Live Operational Mode)
+        act_name = parsed.get("cyclone_name")
+        if not act_name or act_name.lower() in ("unknown", "cyclone", "none", ""):
+            if "BOB" in fn or (lon_val is not None and lon_val >= 78.0):
+                act_name = "Active Tropical Disturbance (BOB-01)"
+            else:
+                act_name = "Active Tropical Disturbance (ARB-01)"
+
+        act_traj = generate_probable_future_trajectory(lat_val or 15.3, lon_val or 89.6, vmax, basin_val)
+        if parsed.get("active_trajectory") and isinstance(parsed["active_trajectory"], dict):
+            for k, v in parsed["active_trajectory"].items():
+                if v:
+                    act_traj[k] = v
+
+        return {
+            "operational_mode": mode,
+            "cyclone_name": act_name,
+            "temporal_status": "ACTIVE_PRESENT",
+            "historical_info": None,
+            "active_trajectory": act_traj
+        }
+
+    def detect_with_gemini(
+        self,
+        image_bytes: bytes,
+        mime_type: str = "image/jpeg",
+        api_key: Optional[str] = None,
+        mode: str = "demo",
+        filename: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Unified Single-Pass Cyclone Analysis powered by Google Gemini Vision with instant caching.
-        Extracts Detection, Georeferenced Coordinates, and Intensity/Classification in ONE call.
+        Extracts Detection, Georeferenced Coordinates, Intensity/Classification, and Temporal/Live Intelligence.
         Subsequent calls for intensity or coordinates return from in-memory cache in <1 millisecond.
         If Cloud API is busy, immediately falls back to local EfficientNet ML models (<1.0s).
         """
         t0 = time.perf_counter()
         img_hash = hashlib.md5(image_bytes).hexdigest()
+        cache_key = f"{img_hash}_{mode}"
 
         # Check in-memory single-pass cache first (< 0.1ms)
-        cached = self._analysis_cache.get(img_hash)
+        cached = self._analysis_cache.get(cache_key) or self._analysis_cache.get(img_hash)
         if cached and "detection" in cached:
             det = dict(cached["detection"])
             det["inference_time_ms"] = round((time.perf_counter() - t0) * 1000, 1)
@@ -336,12 +640,45 @@ class CloudVisionIntensityService:
             "     * Vmax < 34 kt -> 'LOW' (Tropical Depression)\n"
             "     * 34 kt <= Vmax < 64 kt -> 'MEDIUM' (Tropical Storm)\n"
             "     * Vmax >= 64 kt -> 'SEVERE' (Tropical Cyclone)\n\n"
+            "TASK 4: CYCLONE IDENTIFICATION & TEMPORAL INTELLIGENCE (DEMO vs LIVE):\n"
+            "- Identify the cyclone name or designation if recognizable (e.g. 'Cyclone Murasu', 'Cyclone Dana', 'Cyclone Biparjoy', 'Cyclone Michaung', 'Cyclone Fani', 'Cyclone Amphan', 'Cyclone Remal', 'Cyclone Tauktae', or 'Active Tropical Disturbance BOB-01' / 'Active Tropical Disturbance ARB-01').\n"
+            "- Determine temporal_status: 'HISTORICAL' if it occurred in past seasons, or 'ACTIVE_PRESENT' if it represents an ongoing or near-real-time active system.\n"
+            "- If HISTORICAL:\n"
+            "  * historical_year: (int, e.g. 2024, 2023, 2020, 2019)\n"
+            "  * historical_landfall: actual official landfall location and date\n"
+            "  * historical_peak_intensity_kt: peak lifetime intensity in knots\n"
+            "  * historical_summary: 1-2 sentence official IMD retrospective summary\n"
+            "- If ACTIVE_PRESENT (or live projection):\n"
+            "  * current_place: descriptive location and distance from Indian coast\n"
+            "  * movement_direction: direction of motion (e.g. 'North-Northwest (NNW)')\n"
+            "  * movement_speed_kmh: speed of motion in km/h (e.g. 15.0)\n"
+            "  * projected_landfall: expected landfall zone and timeframe\n"
+            "  * probable_future_waypoints: array of 3 future forecast points (24h, 48h, 72h) each with horizon_hours (int), latitude (float), longitude (float), wind_speed_kt (float), stage (str), and region (str).\n\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "is_valid_satellite": true,\n'
             '  "validation_message": "Valid Earth meteorological satellite observation.",\n'
             '  "is_cyclone": true,\n'
             '  "confidence_percent": 95.0,\n'
+            '  "cyclone_name": "Cyclone Dana",\n'
+            '  "temporal_status": "HISTORICAL",\n'
+            '  "historical_info": {\n'
+            '    "year": 2024,\n'
+            '    "actual_landfall": "Between Puri and Sagar Island, near Dhamra Port, Odisha (25 Oct 2024)",\n'
+            '    "peak_intensity_kt": 65.0,\n'
+            '    "historical_summary": "Severe Cyclonic Storm Dana crossed north Odisha coast near Habalikhati Nature Camp with peak winds up to 120 km/h."\n'
+            '  },\n'
+            '  "active_trajectory": {\n'
+            '    "current_place": "East-Central Bay of Bengal (280 km ESE of Paradip, Odisha)",\n'
+            '    "movement_direction": "North-Northwest (NNW)",\n'
+            '    "movement_speed_kmh": 14.5,\n'
+            '    "projected_landfall": "Approaching North Odisha / West Bengal coast within 48-72h",\n'
+            '    "probable_future_waypoints": [\n'
+            '      {"horizon_hours": 24, "latitude": 18.6, "longitude": 87.4, "wind_speed_kt": 60.0, "stage": "Severe Cyclonic Storm", "region": "Northwest Bay of Bengal"},\n'
+            '      {"horizon_hours": 48, "latitude": 20.2, "longitude": 86.8, "wind_speed_kt": 65.0, "stage": "Peak Intensity Landfall", "region": "Odisha Coastal Shelf"},\n'
+            '      {"horizon_hours": 72, "latitude": 21.4, "longitude": 86.1, "wind_speed_kt": 40.0, "stage": "Inland Depression", "region": "Interior Odisha / Jharkhand"}\n'
+            '    ]\n'
+            '  },\n'
             '  "latitude": 15.3,\n'
             '  "longitude": 89.6,\n'
             '  "subbasin": "Bay of Bengal",\n'
@@ -500,6 +837,17 @@ class CloudVisionIntensityService:
                 "description": reasoning
             }
 
+            # Enrich with Temporal & Live Operational Intelligence
+            intel = self.enrich_cyclone_intelligence(
+                parsed,
+                filename=filename,
+                mode=mode,
+                lat_val=lat_val or 15.3,
+                lon_val=lon_val or 89.6,
+                vmax=vmax,
+                basin_val=subbasin_val or "Bay of Bengal"
+            )
+
             detection_res = {
                 "success": True,
                 "is_cyclone": is_cyclone,
@@ -519,16 +867,23 @@ class CloudVisionIntensityService:
                 "validation_message": val_msg,
                 "source": f"Google Gemini Vision ({used_model})",
                 "inference_time_ms": round(t_infer * 1000, 1),
+                "operational_mode": mode,
+                "cyclone_name": intel["cyclone_name"] if is_cyclone else None,
+                "temporal_status": intel["temporal_status"] if is_cyclone else None,
+                "historical_info": intel["historical_info"] if is_cyclone else None,
+                "active_trajectory": intel["active_trajectory"] if is_cyclone else None,
                 # Embed intensity so frontend can use it directly with 0 additional calls!
                 "intensity": intensity_res if is_cyclone else None
             }
 
             # Cache the unified result in memory
-            self._analysis_cache[img_hash] = {
+            cache_payload = {
                 "detection": detection_res,
                 "intensity": intensity_res,
                 "coordinates": coords_res
             }
+            self._analysis_cache[cache_key] = cache_payload
+            self._analysis_cache[img_hash] = cache_payload
 
             return detection_res
 

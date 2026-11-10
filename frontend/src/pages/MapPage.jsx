@@ -77,7 +77,9 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
 
   const aiCyclone = isAiCyclone ? {
     id: `ai-detected-${currentAnalysis.id || 'active'}`,
-    name: currentAnalysis.fileName 
+    name: currentAnalysis.cycloneName 
+      ? currentAnalysis.cycloneName 
+      : currentAnalysis.fileName 
       ? `Cyclone ${currentAnalysis.fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ')}` 
       : 'AI Detected Tropical Cyclone',
     latitude: aiLat,

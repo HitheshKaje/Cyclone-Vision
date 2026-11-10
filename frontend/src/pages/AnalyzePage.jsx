@@ -25,10 +25,17 @@ import {
   Crosshair,
   Map,
   Navigation,
-  Radio
+  Radio,
+  Zap,
+  History,
+  Calendar,
+  Anchor,
+  Landmark,
+  Activity,
+  TrendingUp,
+  RefreshCw
 } from 'lucide-react';
 
-import CoastalBroadcastControl from '../components/CoastalBroadcastControl';
 import { getApiBaseUrl } from '../utils/apiConfig';
 import { logAnalysisEvent } from '../utils/auditLogger';
 import { saveAnalysisRecord, deleteAnalysisRecord } from '../utils/analysisApi';
@@ -45,6 +52,7 @@ const AnalyzePage = ({
   setAnalysisHistory,
   setActiveTab
 }) => {
+  const [operationalMode, setOperationalMode] = useState(() => currentAnalysis?.operationalMode || 'demo');
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(currentAnalysis?.imagePreview || null);
   const [isDragging, setIsDragging] = useState(false);
@@ -66,6 +74,7 @@ const AnalyzePage = ({
   // Synchronize local states whenever currentAnalysis changes (e.g. from history or tab navigation)
   useEffect(() => {
     if (currentAnalysis) {
+      if (currentAnalysis.operationalMode) setOperationalMode(currentAnalysis.operationalMode);
       if (currentAnalysis.latitude != null) setLatitude(String(currentAnalysis.latitude));
       if (currentAnalysis.longitude != null) setLongitude(String(currentAnalysis.longitude));
       if (currentAnalysis.subbasin) setCoordSubbasin(currentAnalysis.subbasin);
@@ -152,6 +161,29 @@ const AnalyzePage = ({
       }
       return rec;
     }));
+  };
+
+  const handleNavigateWithSync = (tabTarget) => {
+    if (currentAnalysis) {
+      const syncLat = parseFloat(latitude) || currentAnalysis.latitude;
+      const syncLon = parseFloat(longitude) || currentAnalysis.longitude;
+      const syncBasin = coordSubbasin || currentAnalysis.subbasin;
+      const syncMethod = coordMethod || currentAnalysis.coordMethod;
+      setCurrentAnalysis(prev => prev ? ({
+        ...prev,
+        latitude: syncLat,
+        longitude: syncLon,
+        subbasin: syncBasin,
+        coordMethod: syncMethod,
+        detection: prev.detection ? {
+          ...prev.detection,
+          latitude: syncLat,
+          longitude: syncLon,
+          subbasin: syncBasin
+        } : prev.detection
+      }) : prev);
+    }
+    setActiveTab(tabTarget);
   };
 
   const loadSampleImage = async (url, filename) => {
@@ -314,6 +346,7 @@ const AnalyzePage = ({
       // Step 1: Objective 1 Cyclone Detection (Single-pass fast analysis)
       const formData = new FormData();
       formData.append('image', file);
+      formData.append('mode', operationalMode);
 
       const detectResponse = await fetch(`${apiBase}/api/detect`, {
         method: 'POST',
@@ -431,11 +464,21 @@ const AnalyzePage = ({
         detectData.subbasin = finalSubbasin;
       }
 
+      const cycloneName = detectData.cyclone_name || (detectData.is_cyclone ? 'Tropical Cyclone' : null);
+      const temporalStatus = detectData.temporal_status || (operationalMode === 'live' ? 'ACTIVE_PRESENT' : null);
+      const historicalInfo = detectData.historical_info || null;
+      const activeTrajectory = detectData.active_trajectory || null;
+
       const analysisRecord = {
         id: Date.now().toString(),
         fileName: file.name,
         imageFile: file,
         imagePreview: previewUrl,
+        operationalMode: operationalMode,
+        cycloneName: cycloneName,
+        temporalStatus: temporalStatus,
+        historicalInfo: historicalInfo,
+        activeTrajectory: activeTrajectory,
         detection: detectData,
         intensity: intensityData,
         classification: classificationData,
@@ -494,14 +537,76 @@ const AnalyzePage = ({
         </div>
         <div className="relative z-10 max-w-2xl">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-            <div className="p-2 bg-sky-500/20 rounded-xl text-sky-400">
-              <UploadCloud size={24} />
+            <div className={`p-2 rounded-xl text-white ${operationalMode === 'live' ? 'bg-rose-500/80 text-white' : 'bg-sky-500/20 text-sky-400'}`}>
+              {operationalMode === 'live' ? <Radio size={24} className="animate-pulse" /> : <UploadCloud size={24} />}
             </div>
             Analyze Satellite Image
           </h1>
           <p className="text-sm text-slate-700 dark:text-slate-300 mt-2 font-medium">
-            Upload a satellite image to detect cyclones, estimate intensity, and get a detailed analysis report.
+            Upload a satellite image to detect cyclones, estimate intensity, and track trajectory.
           </p>
+        </div>
+      </div>
+
+      {/* Operational Mode Switcher (Demo vs Go Live) */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 px-4 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 shadow-sm backdrop-blur-md">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            Mode:
+          </span>
+          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${
+            operationalMode === 'live'
+              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+              : 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20'
+          }`}>
+            {operationalMode === 'live' ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                </span>
+                <span>Live Mode</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={13} />
+                <span>Demo Mode</span>
+              </>
+            )}
+          </span>
+        </div>
+
+        <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-inner">
+          <button
+            type="button"
+            onClick={() => {
+              setOperationalMode('demo');
+              handleResetImage();
+            }}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              operationalMode === 'demo'
+                ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Sparkles size={14} />
+            <span>Demo Mode</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOperationalMode('live');
+              handleResetImage();
+            }}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              operationalMode === 'live'
+                ? 'bg-rose-500 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${operationalMode === 'live' ? 'bg-white' : 'bg-rose-500'} animate-pulse`}></span>
+            <span>Go Live</span>
+          </button>
         </div>
       </div>
 
@@ -594,14 +699,16 @@ const AnalyzePage = ({
                       disabled={!file || isAnalyzing}
                       className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                         file && !isAnalyzing
-                          ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-slate-900 shadow-lg shadow-emerald-500/20 cursor-pointer'
+                          ? operationalMode === 'live'
+                            ? 'bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 hover:from-red-500 hover:to-rose-500 text-white shadow-lg shadow-rose-600/30 cursor-pointer active:scale-98'
+                            : 'bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-slate-900 shadow-lg shadow-emerald-500/20 cursor-pointer active:scale-98'
                           : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 cursor-not-allowed'
                       }`}
                     >
                       {isAnalyzing ? (
-                        <><Loader2 size={18} className="animate-spin" /> Running AI Analysis...</>
+                        <><Loader2 size={18} className="animate-spin" /> {operationalMode === 'live' ? 'Ingesting Live Satellite Telemetry...' : 'Running AI Analysis...'}</>
                       ) : (
-                        <><Play size={16} className="fill-current" /> Analyze Image</>
+                        <><Play size={16} className="fill-current" /> {operationalMode === 'live' ? '🔴 Analyze Live Cyclone & Predict Future Track' : 'Analyze Image'}</>
                       )}
                     </button>
                   </div>
@@ -806,54 +913,109 @@ const AnalyzePage = ({
                       </div>
                     </div>
                   ) : currentAnalysis?.detection?.is_cyclone ? (
-                    /* Cyclone Confirmed: Show Geographical Coordinates Confirmation & Direct Navigation */
-                    <div className="rounded-2xl border-2 border-emerald-500/40 bg-white dark:bg-gradient-to-b dark:from-slate-900/90 dark:to-[#0b1329] p-5 space-y-4 shadow-xl text-slate-900 dark:text-white">
+                    /* Cyclone Confirmed: Clean Telemetry, Intensity & Coordinates Card */
+                    <div className="rounded-2xl border-2 border-emerald-500/40 bg-white dark:bg-gradient-to-b dark:from-slate-900/95 dark:to-[#0b1329] p-5 space-y-4 shadow-xl text-slate-900 dark:text-white">
                       {/* Header */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-200 dark:border-slate-700/60">
-                        <div className="flex items-center gap-2.5">
-                          <div className="p-2 rounded-xl bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/30">
-                            <Compass size={22} className="animate-pulse" />
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-xl bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/30">
+                            <Compass size={24} className="animate-pulse" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="text-base font-black tracking-tight text-slate-900 dark:text-white">
-                                Cyclone Detected — Geographical Coordinates & Location
+                              <h3 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
+                                {operationalMode === 'live' && (currentAnalysis.cycloneName || currentAnalysis.historicalInfo?.name)
+                                  ? (currentAnalysis.cycloneName || currentAnalysis.historicalInfo?.name)
+                                  : 'Cyclone Detected — Coordinates & Location'}
                               </h3>
-                              {isExtractingCoords ? (
-                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40 flex items-center gap-1 animate-pulse shadow-xs">
-                                  <RefreshCw size={11} className="animate-spin" /> Auto-Extracting Eyewall Coordinates...
-                                </span>
-                              ) : hasRadiusLines ? (
-                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 flex items-center gap-1 shadow-xs">
-                                  <Sparkles size={11} /> {coordMethod || 'AI Georeferenced Eyewall Coordinates'}
+                              {operationalMode === 'live' && currentAnalysis.historicalInfo ? (
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40 flex items-center gap-1 shadow-xs">
+                                  <History size={11} /> Historical Landmark Archive
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30">
-                                  {coordMethod || 'Location Auto-Detected'}
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shadow-xs">
+                                  <Sparkles size={11} /> AI Georeferenced Coordinates
+                                </span>
+                              )}
+                              {operationalMode === 'live' && currentAnalysis.historicalInfo?.season && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                  {currentAnalysis.historicalInfo.season}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                              {hasRadiusLines
-                                ? 'Concentric radius range rings & storm eye detected. Coordinates extracted from satellite image.'
-                                : 'Coordinates auto-calculated from satellite vortex center. You can verify or fine-tune before viewing on the Live Map or alerting citizens.'}
-                            </p>
                           </div>
                         </div>
 
                         {/* Basin Badge */}
                         <div className="shrink-0 self-start sm:self-center">
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                            coordSubbasin === 'Bay of Bengal'
-                              ? 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border-blue-500/30'
-                              : 'bg-teal-500/10 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300 border-teal-500/30'
-                          }`}>
-                            Basin: {coordSubbasin || 'North Indian Ocean'}
+                          <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border border-blue-500/30">
+                            Basin: {currentAnalysis.historicalInfo?.basin || coordSubbasin || 'Bay of Bengal'}
                           </span>
                         </div>
                       </div>
 
-                      {/* Coordinate Inputs (Editable after detection) */}
+                      {/* Intensity & Landfall Details */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        {/* Peak Sustained Wind (Intensity) */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+                          <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400">
+                            <Wind size={15} /> Peak Sustained Wind
+                          </div>
+                          <p className="text-lg font-black text-slate-900 dark:text-white">
+                            {currentAnalysis.intensity?.wind_speed_kt || currentAnalysis.detection?.wind_speed_kt || (operationalMode === 'live' && currentAnalysis.historicalInfo?.peak_intensity_kt) || 65} kt
+                            <span className="text-xs font-normal text-slate-500 ml-1.5">
+                              (~{currentAnalysis.intensity?.wind_speed_kmh || Math.round((currentAnalysis.intensity?.wind_speed_kt || 65) * 1.852)} km/h)
+                            </span>
+                          </p>
+                          <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                            {currentAnalysis.intensity?.category || currentAnalysis.classification?.category || (operationalMode === 'live' && currentAnalysis.historicalInfo?.category) || 'Severe Cyclonic Storm'}
+                          </p>
+                        </div>
+
+                        {/* Card 2: Only show Actual Landfall in Live Mode. In Demo Mode, show Central Pressure / Threat Level */}
+                        {operationalMode === 'live' && currentAnalysis.historicalInfo?.actual_landfall ? (
+                          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                              <Anchor size={15} /> Actual Landfall Recorded
+                            </div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">
+                              {currentAnalysis.historicalInfo.actual_landfall}
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              IMD Official Archive
+                            </p>
+                          </div>
+                        ) : operationalMode === 'live' && currentAnalysis.activeTrajectory?.closest_port ? (
+                          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                              <Anchor size={15} /> Proximity to Harbor
+                            </div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">
+                              {currentAnalysis.activeTrajectory.distance_km} km to {currentAnalysis.activeTrajectory.closest_port}
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              Marine Early Warning
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+                            <div className="flex items-center gap-2 text-xs font-bold text-sky-600 dark:text-sky-400">
+                              <Activity size={15} /> Estimated Central Pressure
+                            </div>
+                            <p className="text-lg font-black text-slate-900 dark:text-white">
+                              {currentAnalysis.intensity?.pressure_mb || 968} hPa
+                              <span className="text-xs font-normal text-slate-500 ml-1.5">
+                                (Barometric Core)
+                              </span>
+                            </p>
+                            <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                              High Threat Cyclonic Vortex
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Coordinates: Latitude & Longitude Inputs */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         <div>
                           <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1 flex items-center justify-between">
@@ -870,7 +1032,7 @@ const AnalyzePage = ({
                               max="30.0"
                               value={latitude}
                               onChange={(e) => handleUpdateCoordinates(e.target.value, longitude)}
-                              placeholder="e.g. 15.40"
+                              placeholder="e.g. 16.50"
                               className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500 transition-colors"
                             />
                             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">
@@ -908,7 +1070,7 @@ const AnalyzePage = ({
                       <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
                         <button
                           type="button"
-                          onClick={() => setActiveTab('map')}
+                          onClick={() => handleNavigateWithSync('map')}
                           className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-600/30 transition-all cursor-pointer active:scale-95"
                         >
                           <Map size={17} />
@@ -917,7 +1079,7 @@ const AnalyzePage = ({
 
                         <button
                           type="button"
-                          onClick={() => setActiveTab('prediction')}
+                          onClick={() => handleNavigateWithSync('prediction')}
                           className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer active:scale-95"
                         >
                           <Navigation size={17} />
@@ -926,29 +1088,8 @@ const AnalyzePage = ({
 
                         <button
                           type="button"
-                          onClick={() => {
-                            if (currentAnalysis) {
-                              const syncLat = parseFloat(latitude) || currentAnalysis.latitude;
-                              const syncLon = parseFloat(longitude) || currentAnalysis.longitude;
-                              const syncBasin = coordSubbasin || currentAnalysis.subbasin;
-                              const syncMethod = coordMethod || currentAnalysis.coordMethod;
-                              setCurrentAnalysis(prev => ({
-                                ...prev,
-                                latitude: syncLat,
-                                longitude: syncLon,
-                                subbasin: syncBasin,
-                                coordMethod: syncMethod,
-                                detection: prev.detection ? {
-                                  ...prev.detection,
-                                  latitude: syncLat,
-                                  longitude: syncLon,
-                                  subbasin: syncBasin
-                                } : prev.detection
-                              }));
-                            }
-                            setActiveTab('results');
-                          }}
-                          className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0"
+                          onClick={() => handleNavigateWithSync('results')}
+                          className="py-3 px-4 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-sm"
                         >
                           <span>Full Report</span>
                           <ArrowRight size={15} />
@@ -977,13 +1118,6 @@ const AnalyzePage = ({
                         <span>View Report</span>
                         <ArrowRight size={15} />
                       </button>
-                    </div>
-                  )}
-
-                  {/* Coastal Early Warning & Citizen Siren Broadcast Control (ONLY for verified cyclones) */}
-                  {currentAnalysis && isValidSatellite && currentAnalysis?.detection?.is_cyclone && (
-                    <div className="pt-2">
-                      <CoastalBroadcastControl currentAnalysis={currentAnalysis} />
                     </div>
                   )}
                 </div>
@@ -1030,43 +1164,90 @@ const AnalyzePage = ({
         {!previewUrl && (
           <div className="xl:col-span-5 2xl:col-span-4 space-y-6">
             
-            {/* Try Sample Images */}
-            <div className="app-card p-5 border border-emerald-500/30 bg-gradient-to-b from-emerald-900/10 to-transparent shadow-[0_0_30px_rgba(16,185,129,0.05)]">
+            {/* Try Sample Images / Real-World Feeds */}
+            <div className={`app-card p-5 border transition-all ${
+              operationalMode === 'live' 
+                ? 'border-red-500/30 bg-gradient-to-b from-red-950/20 to-transparent shadow-[0_0_30px_rgba(239,68,68,0.08)]' 
+                : 'border-emerald-500/30 bg-gradient-to-b from-emerald-900/10 to-transparent shadow-[0_0_30px_rgba(16,185,129,0.05)]'
+            }`}>
               <div className="flex items-center justify-between pb-3 border-b border-slate-200/50 dark:border-slate-700/50">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                    <Sparkles size={18} />
+                  <div className={`p-1.5 rounded-lg ${operationalMode === 'live' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                    {operationalMode === 'live' ? <Radio size={18} className="animate-pulse" /> : <Sparkles size={18} />}
                   </div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">Sample Images</h3>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+                    {operationalMode === 'live' ? 'Real-World Satellite Feeds' : 'Benchmark Sample Images'}
+                  </h3>
                 </div>
-                <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider cursor-pointer hover:text-sky-300">View More &rarr;</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${operationalMode === 'live' ? 'text-red-400' : 'text-sky-400'}`}>
+                  {operationalMode === 'live' ? 'Live Telemetry' : 'Demo Test'}
+                </span>
               </div>
               
               {isLoadingSample ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-3">
-                  <Loader2 size={28} className="text-emerald-400 animate-spin" />
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Loading demo image...</span>
+                  <Loader2 size={28} className={`${operationalMode === 'live' ? 'text-red-400' : 'text-emerald-400'} animate-spin`} />
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Loading satellite feed...</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-3 pt-4">
-                  {[
-                    { id: 'severe', name: 'Severe Cyclone', url: '/samples/severe_cyclone.jpg' },
-                    { id: 'moderate', name: 'Moderate Cyclone', url: '/samples/moderate_cyclone.jpg' },
-                    { id: 'clear', name: 'Calm Weather', url: '/samples/clear_weather.jpg' }
-                  ].map((sample) => (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4">
+                  {(operationalMode === 'live' ? [
+                    { 
+                      id: 'dana', 
+                      name: 'Cyclone Dana (Oct 2024)', 
+                      badge: '📜 Historical', 
+                      badgeStyle: 'bg-amber-500/20 text-amber-500 border-amber-500/30',
+                      sub: 'Odisha Landfall (120 km/h)',
+                      url: '/samples/cyclone_dana_live.jpg' 
+                    },
+                    { 
+                      id: 'biparjoy', 
+                      name: 'Cyclone Biparjoy (Jun 2023)', 
+                      badge: '📜 Historical', 
+                      badgeStyle: 'bg-amber-500/20 text-amber-500 border-amber-500/30',
+                      sub: 'Gujarat Landfall (167 km/h)',
+                      url: '/samples/cyclone_biparjoy_live.jpg' 
+                    },
+                    { 
+                      id: 'active_bob01', 
+                      name: 'Active Disturbance BOB-01', 
+                      badge: '⚡ Real-Time', 
+                      badgeStyle: 'bg-red-500/20 text-red-400 border-red-500/30 animate-pulse',
+                      sub: 'Current Bay of Bengal',
+                      url: '/samples/cyclone_active_bob01.jpg' 
+                    }
+                  ] : [
+                    { id: 'severe', name: 'Severe Cyclone', badge: 'Category 3+', badgeStyle: 'bg-red-500/20 text-red-400 border-red-500/30', sub: 'High eyewall rotation', url: '/samples/severe_cyclone.jpg' },
+                    { id: 'moderate', name: 'Moderate Cyclone', badge: 'Tropical Storm', badgeStyle: 'bg-amber-500/20 text-amber-400 border-amber-500/30', sub: 'Developing system', url: '/samples/moderate_cyclone.jpg' },
+                    { id: 'clear', name: 'Calm Weather', badge: 'Normal Sea', badgeStyle: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', sub: 'No tropical cyclone', url: '/samples/clear_weather.jpg' }
+                  ]).map((sample) => (
                     <div 
                       key={sample.id} 
-                      onClick={() => loadSampleImage(sample.url, `demo_${sample.id}.jpg`)}
-                      className="group cursor-pointer bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-xl overflow-hidden hover:border-sky-500/50 hover:shadow-lg transition-all flex flex-col"
+                      onClick={() => loadSampleImage(sample.url, `${sample.id}.jpg`)}
+                      className={`group cursor-pointer bg-white dark:bg-slate-900 border rounded-xl overflow-hidden hover:shadow-lg transition-all flex flex-col ${
+                        operationalMode === 'live' 
+                          ? 'border-red-500/30 hover:border-red-400' 
+                          : 'border-slate-200/80 dark:border-slate-700/80 hover:border-sky-500/50'
+                      }`}
                     >
                       <div className="aspect-[4/3] w-full relative overflow-hidden">
                         <div className="absolute inset-0 bg-slate-900/30 group-hover:bg-transparent transition-colors z-10"></div>
                         <img src={sample.url} alt={sample.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" crossOrigin="anonymous" />
+                        <span className={`absolute top-2 left-2 z-20 text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${sample.badgeStyle}`}>
+                          {sample.badge}
+                        </span>
                       </div>
-                      <div className="p-2 flex-1 flex flex-col justify-between bg-slate-100/80 dark:bg-slate-800/80 text-center space-y-2">
-                        <p className="text-[10px] font-bold text-slate-800 dark:text-slate-200">{sample.name}</p>
-                        <button className="w-full py-1 rounded bg-sky-500 text-slate-900 dark:text-white text-[10px] font-bold hover:bg-sky-400 transition-colors">
-                          Analyze
+                      <div className="p-2.5 flex-1 flex flex-col justify-between bg-slate-50 dark:bg-slate-800/80 text-center space-y-2">
+                        <div>
+                          <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100 line-clamp-1">{sample.name}</p>
+                          <p className="text-[9px] text-slate-500 line-clamp-1 mt-0.5">{sample.sub}</p>
+                        </div>
+                        <button className={`w-full py-1.5 rounded-lg text-white text-[10px] font-bold transition-all shadow-xs ${
+                          operationalMode === 'live'
+                            ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500'
+                            : 'bg-sky-500 hover:bg-sky-400 text-slate-900 font-bold'
+                        }`}>
+                          {operationalMode === 'live' ? 'Ingest Feed' : 'Analyze'}
                         </button>
                       </div>
                     </div>

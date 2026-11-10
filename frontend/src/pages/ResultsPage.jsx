@@ -13,7 +13,12 @@ import {
   Activity,
   PieChart as PieChartIcon,
   Map,
-  Navigation
+  Navigation,
+  Radio,
+  Zap,
+  Landmark,
+  History,
+  Anchor
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -211,6 +216,63 @@ const ResultsPage = ({
           </button>
         </div>
       </div>
+
+      {/* Operational Ingestion Intelligence Banner (Historical vs Active) */}
+      {isCyclone && (currentAnalysis?.temporalStatus === 'HISTORICAL' || currentAnalysis?.historicalInfo) && (
+        <div className="p-4 rounded-2xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-slate-900/60 to-slate-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-500 border border-amber-500/30 shrink-0">
+              <Landmark size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-black text-slate-900 dark:text-white">
+                  {currentAnalysis.cycloneName || 'Historical Cyclone Record'}
+                </span>
+                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  <History size={10} className="inline mr-1" /> Historical Landmark Archive ({currentAnalysis.historicalInfo?.year || 'Archived'})
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                Actual Verified Landfall: <span className="font-bold text-amber-900 dark:text-amber-300">{currentAnalysis.historicalInfo?.actual_landfall || 'Recorded Coastal Landfall'}</span> • Peak Sustained Winds: <span className="font-bold text-slate-900 dark:text-white">{currentAnalysis.historicalInfo?.peak_intensity_kt || windKt} kt (~{currentAnalysis.historicalInfo?.peak_intensity_kmh || windKmh} km/h)</span>
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 shrink-0">
+            Basin: {currentAnalysis.historicalInfo?.basin || displayBasin}
+          </span>
+        </div>
+      )}
+
+      {isCyclone && (currentAnalysis?.temporalStatus === 'ACTIVE_PRESENT' || currentAnalysis?.activeTrajectory) && (
+        <div className="p-4 rounded-2xl border-2 border-red-500/40 bg-gradient-to-r from-red-600/15 via-slate-900/80 to-[#070d1e] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-red-500/20 text-red-500 border border-red-500/30 shrink-0">
+              <Zap size={22} className="animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-black text-slate-900 dark:text-white">
+                  {currentAnalysis.cycloneName || 'Active Tropical Cyclone'}
+                </span>
+                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 animate-pulse">
+                  <Radio size={10} className="inline mr-1" /> Live Threat Active
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                Proximity: <span className="font-bold text-slate-900 dark:text-white">{currentAnalysis.activeTrajectory?.current_place || `${displayBasin} Coastal Shelf`}</span> • Drift: <span className="font-bold text-slate-900 dark:text-white">{currentAnalysis.activeTrajectory?.movement_direction || 'NNW'} at {currentAnalysis.activeTrajectory?.movement_speed_kmh || 15} km/h</span>
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab('map')}
+            className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-600/30 transition-all shrink-0 cursor-pointer"
+          >
+            <Map size={14} />
+            <span>Track Live Path</span>
+          </button>
+        </div>
+      )}
 
       {/* Coastal Early Warning & Citizen Broadcast Controller (Shown ONLY for valid satellite observations) */}
       {!isValidSatellite ? (

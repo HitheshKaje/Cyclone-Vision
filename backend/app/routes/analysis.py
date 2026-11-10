@@ -36,6 +36,14 @@ class AnalysisRecordPayload(BaseModel):
     coordMethod: Optional[str] = None
     coordConfidence: Optional[float] = None
     timestamp: Optional[str] = None
+    operationalMode: Optional[str] = "demo"
+    cycloneName: Optional[str] = None
+    temporalStatus: Optional[str] = None
+    historicalInfo: Optional[Dict[str, Any]] = None
+    activeTrajectory: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "allow"
 
 
 @router.get("/analysis/stats")

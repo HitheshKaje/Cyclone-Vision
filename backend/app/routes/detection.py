@@ -2,7 +2,8 @@ import os
 import sys
 import time
 import logging
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from typing import Optional
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from services.ml_service import ml_service
 from services.cloud_vision_service import cloud_vision_service
 
@@ -16,7 +17,10 @@ def get_model():
     return None
 
 @router.post("/detect")
-async def detect_cyclone(image: UploadFile = File(...)):
+async def detect_cyclone(
+    image: UploadFile = File(...),
+    mode: Optional[str] = Form("demo")
+):
     # Validate file type
     if not image.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.tif')):
         raise HTTPException(status_code=400, detail="Unsupported file format. Please upload an image.")
@@ -50,7 +54,12 @@ async def detect_cyclone(image: UploadFile = File(...)):
 
         # 1. Engine: High-Accuracy Google Gemini Vision AI API (Exclusively)
         try:
-            result = cloud_vision_service.detect_with_gemini(image_bytes, mime_type=mime_type)
+            result = cloud_vision_service.detect_with_gemini(
+                image_bytes, 
+                mime_type=mime_type, 
+                mode=mode or "demo", 
+                filename=image.filename
+            )
             if result.get("is_valid_satellite") is False:
                 return result
         except Exception as g_err:
