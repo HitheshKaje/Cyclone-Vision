@@ -1,3 +1,16 @@
+# Documents, Reports & Presentations
+*.pdf
+*.docx
+*.doc
+*.pptx
+*.ppt
+*.xlsx
+*.xls
+HI/
+reports/
+report/
+docs/reports/
+
 # Python
 __pycache__/
 *.pyc
