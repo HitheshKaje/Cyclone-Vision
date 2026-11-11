@@ -862,56 +862,65 @@ const AnalyzePage = ({
               {isCompleted && (
                 <div className="space-y-4 pt-1">
                   {!isValidSatellite ? (
-                    /* CASE 1: Rejected Non-Satellite Image (Person, everyday object, galaxy, graphic) */
-                    <div className="p-5 rounded-2xl border-2 border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20 text-slate-900 dark:text-slate-100 space-y-4 shadow-lg">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-amber-200 dark:border-amber-800/40">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                            <AlertTriangle size={24} />
+                    /* CASE 1: Rejected Image (Non-satellite or Non-Indian coastal region) */
+                    (() => {
+                      const isCoastalRejection = currentAnalysis?.detection?.validation_message?.toLowerCase()?.includes('indian coastal');
+                      return (
+                        <div className="p-5 rounded-2xl border-2 border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20 text-slate-900 dark:text-slate-100 space-y-4 shadow-lg">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-amber-200 dark:border-amber-800/40">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                <AlertTriangle size={24} />
+                              </div>
+                              <div>
+                                <h3 className="text-base font-bold text-amber-950 dark:text-amber-200">
+                                  {isCoastalRejection 
+                                    ? 'Regional Domain Restriction — Indian Coastal Regions Only' 
+                                    : 'Invalid Image — Not a Meteorological Satellite Image'}
+                                </h3>
+                                <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                                  {isCoastalRejection 
+                                    ? 'Only tropical cyclones and weather observations from the Bay of Bengal or Arabian Sea are permitted.'
+                                    : 'The uploaded file is not recognized as an Earth weather satellite observation.'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                              {isCoastalRejection ? 'Non-Indian Coastal Region' : 'Non-Satellite Input'}
+                            </span>
                           </div>
-                          <div>
-                            <h3 className="text-base font-bold text-amber-950 dark:text-amber-200">
-                              Invalid Image — Not a Meteorological Satellite Image
-                            </h3>
-                            <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
-                              The uploaded file is not recognized as an Earth weather satellite observation.
+
+                          <div className="text-xs text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-amber-200/60 dark:border-amber-800/30 space-y-1">
+                            <p className="font-semibold text-amber-900 dark:text-amber-300">
+                              Validation Notice:
+                            </p>
+                            <p className="text-slate-700 dark:text-slate-200 leading-relaxed font-bold">
+                              {currentAnalysis?.detection?.validation_message || 'Please upload Indian coastal related images only.'}
                             </p>
                           </div>
+
+                          <div className="flex flex-wrap items-center gap-3 pt-1">
+                            <button
+                              type="button"
+                              onClick={handleResetImage}
+                              className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-amber-600/20 transition-all cursor-pointer"
+                            >
+                              <RotateCcw size={15} />
+                              <span>{isCoastalRejection ? 'Upload Indian Coastal Image' : 'Upload Genuine Satellite Image'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('results')}
+                              className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
+                            >
+                              <span>Rejection Diagnostics</span>
+                              <ArrowRight size={14} />
+                            </button>
+                          </div>
                         </div>
-                        <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30">
-                          Non-Satellite Input
-                        </span>
-                      </div>
-
-                      <div className="text-xs text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 p-3.5 rounded-xl border border-amber-200/60 dark:border-amber-800/30 space-y-1">
-                        <p className="font-semibold text-amber-900 dark:text-amber-300">
-                          Domain Gate Reason:
-                        </p>
-                        <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                          {currentAnalysis?.detection?.validation_message || 'Detected non-satellite photo (e.g. human portrait, selfie, everyday object, or outer space graphic). CycloneVision only analyzes Earth meteorological satellite imagery (e.g. INSAT-3D, GOES, NOAA, Himawari).'}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3 pt-1">
-                        <button
-                          type="button"
-                          onClick={handleResetImage}
-                          className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-amber-600/20 transition-all cursor-pointer"
-                        >
-                          <RotateCcw size={15} />
-                          <span>Upload Genuine Satellite Image</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('results')}
-                          className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
-                        >
-                          <span>Rejection Diagnostics</span>
-                          <ArrowRight size={14} />
-                        </button>
-                      </div>
-                    </div>
+                      );
+                    })()
                   ) : currentAnalysis?.detection?.is_cyclone ? (
                     /* Cyclone Confirmed: Clean Telemetry, Intensity & Coordinates Card */
                     <div className="rounded-2xl border-2 border-emerald-500/40 bg-white dark:bg-gradient-to-b dark:from-slate-900/95 dark:to-[#0b1329] p-5 space-y-4 shadow-xl text-slate-900 dark:text-white">
@@ -928,7 +937,11 @@ const AnalyzePage = ({
                                   ? (currentAnalysis.cycloneName || currentAnalysis.historicalInfo?.name)
                                   : 'Cyclone Detected — Coordinates & Location'}
                               </h3>
-                              {operationalMode === 'live' && currentAnalysis.historicalInfo ? (
+                              {operationalMode === 'live' && currentAnalysis.temporalStatus === 'ACTIVE_PRESENT' ? (
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shadow-xs">
+                                  <Sparkles size={11} /> Live Satellite & Internet Intelligence
+                                </span>
+                              ) : operationalMode === 'live' && currentAnalysis.historicalInfo ? (
                                 <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40 flex items-center gap-1 shadow-xs">
                                   <History size={11} /> Historical Landmark Archive
                                 </span>
@@ -972,8 +985,20 @@ const AnalyzePage = ({
                           </p>
                         </div>
 
-                        {/* Card 2: Only show Actual Landfall in Live Mode. In Demo Mode, show Central Pressure / Threat Level */}
-                        {operationalMode === 'live' && currentAnalysis.historicalInfo?.actual_landfall ? (
+                        {/* Card 2: Only show Landfall / Track in Live Mode. In Demo Mode, show Central Pressure / Threat Level */}
+                        {operationalMode === 'live' && currentAnalysis.activeTrajectory?.projected_landfall ? (
+                          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+                            <div className="flex items-center gap-2 text-xs font-bold text-rose-600 dark:text-rose-400">
+                              <Compass size={15} /> Projected Landfall & Track
+                            </div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">
+                              {currentAnalysis.activeTrajectory.projected_landfall}
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              Live Satellite Tracking ({currentAnalysis.activeTrajectory.movement_direction || 'WNW Direction'})
+                            </p>
+                          </div>
+                        ) : operationalMode === 'live' && currentAnalysis.historicalInfo?.actual_landfall ? (
                           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
                             <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                               <Anchor size={15} /> Actual Landfall Recorded
