@@ -16,15 +16,17 @@ import {
 } from 'lucide-react';
 
 /**
- * Zoom Earth style Floating Meteorological Menu.
+ * Zoom Earth style Meteorological Drawer.
+ * Can be docked cleanly into the sidebar or floated over the map.
  * Allows instant live toggling between Satellite, Radar, Wind, Humidity, Precipitation, and Pressure.
  */
 export default function ZoomEarthLayerMenu({
   activeLayer = 'wind',
   setActiveLayer,
-  activeBaseMap = 'satellite',
+  activeBaseMap = 'satellite_base',
   setActiveBaseMap,
-  isLiveLoading = false
+  isLiveLoading = false,
+  isSidebar = true
 }) {
   const [isOpen, setIsOpen] = useState(true);
   const [isLiveExpanded, setIsLiveExpanded] = useState(true);
@@ -51,9 +53,9 @@ export default function ZoomEarthLayerMenu({
   ];
 
   return (
-    <div className="absolute top-4 right-4 z-[500] pointer-events-auto select-none font-sans">
-      {/* Floating Glassmorphic Container (Zoom Earth Aesthetic) */}
-      <div className="w-56 sm:w-60 bg-gradient-to-b from-[#0f2930]/95 via-[#0c2027]/95 to-[#08151a]/95 backdrop-blur-xl border border-teal-500/30 rounded-2xl shadow-2xl text-slate-100 overflow-hidden transition-all duration-300">
+    <div className={isSidebar ? "w-full pointer-events-auto select-none font-sans" : "absolute top-4 right-4 z-[500] pointer-events-auto select-none font-sans"}>
+      {/* Glassmorphic Container (Zoom Earth Aesthetic) */}
+      <div className={`w-full bg-gradient-to-b from-[#0f2930]/95 via-[#0c2027]/95 to-[#08151a]/95 backdrop-blur-xl border border-teal-500/30 rounded-2xl shadow-xl text-slate-100 overflow-hidden transition-all duration-300 ${!isSidebar ? 'sm:w-60' : ''}`}>
         
         {/* Header Bar */}
         <div 
@@ -73,7 +75,7 @@ export default function ZoomEarthLayerMenu({
               </span>
             </div>
           </div>
-          <button type="button" className="text-teal-300/80 hover:text-teal-200">
+          <button type="button" className="text-teal-300/80 hover:text-teal-200 cursor-pointer">
             {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
         </div>
@@ -200,4 +202,3 @@ export default function ZoomEarthLayerMenu({
     </div>
   );
 }
-

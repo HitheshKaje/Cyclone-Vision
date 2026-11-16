@@ -19,7 +19,8 @@ import {
   Radar, 
   Droplets, 
   CloudRain, 
-  ExternalLink 
+  ExternalLink,
+  ArrowLeft
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, LayerGroup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -28,6 +29,8 @@ import { getApiBaseUrl } from '../utils/apiConfig';
 import WindParticleOverlay from '../components/WindParticleOverlay';
 import ZoomEarthLayerMenu from '../components/ZoomEarthLayerMenu';
 import HumidityMoistureOverlay from '../components/HumidityMoistureOverlay';
+import PressureIsobarOverlay from '../components/PressureIsobarOverlay';
+import TemperatureOverlay from '../components/TemperatureOverlay';
 import WindyAtmosphericPlayer from '../components/WindyAtmosphericPlayer';
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -293,20 +296,39 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-100px)] space-y-4 pb-6">
-      {/* 1. Page Header with Interactive Mode Toggle */}
+      {/* 1. Page Header with Interactive Mode Toggle & Back Option */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/50 dark:border-slate-700/50">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-              India Coastal Cyclone Monitor
-            </h1>
-            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30 flex items-center gap-1">
-              <Sparkles size={11} /> Live Meteorological Suite
-            </span>
+        <div className="flex items-center gap-3">
+          {setActiveTab && (
+            <button
+              type="button"
+              onClick={() => {
+                if (currentAnalysis) {
+                  setActiveTab('results');
+                } else {
+                  setActiveTab('home');
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 font-bold text-xs shadow-xs transition-all cursor-pointer group shrink-0"
+              title="Back to previous page"
+            >
+              <ArrowLeft size={15} className="text-slate-500 group-hover:-translate-x-1 transition-transform" />
+              <span>Back</span>
+            </button>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                India Coastal Cyclone Monitor
+              </h1>
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30 flex items-center gap-1">
+                <Sparkles size={11} /> Live Meteorological Suite
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Real-time spaceborne satellite, Doppler radar, wind streamlines & atmospheric moisture feeds
+            </p>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Real-time spaceborne satellite, Doppler radar, wind streamlines & atmospheric moisture feeds
-          </p>
         </div>
 
         {/* View Mode Switcher */}
@@ -452,6 +474,23 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
                   showLegend={true}
                 />
 
+                {/* 6. Live Atmospheric Pressure (MSLP) Isobars & Depression Core */}
+                <PressureIsobarOverlay
+                  stormLat={aiCyclone?.latitude || 15.5}
+                  stormLng={aiCyclone?.longitude || 81.8}
+                  stormWindKt={aiCyclone?.wind_kt || 65}
+                  active={activeLayer === 'pressure'}
+                  showLegend={true}
+                />
+
+                {/* 7. Live Sea Surface & Air Temperature Warm Pool */}
+                <TemperatureOverlay
+                  stormLat={aiCyclone?.latitude || 15.5}
+                  stormLng={aiCyclone?.longitude || 81.8}
+                  active={activeLayer === 'temperature'}
+                  showLegend={true}
+                />
+
                 {/* AI Detected Cyclone Eyewall Pinpoint */}
                 {aiCyclone && (
                   <Marker 
@@ -521,22 +560,23 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
                   </Marker>
                 ))}
               </MapContainer>
-
-              {/* Floating Zoom Earth Style Meteorological Drawer */}
-              <ZoomEarthLayerMenu 
-                activeLayer={activeLayer}
-                setActiveLayer={setActiveLayer}
-                activeBaseMap={activeBaseMap}
-                setActiveBaseMap={setActiveBaseMap}
-                isLiveLoading={isRadarLoading}
-              />
             </>
           )}
 
         </div>
 
-        {/* 3. Map Information Panel */}
-        <div className="w-full md:w-80 flex flex-col gap-4 h-full">
+        {/* 3. Map Information & Meteorological Feeds Sidebar */}
+        <div className="w-full md:w-80 flex flex-col gap-4 h-full overflow-y-auto pr-0.5 custom-scrollbar">
+          {/* Zoom Earth Meteorological Feeds Drawer (Placed cleanly in Sidebar so Map is 100% clear) */}
+          <ZoomEarthLayerMenu 
+            isSidebar={true}
+            activeLayer={activeLayer}
+            setActiveLayer={setActiveLayer}
+            activeBaseMap={activeBaseMap}
+            setActiveBaseMap={setActiveBaseMap}
+            isLiveLoading={isRadarLoading}
+          />
+
           {/* Active 24-Hour Landfall Prediction Card */}
           {aiCyclone && aiForecast && aiForecast.length > 0 && (() => {
             const activeWp = aiForecast.find(wp => wp.step === currentStep) || aiForecast[0];

@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useMap } from 'react-leaflet';
-import L from 'leaflet';
 import { Wind, Compass, Info } from 'lucide-react';
 
 /**
  * High-performance HTML5 Canvas Wind Streamline & Particle Flow Overlay for Leaflet.
- * Accurately simulates cyclonic vector dynamics (counter-clockwise vortex with radial inflow)
- * and ambient oceanic wind fields across the Indian Ocean / Bay of Bengal / Arabian Sea.
+ * 100% Transparent Canvas: Accurately preserves complete visibility of the underlying map tiles
+ * (coastlines, topography, satellite, and ocean) while animating flowing wind vectors.
  */
 export default function WindParticleOverlay({
   stormLat = 15.5,
@@ -22,8 +21,8 @@ export default function WindParticleOverlay({
   const particlesRef = useRef([]);
   const [inspectedWind, setInspectedWind] = useState(null);
 
-  // Convert wind speed to color
-  const getWindColor = (speedKmh, alpha = 0.8) => {
+  // Convert wind speed to vibrant color with proper alpha
+  const getWindColor = (speedKmh, alpha = 0.85) => {
     if (speedKmh < 25) return `rgba(129, 140, 248, ${alpha})`; // Indigo/Purple
     if (speedKmh < 50) return `rgba(6, 182, 212, ${alpha})`;   // Cyan/Teal
     if (speedKmh < 75) return `rgba(16, 185, 129, ${alpha})`;  // Emerald
@@ -53,15 +52,13 @@ export default function WindParticleOverlay({
     if (distKm <= rMax) {
       vTan = peakKmh * (distKm / rMax);
     } else {
-      // Decays with power 0.55 out to ~900 km
       vTan = peakKmh * Math.pow(rMax / distKm, 0.55);
     }
 
     // Inflow angle (spiral inflow into the cyclone center ~ 22 degrees)
     const inflowAngle = 0.38; // ~22 degrees inwards
 
-    // Counter-clockwise cyclonic rotation in Northern Hemisphere:
-    // Tangential vector is (-sin, cos). Adding radial inward inflow (-cos, -sin).
+    // Counter-clockwise cyclonic rotation in Northern Hemisphere
     const rotAngle = angle + Math.PI / 2 + inflowAngle;
     let u = vTan * Math.cos(rotAngle);
     let v = vTan * Math.sin(rotAngle);
@@ -113,16 +110,17 @@ export default function WindParticleOverlay({
     };
     resizeCanvas();
 
-    // Spawn 320 animated particles
-    const particleCount = 340;
+    // Spawn animated particles with trail history
+    const particleCount = 380;
     const particles = [];
     for (let i = 0; i < particleCount; i++) {
       particles.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        age: Math.floor(Math.random() * 80),
-        maxAge: 70 + Math.floor(Math.random() * 50),
-        speed: 0.8 + Math.random() * 0.7
+        age: Math.floor(Math.random() * 40),
+        maxAge: 45 + Math.floor(Math.random() * 35),
+        speed: 0.9 + Math.random() * 0.7,
+        history: [] // stores previous positions for transparent fading trails
       });
     }
     particlesRef.current = particles;
@@ -132,12 +130,12 @@ export default function WindParticleOverlay({
     const draw = () => {
       if (!isRunning) return;
 
-      // Soft trail fade for smooth glowing streamlines
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.16)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // CRITICAL: Fully clear the canvas every single frame!
+      // This guarantees the Leaflet map (ocean, land, cities, borders) remains 100% visible and crystal clear!
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const bounds = map.getBounds();
       const currentParticles = particlesRef.current;
+      const maxTrailLength = 7;
 
       for (let i = 0; i < currentParticles.length; i++) {
         const p = currentParticles[i];
@@ -149,7 +147,6 @@ export default function WindParticleOverlay({
         const wind = getWindVector(latLng.lat, latLng.lng);
 
         // Convert geographic velocity into screen pixel velocity
-        // Scale factor adjusted for visual clarity
         const scale = 0.045 * p.speed;
         const dx = wind.u * scale;
         const dy = -wind.v * scale; // Invert latitude to screen Y
@@ -157,14 +154,34 @@ export default function WindParticleOverlay({
         const nextX = p.x + dx;
         const nextY = p.y + dy;
 
-        // Draw particle vector streak
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(nextX, nextY);
-        ctx.strokeStyle = getWindColor(wind.speedKmh, Math.min(1, p.age / 15));
-        ctx.lineWidth = Math.min(2.8, 1.2 + (wind.speedKmh / 50));
-        ctx.lineCap = 'round';
-        ctx.stroke();
+        // Push current point to history
+        p.history.push({ x: p.x, y: p.y });
+        if (p.history.length > maxTrailLength) {
+          p.history.shift();
+        }
+
+        // Draw smooth streamline trail
+        if (p.history.length >= 2) {
+          ctx.beginPath();
+          ctx.moveTo(p.history[0].x, p.history[0].y);
+          for (let j = 1; j < p.history.length; j++) {
+            ctx.lineTo(p.history[j].x, p.history[j].y);
+          }
+          ctx.lineTo(nextX, nextY);
+
+          // Alpha fades in as particle matures
+          const alpha = Math.min(0.9, Math.max(0.2, p.age / 12));
+          ctx.strokeStyle = getWindColor(wind.speedKmh, alpha);
+          ctx.lineWidth = Math.min(2.4, 1.2 + (wind.speedKmh / 55));
+          ctx.lineCap = 'round';
+          ctx.stroke();
+
+          // Leading particle head dot
+          ctx.beginPath();
+          ctx.arc(nextX, nextY, Math.min(2.2, 1.0 + (wind.speedKmh / 65)), 0, Math.PI * 2);
+          ctx.fillStyle = getWindColor(wind.speedKmh, 1.0);
+          ctx.fill();
+        }
 
         // Advance position
         p.x = nextX;
@@ -174,15 +191,16 @@ export default function WindParticleOverlay({
         // Reset if out of bounds or age exceeded
         if (
           p.age >= p.maxAge ||
-          p.x < 0 ||
-          p.x > canvas.width ||
-          p.y < 0 ||
-          p.y > canvas.height
+          p.x < -10 ||
+          p.x > canvas.width + 10 ||
+          p.y < -10 ||
+          p.y > canvas.height + 10
         ) {
           p.x = Math.random() * canvas.width;
           p.y = Math.random() * canvas.height;
           p.age = 0;
-          p.maxAge = 60 + Math.floor(Math.random() * 60);
+          p.maxAge = 40 + Math.floor(Math.random() * 40);
+          p.history = [];
         }
       }
 
@@ -193,6 +211,8 @@ export default function WindParticleOverlay({
 
     const handleMapMove = () => {
       resizeCanvas();
+      // Clear trail histories on zoom/pan so lines don't stretch
+      particlesRef.current.forEach(p => { p.history = []; });
     };
 
     map.on('move', handleMapMove);
@@ -210,7 +230,7 @@ export default function WindParticleOverlay({
 
   return (
     <>
-      {/* HTML5 Canvas Streamline Layer */}
+      {/* HTML5 Canvas Streamline Layer - Strictly Transparent */}
       <div 
         className="leaflet-pane leaflet-overlay-pane"
         style={{
@@ -225,11 +245,11 @@ export default function WindParticleOverlay({
       >
         <canvas
           ref={canvasRef}
-          style={{ width: '100%', height: '100%', display: 'block' }}
+          style={{ width: '100%', height: '100%', display: 'block', pointerEvents: 'none' }}
         />
       </div>
 
-      {/* Floating Wind Speed Legend Scale (Matching Windy / Zoom Earth) */}
+      {/* Floating Wind Speed Legend Scale */}
       {showLegend && (
         <div className="absolute bottom-5 left-5 z-[500] pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-2.5 shadow-2xl text-white text-xs select-none min-w-[240px]">
           <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-slate-700/60">
@@ -297,4 +317,3 @@ export default function WindParticleOverlay({
     </>
   );
 }
-
