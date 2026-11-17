@@ -12,6 +12,7 @@ function App() {
     typeof window !== 'undefined' ? window.location.pathname : '/'
   );
   const [activeTab, setActiveTab] = useState('home');
+  const [mapViewMode, setMapViewMode] = useState('tactical'); // 'tactical' | 'windy_engine'
   const [activeMapLayer, setActiveMapLayer] = useState('wind');
   const [activeBaseMap, setActiveBaseMap] = useState('satellite_base');
   const [currentAnalysis, setCurrentAnalysis] = useState(null);
@@ -209,6 +210,8 @@ function App() {
       toggleDarkMode={toggleDarkMode}
       onLogout={handleAdminLogout}
       adminUser={adminUser}
+      mapViewMode={mapViewMode}
+      setMapViewMode={setMapViewMode}
       activeMapLayer={activeMapLayer}
       setActiveMapLayer={setActiveMapLayer}
       activeBaseMap={activeBaseMap}
@@ -226,6 +229,8 @@ function App() {
         currentStage={currentStage}
         setCurrentStage={setCurrentStage}
         adminUser={adminUser}
+        mapViewMode={mapViewMode}
+        setMapViewMode={setMapViewMode}
         activeMapLayer={activeMapLayer}
         setActiveMapLayer={setActiveMapLayer}
         activeBaseMap={activeBaseMap}

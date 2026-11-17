@@ -22,6 +22,8 @@ const Dashboard = ({
   currentStage,
   setCurrentStage,
   adminUser,
+  mapViewMode = 'tactical',
+  setMapViewMode,
   activeMapLayer = 'wind',
   setActiveMapLayer,
   activeBaseMap = 'satellite_base',
@@ -69,6 +71,8 @@ const Dashboard = ({
         <MapPage 
           currentAnalysis={currentAnalysis}
           setActiveTab={setActiveTab}
+          viewMode={mapViewMode}
+          setViewMode={setMapViewMode}
           activeLayer={activeMapLayer}
           setActiveLayer={setActiveMapLayer}
           activeBaseMap={activeBaseMap}

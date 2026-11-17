@@ -63,6 +63,8 @@ const Sidebar = ({
   closeSidebar, 
   activeTab, 
   setActiveTab,
+  mapViewMode = 'tactical',
+  setMapViewMode,
   activeMapLayer = 'wind',
   setActiveMapLayer,
   activeBaseMap = 'satellite_base',
@@ -235,34 +237,36 @@ const Sidebar = ({
                     </div>
                   </div>
 
-                  {/* Base Cartography */}
-                  <div className="space-y-1 pt-1 border-t border-slate-200 dark:border-slate-800">
-                    <div className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Base Map
+                  {/* Base Cartography: ONLY displayed in Tactical Map mode, NOT in Radar Engine mode */}
+                  {mapViewMode === 'tactical' && (
+                    <div className="space-y-1 pt-1 border-t border-slate-200 dark:border-slate-800">
+                      <div className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Base Map
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 px-1">
+                        {baseMaps.map((base) => {
+                          const isSelected = activeBaseMap === base.id;
+                          return (
+                            <button
+                              key={base.id}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (setActiveBaseMap) setActiveBaseMap(base.id);
+                              }}
+                              className={`px-1.5 py-1 rounded text-[10px] font-semibold text-center truncate transition-colors cursor-pointer ${
+                                isSelected
+                                  ? 'bg-teal-600 text-white shadow-xs font-bold'
+                                  : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              {base.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-1 px-1">
-                      {baseMaps.map((base) => {
-                        const isSelected = activeBaseMap === base.id;
-                        return (
-                          <button
-                            key={base.id}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (setActiveBaseMap) setActiveBaseMap(base.id);
-                            }}
-                            className={`px-1.5 py-1 rounded text-[10px] font-semibold text-center truncate transition-colors cursor-pointer ${
-                              isSelected
-                                ? 'bg-teal-600 text-white shadow-xs font-bold'
-                                : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'
-                            }`}
-                          >
-                            {base.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  )}
 
                 </div>
               )}

@@ -10,6 +10,8 @@ const MainLayout = ({
   toggleDarkMode, 
   onLogout, 
   adminUser,
+  mapViewMode = 'tactical',
+  setMapViewMode,
   activeMapLayer,
   setActiveMapLayer,
   activeBaseMap,
@@ -63,6 +65,8 @@ const MainLayout = ({
           closeSidebar={() => isMobile && setSidebarOpen(false)}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
+          mapViewMode={mapViewMode}
+          setMapViewMode={setMapViewMode}
           activeMapLayer={activeMapLayer}
           setActiveMapLayer={setActiveMapLayer}
           activeBaseMap={activeBaseMap}

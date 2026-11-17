@@ -164,12 +164,16 @@ const parseGdacsFeaturesToCyclones = (features) => {
 const MapPage = ({ 
   currentAnalysis, 
   setActiveTab,
+  viewMode: propViewMode,
+  setViewMode: propSetViewMode,
   activeLayer: propActiveLayer,
   setActiveLayer: propSetActiveLayer,
   activeBaseMap: propActiveBaseMap,
   setActiveBaseMap: propSetActiveBaseMap
 }) => {
-  const [viewMode, setViewMode] = useState('tactical'); // 'tactical' | 'windy_engine'
+  const [internalViewMode, setInternalViewMode] = useState('tactical'); // 'tactical' | 'windy_engine'
+  const viewMode = propViewMode !== undefined ? propViewMode : internalViewMode;
+  const setViewMode = propSetViewMode || setInternalViewMode;
   const [internalActiveLayer, setInternalActiveLayer] = useState('wind');
   const [internalActiveBaseMap, setInternalActiveBaseMap] = useState('satellite_base');
 
