@@ -12,6 +12,8 @@ function App() {
     typeof window !== 'undefined' ? window.location.pathname : '/'
   );
   const [activeTab, setActiveTab] = useState('home');
+  const [activeMapLayer, setActiveMapLayer] = useState('wind');
+  const [activeBaseMap, setActiveBaseMap] = useState('satellite_base');
   const [currentAnalysis, setCurrentAnalysis] = useState(null);
   const [analysisHistory, setAnalysisHistory] = useState([]);
   const [analysisStatus, setAnalysisStatus] = useState('idle');
@@ -207,6 +209,10 @@ function App() {
       toggleDarkMode={toggleDarkMode}
       onLogout={handleAdminLogout}
       adminUser={adminUser}
+      activeMapLayer={activeMapLayer}
+      setActiveMapLayer={setActiveMapLayer}
+      activeBaseMap={activeBaseMap}
+      setActiveBaseMap={setActiveBaseMap}
     >
       <Dashboard 
         activeTab={activeTab} 
@@ -220,6 +226,10 @@ function App() {
         currentStage={currentStage}
         setCurrentStage={setCurrentStage}
         adminUser={adminUser}
+        activeMapLayer={activeMapLayer}
+        setActiveMapLayer={setActiveMapLayer}
+        activeBaseMap={activeBaseMap}
+        setActiveBaseMap={setActiveBaseMap}
       />
     </MainLayout>
   );

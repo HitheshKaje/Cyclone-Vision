@@ -2,7 +2,19 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 
-const MainLayout = ({ children, activeTab, setActiveTab, isDarkMode, toggleDarkMode, onLogout, adminUser }) => {
+const MainLayout = ({ 
+  children, 
+  activeTab, 
+  setActiveTab, 
+  isDarkMode, 
+  toggleDarkMode, 
+  onLogout, 
+  adminUser,
+  activeMapLayer,
+  setActiveMapLayer,
+  activeBaseMap,
+  setActiveBaseMap
+}) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -51,6 +63,10 @@ const MainLayout = ({ children, activeTab, setActiveTab, isDarkMode, toggleDarkM
           closeSidebar={() => isMobile && setSidebarOpen(false)}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
+          activeMapLayer={activeMapLayer}
+          setActiveMapLayer={setActiveMapLayer}
+          activeBaseMap={activeBaseMap}
+          setActiveBaseMap={setActiveBaseMap}
         />
         
         {/* Mobile Overlay */}
@@ -61,8 +77,8 @@ const MainLayout = ({ children, activeTab, setActiveTab, isDarkMode, toggleDarkM
           />
         )}
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 lg:p-6 w-full">
-          <div className="max-w-7xl mx-auto w-full">
+        <main className={`flex-1 ${activeTab === 'map' ? 'p-0 w-full h-[calc(100vh-64px)] overflow-hidden' : 'overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 lg:p-6 w-full'}`}>
+          <div className={activeTab === 'map' ? 'w-full h-full' : 'max-w-7xl mx-auto w-full'}>
             {children}
           </div>
         </main>

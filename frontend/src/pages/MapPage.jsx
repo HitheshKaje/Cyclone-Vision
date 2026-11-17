@@ -12,6 +12,10 @@ import {
   Wind, 
   Calendar, 
   ChevronRight, 
+  ChevronLeft,
+  Play,
+  Pause,
+  SkipForward,
   Target, 
   Sparkles, 
   Layers, 
@@ -20,7 +24,14 @@ import {
   Droplets, 
   CloudRain, 
   ExternalLink,
-  ArrowLeft
+  ArrowLeft,
+  Plus,
+  Minus,
+  Crosshair,
+  Maximize2,
+  Minimize2,
+  X,
+  List
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, LayerGroup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -40,14 +51,29 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Custom cyclone icon using divIcon (Live GDACS storms)
-const cycloneIcon = new L.divIcon({
-  html: `<div style="background-color: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.8); display: flex; align-items: center; justify-content: center;"><div style="background-color: white; width: 4px; height: 4px; border-radius: 50%;"></div></div>`,
-  className: 'custom-cyclone-marker',
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
-  popupAnchor: [0, -10]
-});
+// Dynamic Real-Time Cyclone Icon based on Alert Level & Selection State
+const createLiveCycloneIcon = (alertLevel = 'Red', isSelected = false) => {
+  const isRed = alertLevel === 'Red';
+  const isOrange = alertLevel === 'Orange';
+  const color = isRed ? '#ef4444' : isOrange ? '#f97316' : '#10b981';
+  const size = isSelected ? 34 : 26;
+  const innerSize = isSelected ? 18 : 14;
+
+  return new L.divIcon({
+    html: `
+      <div style="position: relative; width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <div style="position: absolute; width: ${size}px; height: ${size}px; border-radius: 50%; background: ${color}35; border: 2px solid ${color}; animation: ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="width: ${innerSize}px; height: ${innerSize}px; border-radius: 50%; background: ${color}; border: 2.5px solid #ffffff; box-shadow: 0 0 14px ${color}; display: flex; align-items: center; justify-content: center; z-index: 5;">
+          <div style="background-color: #ffffff; width: 4px; height: 4px; border-radius: 50%;"></div>
+        </div>
+      </div>
+    `,
+    className: 'custom-live-cyclone-marker',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2]
+  });
+};
 
 // High-visibility Animated Radar Marker for AI Detected Cyclone
 const aiCycloneIcon = new L.divIcon({
@@ -68,17 +94,105 @@ const aiCycloneIcon = new L.divIcon({
 
 const API_URL = getApiBaseUrl();
 
-const MapPage = ({ currentAnalysis, setActiveTab }) => {
+// Client-side parser for direct GDACS satellite feed (fallback to ensure 100% live uptime)
+const parseGdacsFeaturesToCyclones = (features) => {
+  if (!Array.isArray(features)) return [];
+  const list = [];
+  
+  for (const f of features) {
+    const props = f?.properties || {};
+    const geom = f?.geometry || {};
+    const coords = geom?.coordinates || [];
+    if (coords.length < 2 || props.eventtype !== 'TC') continue;
+
+    const lon = Number(coords[0]);
+    const lat = Number(coords[1]);
+    const rawName = String(props.eventname || props.name || 'Tropical Cyclone').trim();
+    const sev = props.severitydata || {};
+    const speedKmh = sev.severity ? Math.round(Number(sev.severity)) : null;
+    const speedKt = speedKmh ? Math.round(speedKmh / 1.852) : null;
+
+    const countryStr = String(props.country || '');
+    const iso3 = String(props.iso3 || '');
+    const isNio = (lon >= 45.0 && lon <= 105.0 && lat >= 0.0 && lat <= 35.0) ||
+      countryStr.includes('India') || countryStr.includes('Sri Lanka') || countryStr.includes('Bangladesh') || countryStr.includes('Myanmar') ||
+      ['IND', 'LKA', 'BGD', 'MMR', 'OMN', 'PAK'].includes(iso3);
+
+    const basin = isNio ? (lon >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea') : 'Global Ocean Waters';
+    const cleanName = rawName.replace(/-2[4-6]/g, '').trim();
+    const titleName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1).toLowerCase();
+
+    let displayName = `Tropical Cyclone ${titleName}`;
+    if (speedKt && speedKt >= 64) {
+      displayName = isNio ? `Severe Cyclonic Storm ${titleName}` : `Severe Tropical Cyclone ${titleName}`;
+    } else if (speedKt && speedKt >= 34) {
+      displayName = isNio ? `Cyclonic Storm ${titleName}` : `Tropical Storm ${titleName}`;
+    } else if (speedKt && speedKt >= 17) {
+      displayName = isNio ? `Deep Depression ${titleName}` : `Tropical Depression ${titleName}`;
+    }
+
+    const alertLevel = props.alertlevel || 'Orange';
+
+    list.push({
+      id: String(props.eventid || ''),
+      name: displayName,
+      raw_name: rawName,
+      latitude: Number(lat.toFixed(2)),
+      longitude: Number(lon.toFixed(2)),
+      wind_speed: speedKmh,
+      wind_kt: speedKt,
+      status: `${alertLevel} Alert`,
+      alert_level: alertLevel,
+      basin,
+      is_nio: isNio,
+      country: countryStr,
+      description: props.htmldescription || props.description || '',
+      last_updated: props.todate || props.datemodified || '',
+      report_url: props.url?.report || ''
+    });
+  }
+
+  // Sort: Indian coastal waters first, then highest sustained wind
+  list.sort((a, b) => {
+    if (a.is_nio !== b.is_nio) return a.is_nio ? -1 : 1;
+    return (b.wind_speed || 0) - (a.wind_speed || 0);
+  });
+
+  return list;
+};
+
+const MapPage = ({ 
+  currentAnalysis, 
+  setActiveTab,
+  activeLayer: propActiveLayer,
+  setActiveLayer: propSetActiveLayer,
+  activeBaseMap: propActiveBaseMap,
+  setActiveBaseMap: propSetActiveBaseMap
+}) => {
   const [viewMode, setViewMode] = useState('tactical'); // 'tactical' | 'windy_engine'
-  const [activeLayer, setActiveLayer] = useState('wind'); // 'wind', 'satellite', 'radar', 'humidity', 'precipitation', 'pressure'
-  const [activeBaseMap, setActiveBaseMap] = useState('satellite_base'); // 'street', 'satellite_base', 'ocean', 'terrain'
+  const [internalActiveLayer, setInternalActiveLayer] = useState('wind');
+  const [internalActiveBaseMap, setInternalActiveBaseMap] = useState('satellite_base');
+
+  const activeLayer = propActiveLayer !== undefined ? propActiveLayer : internalActiveLayer;
+  const setActiveLayer = propSetActiveLayer || setInternalActiveLayer;
+
+  const activeBaseMap = propActiveBaseMap !== undefined ? propActiveBaseMap : internalActiveBaseMap;
+  const setActiveBaseMap = propSetActiveBaseMap || setInternalActiveBaseMap;
+
   const [rainviewerPath, setRainviewerPath] = useState(null);
   const [isRadarLoading, setIsRadarLoading] = useState(false);
+
+  // Floating UI state
+  const [isCycloneDrawerOpen, setIsCycloneDrawerOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('GFS 22 km'); // 'ICON 13 km' | 'GFS 22 km' | 'ECMWF 9 km'
+  const [isPlaying, setIsPlaying] = useState(true);
 
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('Updating');
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
+  const [selectedCycloneId, setSelectedCycloneId] = useState(null);
+
   const [aiForecast, setAiForecast] = useState(null);
   const [isForecastLoading, setIsForecastLoading] = useState(false);
   const [manualDayStep, setManualDayStep] = useState(null);
@@ -86,6 +200,7 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
   const abortControllerRef = useRef(null);
   const isFetchingRef = useRef(false);
   const mapRef = useRef(null);
+  const hasAutoCenteredRef = useRef(false);
 
   // Compute AI Detected Cyclone from currentAnalysis
   const isAiCyclone = (currentAnalysis?.detection?.is_cyclone !== false) && currentAnalysis?.latitude != null && currentAnalysis?.longitude != null;
@@ -108,6 +223,8 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
     status: currentAnalysis.classification?.classification || currentAnalysis.intensity?.classification || 'Severe Cyclonic Storm (SCS)',
     category_desc: currentAnalysis.classification?.description || 'Detected via Satellite AI Analysis',
     subbasin: currentAnalysis.subbasin || (aiLng >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea'),
+    basin: currentAnalysis.subbasin || (aiLng >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea'),
+    alert_level: 'Red',
     isAiDetected: true,
     imagePreview: currentAnalysis.imagePreview,
     coordMethod: currentAnalysis.coordMethod || 'Auto-Extracted from Image',
@@ -225,52 +342,72 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
     return () => { isMounted = false; };
   }, [aiCyclone?.latitude, aiCyclone?.longitude, aiCyclone?.wind_kt]);
 
-  // Auto-center directly on the detected cyclone eye position
-  useEffect(() => {
-    if (aiCyclone && mapRef.current) {
-      const timer = setTimeout(() => {
-        try {
-          mapRef.current.flyTo([aiCyclone.latitude, aiCyclone.longitude], 6, {
-            duration: 1.5
-          });
-        } catch (e) {
-          console.warn('Map flyTo notice:', e);
-        }
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [aiCyclone?.latitude, aiCyclone?.longitude]);
-
+  // Robust live cyclone fetcher: checks backend first, falls back directly to GDACS live feed
   const fetchLiveCyclones = async () => {
     if (isFetchingRef.current) return;
     
     try {
       isFetchingRef.current = true;
-      setStatus(prev => prev === 'Connection Error' ? 'Updating' : prev);
-      
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
       abortControllerRef.current = new AbortController();
 
-      const response = await fetch(`${API_URL}/api/cyclones/live`, {
-        signal: abortControllerRef.current.signal
-      });
-      
-      if (!response.ok) throw new Error('API Error');
-      
-      const jsonData = await response.json();
-      
-      setData(prev => {
-        if (JSON.stringify(prev) !== JSON.stringify(jsonData)) {
-          return jsonData;
+      let loaded = false;
+
+      // 1. Try local FastAPI backend endpoint
+      try {
+        const response = await fetch(`${API_URL}/api/cyclones/live`, {
+          signal: abortControllerRef.current.signal
+        });
+        
+        if (response.ok) {
+          const jsonData = await response.json();
+          if (jsonData && jsonData.status === 'connected' && Array.isArray(jsonData.cyclones) && jsonData.cyclones.length > 0) {
+            setData(jsonData);
+            setStatus('LIVE / Connected');
+            setLastUpdated(new Date().toLocaleTimeString());
+            setError(null);
+            loaded = true;
+          }
         }
-        return prev;
-      });
-      
-      setStatus('LIVE / Connected');
-      setLastUpdated(new Date().toLocaleTimeString());
-      setError(null);
+      } catch (backendErr) {
+        // Local backend offline or starting -> fall through to direct live satellite feed
+      }
+
+      // 2. Direct browser fallback to GDACS Live Tropical Cyclone API (Supports CORS)
+      if (!loaded) {
+        try {
+          const directRes = await fetch('https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventtypes=TC', {
+            headers: { 'Accept': 'application/json' },
+            signal: abortControllerRef.current.signal
+          });
+          if (directRes.ok) {
+            const directJson = await directRes.json();
+            const parsedCyclones = parseGdacsFeaturesToCyclones(directJson?.features);
+            if (parsedCyclones.length > 0) {
+              setData({
+                updated_at: new Date().toISOString(),
+                source: 'GDACS & Joint Typhoon Warning Center (JTWC) Live Spaceborne Feed',
+                status: 'connected',
+                active_cyclones_count: parsedCyclones.length,
+                cyclones: parsedCyclones
+              });
+              setStatus('LIVE / Connected');
+              setLastUpdated(new Date().toLocaleTimeString());
+              setError(null);
+              loaded = true;
+            }
+          }
+        } catch (directErr) {
+          console.warn('Direct GDACS fallback notice:', directErr);
+        }
+      }
+
+      if (!loaded && !data) {
+        setStatus('Connection Error');
+        setError('Connecting to live satellite data feeds...');
+      }
     } catch (err) {
       if (err.name !== 'AbortError') {
         setStatus('Connection Error');
@@ -283,7 +420,7 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
 
   useEffect(() => {
     fetchLiveCyclones();
-    const interval = setInterval(fetchLiveCyclones, 5000);
+    const interval = setInterval(fetchLiveCyclones, 15000); // Live poll every 15 seconds
     return () => {
       clearInterval(interval);
       if (abortControllerRef.current) {
@@ -294,11 +431,319 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
 
   const cyclones = data?.cyclones || [];
 
+  // Determine currently active storm to center wind vortex and atmospheric layers on
+  const primaryCyclone = selectedCycloneId
+    ? (selectedCycloneId === aiCyclone?.id ? aiCyclone : cyclones.find(c => c.id === selectedCycloneId))
+    : (aiCyclone || cyclones[0] || null);
+
+  const activeLat = primaryCyclone?.latitude || 15.80;
+  const activeLng = primaryCyclone?.longitude || 80.20;
+  const activeWindKt = primaryCyclone?.wind_kt || 85;
+  const activeWindKmh = primaryCyclone?.wind_speed || 157;
+  const activeName = primaryCyclone?.name || 'Live Monitored Cyclone';
+
+  // Smooth auto-centering on the primary active cyclone when page or data loads
+  useEffect(() => {
+    if (!hasAutoCenteredRef.current && mapRef.current) {
+      if (aiCyclone) {
+        hasAutoCenteredRef.current = true;
+        mapRef.current.flyTo([aiCyclone.latitude, aiCyclone.longitude], 6, { duration: 1.5 });
+      } else if (cyclones.length > 0) {
+        hasAutoCenteredRef.current = true;
+        mapRef.current.flyTo([cyclones[0].latitude, cyclones[0].longitude], 6, { duration: 1.5 });
+      }
+    }
+  }, [aiCyclone, cyclones]);
+
+  // Whenever user clicks any of the 4 Base Maps (Street, Satellite, Ocean, Terrain), switch to Tactical Map mode
+  useEffect(() => {
+    if (activeBaseMap) {
+      setViewMode('tactical');
+    }
+  }, [activeBaseMap]);
+
+  const handleSelectCyclone = (cyclone) => {
+    if (!cyclone) return;
+    setSelectedCycloneId(cyclone.id);
+    if (mapRef.current && cyclone.latitude != null && cyclone.longitude != null) {
+      try {
+        mapRef.current.flyTo([cyclone.latitude, cyclone.longitude], 7, { duration: 1.2 });
+      } catch (e) {
+        console.warn('Map flyTo notice:', e);
+      }
+    }
+  };
+
+  const handleZoomIn = () => {
+    if (mapRef.current) mapRef.current.zoomIn();
+  };
+
+  const handleZoomOut = () => {
+    if (mapRef.current) mapRef.current.zoomOut();
+  };
+
+  const handleRecenter = () => {
+    if (mapRef.current) {
+      mapRef.current.flyTo([activeLat, activeLng], 6, { duration: 1.2 });
+    }
+  };
+
+  const nioCount = cyclones.filter(c => c.is_nio).length;
+  const totalActiveCount = (aiCyclone ? 1 : 0) + cyclones.length;
+
+  // Formatted synoptic timestamp for the bottom player (e.g. "16 Nov  18:35")
+  const currentFormattedTime = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + '  ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] space-y-4 pb-6">
-      {/* 1. Page Header with Interactive Mode Toggle & Back Option */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/50 dark:border-slate-700/50">
-        <div className="flex items-center gap-3">
+    <div className="relative w-full h-[calc(100vh-64px)] overflow-hidden select-none bg-[#0a1622] font-sans">
+      
+      {/* =========================================================================
+          FULL-PAGE WIDE MAP CONTAINER (Edge-to-Edge)
+      ========================================================================= */}
+      {viewMode === 'windy_engine' ? (
+        /* Full Live Atmospheric Radar Engine */
+        <WindyAtmosphericPlayer
+          stormLat={activeLat}
+          stormLng={activeLng}
+          stormName={activeName}
+          stormWindKt={activeWindKt}
+          activeLayer={activeLayer}
+          setActiveLayer={setActiveLayer}
+        />
+      ) : (
+        <MapContainer 
+          ref={mapRef}
+          center={[activeLat, activeLng]} 
+          zoom={6} 
+          minZoom={3}
+          maxZoom={12}
+          zoomControl={false}
+          scrollWheelZoom={true} 
+          className="w-full h-full z-0"
+          style={{ width: '100%', height: '100%', background: '#0a1622' }}
+        >
+          {/* 1. Base Cartography Tiles (Keyed to force clean unmount/remount in Leaflet) */}
+          {activeBaseMap === 'street' && (
+            <TileLayer
+              key="base-street"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+            />
+          )}
+          {activeBaseMap === 'satellite_base' && (
+            <LayerGroup key="base-satellite">
+              <TileLayer
+                attribution='Tiles &copy; Esri World Imagery'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={18}
+              />
+              <TileLayer
+                attribution='Labels &copy; Esri'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={18}
+              />
+            </LayerGroup>
+          )}
+          {activeBaseMap === 'terrain' && (
+            <TileLayer
+              key="base-terrain"
+              attribution='Tiles &copy; Esri Topo'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={18}
+            />
+          )}
+          {activeBaseMap === 'ocean' && (
+            <LayerGroup key="base-ocean">
+              <TileLayer
+                attribution='Tiles &copy; Esri Ocean'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={13}
+              />
+              <TileLayer
+                attribution='Labels &copy; Esri'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={13}
+              />
+            </LayerGroup>
+          )}
+
+          {/* 2. Live Weather Doppler Radar (RainViewer Real-Time API) */}
+          {(activeLayer === 'radar' || activeLayer === 'precipitation') && rainviewerPath && (
+            <TileLayer
+              key={`radar-${rainviewerPath}`}
+              attribution='Radar &copy; <a href="https://www.rainviewer.com">RainViewer</a>'
+              url={`https://tilecache.rainviewer.com${rainviewerPath}/512/{z}/{x}/{y}/2/1_1.png`}
+              opacity={0.85}
+              zIndex={420}
+            />
+          )}
+
+          {/* 3. Live Satellite Cloud Cover Layer */}
+          {activeLayer === 'satellite' && (
+            <TileLayer
+              attribution='Satellite &copy; NASA GIBS / Esri'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              opacity={0.95}
+              zIndex={410}
+            />
+          )}
+
+          {/* 4. Live Animated Wind Streamlines & Particle Vector Flow */}
+          <WindParticleOverlay
+            stormLat={activeLat}
+            stormLng={activeLng}
+            stormWindKt={activeWindKt}
+            active={activeLayer === 'wind'}
+            showLegend={false}
+          />
+
+          {/* 5. Live Atmospheric Relative Humidity & Moisture Flux */}
+          <HumidityMoistureOverlay
+            stormLat={activeLat}
+            stormLng={activeLng}
+            active={activeLayer === 'humidity'}
+            showLegend={false}
+          />
+
+          {/* 6. Live Atmospheric Pressure (MSLP) Isobars & Depression Core */}
+          <PressureIsobarOverlay
+            stormLat={activeLat}
+            stormLng={activeLng}
+            stormWindKt={activeWindKt}
+            active={activeLayer === 'pressure'}
+            showLegend={false}
+          />
+
+          {/* 7. Live Sea Surface & Air Temperature Warm Pool */}
+          <TemperatureOverlay
+            stormLat={activeLat}
+            stormLng={activeLng}
+            active={activeLayer === 'temperature'}
+            showLegend={false}
+          />
+
+          {/* AI Detected Cyclone Eyewall Pinpoint */}
+          {aiCyclone && (
+            <Marker 
+              key={aiCyclone.id} 
+              position={[aiCyclone.latitude, aiCyclone.longitude]}
+              icon={aiCycloneIcon}
+              eventHandlers={{
+                click: () => handleSelectCyclone(aiCyclone)
+              }}
+            >
+              <Popup className="custom-popup" autoPan={true}>
+                <div className="p-1 min-w-[220px]">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white animate-pulse shadow-xs">
+                      AI DETECTED EYEWALL
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-2">{aiCyclone.name}</h4>
+                  <div className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                    <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                      <span className="font-semibold text-slate-500">Eyewall Coordinates:</span>
+                      <span className="font-black text-red-500">{aiCyclone.latitude}°N, {aiCyclone.longitude}°E</span>
+                    </p>
+                    <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                      <span className="font-semibold text-slate-500">Basin:</span>
+                      <span className="font-bold">{aiCyclone.subbasin}</span>
+                    </p>
+                    <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                      <span className="font-semibold text-slate-500">Classification:</span>
+                      <span className="font-bold text-amber-500">{aiCyclone.status}</span>
+                    </p>
+                    <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                      <span className="font-semibold text-slate-500">Wind Speed:</span>
+                      <span className="font-bold text-red-600">{aiCyclone.wind_speed} km/h ({aiCyclone.wind_kt} kt)</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400 pt-1">
+                      Detection: {aiCyclone.coordMethod}
+                    </p>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          )}
+
+          {/* Live External Cyclones from GDACS & JTWC Feeds */}
+          {cyclones.map((cyclone) => {
+            const isSelected = selectedCycloneId === cyclone.id || (!selectedCycloneId && !aiCyclone && cyclones[0]?.id === cyclone.id);
+            return (
+              <Marker 
+                key={cyclone.id} 
+                position={[cyclone.latitude, cyclone.longitude]}
+                icon={createLiveCycloneIcon(cyclone.alert_level, isSelected)}
+                eventHandlers={{
+                  click: () => handleSelectCyclone(cyclone)
+                }}
+              >
+                <Popup className="custom-popup" autoPan={true}>
+                  <div className="p-1 min-w-[210px]">
+                    <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-xs ${
+                        cyclone.alert_level === 'Red' ? 'bg-red-600' : cyclone.alert_level === 'Orange' ? 'bg-amber-600' : 'bg-emerald-600'
+                      }`}>
+                        {cyclone.alert_level || 'Active'} Alert
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">GDACS / JTWC</span>
+                    </div>
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-2">{cyclone.name}</h4>
+                    <div className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                      <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                        <span className="font-semibold text-slate-500">Eyewall Coordinates:</span>
+                        <span className="font-black text-red-500">{cyclone.latitude}°N, {cyclone.longitude}°E</span>
+                      </p>
+                      <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                        <span className="font-semibold text-slate-500">Basin:</span>
+                        <span className="font-bold">{cyclone.basin || 'North Indian Ocean'}</span>
+                      </p>
+                      {cyclone.wind_speed != null && (
+                        <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                          <span className="font-semibold text-slate-500">Sustained Wind:</span>
+                          <span className="font-bold text-red-600">{cyclone.wind_speed} km/h ({cyclone.wind_kt || Math.round(cyclone.wind_speed / 1.852)} kt)</span>
+                        </p>
+                      )}
+                      {cyclone.country && (
+                        <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                          <span className="font-semibold text-slate-500">Threat Region:</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">{cyclone.country}</span>
+                        </p>
+                      )}
+                      {cyclone.last_updated && (
+                        <p className="text-[10px] text-slate-400 pt-1">
+                          Bulletin: {new Date(cyclone.last_updated).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                      {cyclone.report_url && (
+                        <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                          <a 
+                            href={cyclone.report_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-teal-600 dark:text-teal-400 hover:underline font-bold flex items-center gap-1"
+                          >
+                            <span>Official GDACS Bulletin</span>
+                            <ExternalLink size={11} />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+        </MapContainer>
+      )}
+
+      {/* =========================================================================
+          TOP FLOATING NAVIGATION & COMMAND BAR (100% Full-Width Map)
+      ========================================================================= */}
+      <div className="absolute top-3 left-3 right-3 z-[990] flex items-center justify-between pointer-events-none gap-2">
+        {/* Left: Back button & Title */}
+        <div className="flex items-center gap-2 pointer-events-auto shrink-0">
           {setActiveTab && (
             <button
               type="button"
@@ -309,382 +754,313 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
                   setActiveTab('home');
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 font-bold text-xs shadow-xs transition-all cursor-pointer group shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0a1b24]/90 backdrop-blur-md border border-teal-500/35 text-slate-200 hover:bg-teal-900/40 hover:text-white font-bold text-xs shadow-xl transition-all cursor-pointer group shrink-0"
               title="Back to previous page"
             >
-              <ArrowLeft size={15} className="text-slate-500 group-hover:-translate-x-1 transition-transform" />
+              <ArrowLeft size={14} className="text-teal-400 group-hover:-translate-x-1 transition-transform" />
               <span>Back</span>
             </button>
           )}
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                India Coastal Cyclone Monitor
-              </h1>
-              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30 flex items-center gap-1">
-                <Sparkles size={11} /> Live Meteorological Suite
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Real-time spaceborne satellite, Doppler radar, wind streamlines & atmospheric moisture feeds
-            </p>
+
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/90 backdrop-blur-md border border-teal-500/35 shadow-xl text-xs">
+            <h1 className="font-bold text-white tracking-tight">
+              India Coastal Cyclone Monitor
+            </h1>
+            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center gap-1">
+              <Sparkles size={10} /> Live
+            </span>
           </div>
         </div>
 
-        {/* View Mode Switcher */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs shadow-xs">
+        {/* Right: Mode Switcher & Active Cyclones Trigger Button */}
+        <div className="flex items-center gap-2 pointer-events-auto shrink-0">
+          {/* Tactical Map vs Windy Atmospheric Radar Engine Switcher */}
+          <div className="flex items-center p-0.5 rounded-xl bg-[#0a1b24]/90 backdrop-blur-md border border-teal-500/35 text-xs shadow-xl">
             <button
               type="button"
               onClick={() => setViewMode('tactical')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'tactical'
-                  ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs border border-slate-200 dark:border-slate-700'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-teal-500/30 text-teal-200 border border-teal-400/40 shadow-xs'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Compass size={14} />
-              <span>Tactical AI Cyclone Map</span>
+              <Compass size={13} />
+              <span className="text-[11px] sm:text-xs">Tactical Map</span>
             </button>
 
             <button
               type="button"
               onClick={() => setViewMode('windy_engine')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'windy_engine'
                   ? 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-xs font-black'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Wind size={14} className={viewMode === 'windy_engine' ? 'animate-pulse' : ''} />
-              <span>Live Atmospheric Radar Engine</span>
+              <Wind size={13} className={viewMode === 'windy_engine' ? 'animate-pulse' : ''} />
+              <span className="text-[11px] sm:text-xs">Radar Engine</span>
             </button>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-            <span className={`w-2 h-2 rounded-full ${
-              status === 'LIVE / Connected' 
-                ? 'bg-emerald-500 animate-pulse' 
-                : status === 'Updating' 
-                ? 'bg-amber-500 animate-ping' 
-                : 'bg-red-500'
-            }`} />
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              {status}
-            </span>
+          {/* Active Storms Trigger Pill */}
+          <button
+            type="button"
+            onClick={() => setIsCycloneDrawerOpen(!isCycloneDrawerOpen)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-md text-xs font-bold shadow-xl transition-all cursor-pointer ${
+              isCycloneDrawerOpen
+                ? 'bg-red-600 text-white border border-red-400'
+                : 'bg-[#0a1b24]/90 border border-teal-500/35 text-slate-200 hover:bg-teal-900/40 hover:text-white'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+            <span>Active Storms ({totalActiveCount})</span>
+            <List size={13} />
+          </button>
+
+          {/* Live Status Pill */}
+          <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0a1b24]/90 backdrop-blur-md border border-teal-500/35 text-xs text-slate-300 shadow-xl">
+            <span className={`w-2 h-2 rounded-full ${status === 'LIVE / Connected' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
+            <span className="text-[11px] font-medium">{status}</span>
           </div>
         </div>
       </div>
 
-      {/* 2. Main Content Layout (Map + Sidebar) */}
-      <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
-        
-        {/* Map View Section */}
-        <div className="flex-1 rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 shadow-sm relative min-h-[440px]">
-          
-          {viewMode === 'windy_engine' ? (
-            /* Mode B: Full Live Atmospheric Radar Engine (Windy / Numerical Model Player) */
-            <WindyAtmosphericPlayer
-              stormLat={aiCyclone?.latitude || 15.50}
-              stormLng={aiCyclone?.longitude || 81.80}
-              stormName={aiCyclone?.name || 'Severe Cyclonic Storm Murasu'}
-              stormWindKt={aiCyclone?.wind_kt || 65}
-              initialOverlay={activeLayer}
-            />
-          ) : (
-            /* Mode A: Tactical AI Cyclone Map with Zoom Earth Live Floating Drawer & Overlays */
-            <>
-              <MapContainer 
-                ref={mapRef}
-                center={aiCyclone ? [aiCyclone.latitude, aiCyclone.longitude] : [15.5, 78.5]} 
-                zoom={aiCyclone ? 6 : 5} 
-                minZoom={3}
-                maxZoom={12}
-                scrollWheelZoom={true} 
-                className="w-full h-full"
-                style={{ height: '100%', minHeight: '100%', background: '#0a1622' }}
+      {/* =========================================================================
+          FLOATING OPTION 3: RIGHT FLOATING DOCK (Zoom, Recenter & Quick Tools)
+      ========================================================================= */}
+      <div className="absolute top-16 sm:top-20 right-3 z-[990] flex flex-col gap-1.5 pointer-events-auto">
+        <button
+          type="button"
+          onClick={handleZoomIn}
+          className="w-9 h-9 rounded-xl bg-[#0a1b24]/90 hover:bg-teal-900/60 text-slate-200 hover:text-white border border-teal-500/35 backdrop-blur-md shadow-xl flex items-center justify-center transition-all cursor-pointer"
+          title="Zoom In"
+        >
+          <Plus size={17} />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleZoomOut}
+          className="w-9 h-9 rounded-xl bg-[#0a1b24]/90 hover:bg-teal-900/60 text-slate-200 hover:text-white border border-teal-500/35 backdrop-blur-md shadow-xl flex items-center justify-center transition-all cursor-pointer"
+          title="Zoom Out"
+        >
+          <Minus size={17} />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleRecenter}
+          className="w-9 h-9 rounded-xl bg-[#0a1b24]/90 hover:bg-teal-900/60 text-teal-300 hover:text-white border border-teal-500/35 backdrop-blur-md shadow-xl flex items-center justify-center transition-all cursor-pointer"
+          title="Recenter on Active Cyclone Eye"
+        >
+          <Crosshair size={17} />
+        </button>
+      </div>
+
+      {/* =========================================================================
+          FLOATING OPTION 4 & 5: TACTICAL SCALE & PLAYER (Only in Tactical Map Mode)
+          (Windy has its own built-in interactive timeline and scale bar)
+      ========================================================================= */}
+      {viewMode === 'tactical' && (
+        <>
+          {/* Floating Option 4: Bottom-Left Scale Bar */}
+          <div className="absolute bottom-4 left-3 z-[950] pointer-events-auto select-none">
+            {activeLayer === 'pressure' && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
+                <span className="font-bold text-teal-300">hPa</span>
+                <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
+                  <span className="px-1.5 py-0.5 bg-[#1d3557] text-white">970</span>
+                  <span className="px-1.5 py-0.5 bg-[#457b9d] text-white">985</span>
+                  <span className="px-1.5 py-0.5 bg-[#a8dadc] text-slate-900 font-bold">1000</span>
+                  <span className="px-1.5 py-0.5 bg-[#f1faee] text-slate-900 font-bold">1015</span>
+                  <span className="px-1.5 py-0.5 bg-[#e63946] text-white">1030</span>
+                  <span className="px-1.5 py-0.5 bg-[#6a040f] text-white">1045</span>
+                </div>
+                <span className="hidden sm:inline text-teal-400 font-bold">MSLP Isobars</span>
+              </div>
+            )}
+
+            {activeLayer === 'wind' && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
+                <span className="font-bold text-teal-300">km/h</span>
+                <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
+                  <span className="px-1.5 py-0.5 bg-[#818cf8] text-white">0</span>
+                  <span className="px-1.5 py-0.5 bg-[#06b6d4] text-white">25</span>
+                  <span className="px-1.5 py-0.5 bg-[#10b981] text-white">50</span>
+                  <span className="px-1.5 py-0.5 bg-[#eab308] text-slate-900 font-bold">75</span>
+                  <span className="px-1.5 py-0.5 bg-[#f97316] text-white">100</span>
+                  <span className="px-1.5 py-0.5 bg-[#ef4444] text-white font-bold">125+</span>
+                </div>
+                <span className="hidden sm:inline text-teal-400 font-bold">Wind Vectors</span>
+              </div>
+            )}
+
+            {activeLayer === 'temperature' && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
+                <span className="font-bold text-teal-300">°C</span>
+                <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
+                  <span className="px-1.5 py-0.5 bg-[#3b82f6] text-white">20</span>
+                  <span className="px-1.5 py-0.5 bg-[#06b6d4] text-white">24</span>
+                  <span className="px-1.5 py-0.5 bg-[#10b981] text-white">28</span>
+                  <span className="px-1.5 py-0.5 bg-[#f59e0b] text-slate-900 font-bold">30</span>
+                  <span className="px-1.5 py-0.5 bg-[#ef4444] text-white font-bold">34+</span>
+                </div>
+                <span className="hidden sm:inline text-teal-400 font-bold">SST Thermal</span>
+              </div>
+            )}
+
+            {activeLayer === 'humidity' && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
+                <span className="font-bold text-teal-300">%</span>
+                <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
+                  <span className="px-1.5 py-0.5 bg-[#e0f2fe] text-slate-900 font-bold">40%</span>
+                  <span className="px-1.5 py-0.5 bg-[#38bdf8] text-slate-900 font-bold">60%</span>
+                  <span className="px-1.5 py-0.5 bg-[#0284c7] text-white">75%</span>
+                  <span className="px-1.5 py-0.5 bg-[#0369a1] text-white">90%</span>
+                  <span className="px-1.5 py-0.5 bg-[#0c4a6e] text-white font-bold">100%</span>
+                </div>
+                <span className="hidden sm:inline text-teal-400 font-bold">RH Moisture</span>
+              </div>
+            )}
+          </div>
+
+          {/* Floating Option 5: Bottom-Center Synoptic Player */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[950] pointer-events-auto flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-xs text-white">
+              <button 
+                type="button"
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="w-7 h-7 rounded-lg bg-teal-500/25 hover:bg-teal-500/40 text-teal-300 flex items-center justify-center transition-colors cursor-pointer"
+                title={isPlaying ? "Pause Stream" : "Play Stream"}
               >
-                {/* 1. Base Cartography Tiles */}
-                {activeBaseMap === 'street' && (
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                )}
-                {activeBaseMap === 'satellite_base' && (
-                  <LayerGroup>
-                    <TileLayer
-                      attribution='Tiles &copy; Esri World Imagery'
-                      url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                    />
-                    <TileLayer
-                      attribution='Labels &copy; Esri'
-                      url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-                    />
-                  </LayerGroup>
-                )}
-                {activeBaseMap === 'terrain' && (
-                  <TileLayer
-                    attribution='Tiles &copy; Esri Topo'
-                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
-                  />
-                )}
-                {activeBaseMap === 'ocean' && (
-                  <TileLayer
-                    attribution='Tiles &copy; Esri Ocean'
-                    url="https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
-                  />
-                )}
+                {isPlaying ? <Pause size={13} /> : <Play size={13} className="ml-0.5" />}
+              </button>
 
-                {/* 2. Live Weather Doppler Radar (RainViewer Real-Time API) */}
-                {(activeLayer === 'radar' || activeLayer === 'precipitation') && rainviewerPath && (
-                  <TileLayer
-                    key={`radar-${rainviewerPath}`}
-                    attribution='Radar &copy; <a href="https://www.rainviewer.com">RainViewer</a>'
-                    url={`https://tilecache.rainviewer.com${rainviewerPath}/512/{z}/{x}/{y}/2/1_1.png`}
-                    opacity={0.85}
-                    zIndex={420}
-                  />
-                )}
+              <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-slate-200 px-1 border-x border-teal-500/20">
+                <Clock size={12} className="text-teal-400" />
+                <span>{currentFormattedTime}</span>
+              </div>
 
-                {/* 3. Live Satellite Cloud Cover Layer */}
-                {activeLayer === 'satellite' && (
-                  <TileLayer
-                    attribution='Satellite &copy; NASA GIBS / Esri'
-                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                    opacity={0.95}
-                    zIndex={410}
-                  />
-                )}
+              <button 
+                type="button"
+                onClick={() => fetchLiveCyclones()}
+                className="w-7 h-7 rounded-lg bg-teal-500/15 hover:bg-teal-500/30 text-teal-300 flex items-center justify-center transition-colors cursor-pointer"
+                title="Next Synoptic Refresh"
+              >
+                <SkipForward size={13} />
+              </button>
 
-                {/* 4. Live Animated Wind Streamlines & Particle Vector Flow */}
-                <WindParticleOverlay
-                  stormLat={aiCyclone?.latitude || 15.5}
-                  stormLng={aiCyclone?.longitude || 81.8}
-                  stormWindKt={aiCyclone?.wind_kt || 65}
-                  active={activeLayer === 'wind'}
-                  showLegend={true}
-                />
-
-                {/* 5. Live Atmospheric Relative Humidity & Moisture Flux */}
-                <HumidityMoistureOverlay
-                  stormLat={aiCyclone?.latitude || 15.5}
-                  stormLng={aiCyclone?.longitude || 81.8}
-                  active={activeLayer === 'humidity'}
-                  showLegend={true}
-                />
-
-                {/* 6. Live Atmospheric Pressure (MSLP) Isobars & Depression Core */}
-                <PressureIsobarOverlay
-                  stormLat={aiCyclone?.latitude || 15.5}
-                  stormLng={aiCyclone?.longitude || 81.8}
-                  stormWindKt={aiCyclone?.wind_kt || 65}
-                  active={activeLayer === 'pressure'}
-                  showLegend={true}
-                />
-
-                {/* 7. Live Sea Surface & Air Temperature Warm Pool */}
-                <TemperatureOverlay
-                  stormLat={aiCyclone?.latitude || 15.5}
-                  stormLng={aiCyclone?.longitude || 81.8}
-                  active={activeLayer === 'temperature'}
-                  showLegend={true}
-                />
-
-                {/* AI Detected Cyclone Eyewall Pinpoint */}
-                {aiCyclone && (
-                  <Marker 
-                    key={aiCyclone.id} 
-                    position={[aiCyclone.latitude, aiCyclone.longitude]}
-                    icon={aiCycloneIcon}
+              {/* Model Resolution Badges */}
+              <div className="hidden sm:flex items-center gap-1 ml-1">
+                {['ICON 13 km', 'GFS 22 km', 'ECMWF 9 km'].map((model) => (
+                  <button
+                    key={model}
+                    type="button"
+                    onClick={() => setSelectedModel(model)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase transition-all cursor-pointer ${
+                      selectedModel === model 
+                        ? 'bg-teal-400 text-slate-900 shadow-xs' 
+                        : 'bg-teal-950/60 hover:bg-teal-900/60 text-teal-300/80 border border-teal-500/20'
+                    }`}
                   >
-                    <Popup className="custom-popup" autoPan={true}>
-                      <div className="p-1 min-w-[220px]">
-                        <div className="flex items-center gap-1.5 mb-1.5">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white animate-pulse shadow-xs">
-                            AI DETECTED EYEWALL
-                          </span>
-                        </div>
-                        <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-2">{aiCyclone.name}</h4>
-                        <div className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
-                          <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
-                            <span className="font-semibold text-slate-500">Eyewall Coordinates:</span>
-                            <span className="font-black text-red-500">{aiCyclone.latitude}°N, {aiCyclone.longitude}°E</span>
-                          </p>
-                          <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
-                            <span className="font-semibold text-slate-500">Basin:</span>
-                            <span className="font-bold">{aiCyclone.subbasin}</span>
-                          </p>
-                          <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
-                            <span className="font-semibold text-slate-500">Classification:</span>
-                            <span className="font-bold text-amber-500">{aiCyclone.status}</span>
-                          </p>
-                          <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
-                            <span className="font-semibold text-slate-500">Wind Speed:</span>
-                            <span className="font-bold text-red-600">{aiCyclone.wind_speed} km/h ({aiCyclone.wind_kt} kt)</span>
-                          </p>
-                          <p className="text-[10px] text-slate-400 pt-1">
-                            Detection: {aiCyclone.coordMethod}
-                          </p>
-                        </div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                )}
-
-                {/* Live External Cyclones from GDACS */}
-                {cyclones.map((cyclone) => (
-                  <Marker 
-                    key={cyclone.id} 
-                    position={[cyclone.latitude, cyclone.longitude]}
-                    icon={cycloneIcon}
-                  >
-                    <Popup className="custom-popup">
-                      <div className="p-1">
-                        <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-2">{cyclone.name}</h4>
-                        <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400">
-                          <p><span className="font-semibold">Latitude:</span> {cyclone.latitude}°</p>
-                          <p><span className="font-semibold">Longitude:</span> {cyclone.longitude}°</p>
-                          {cyclone.wind_speed != null && (
-                            <p><span className="font-semibold">Wind:</span> {cyclone.wind_speed} km/h</p>
-                          )}
-                          {cyclone.status && (
-                            <p><span className="font-semibold">Status:</span> {cyclone.status}</p>
-                          )}
-                          {cyclone.last_updated && (
-                            <p className="mt-2 text-[10px] text-slate-600 dark:text-slate-400">Update: {cyclone.last_updated}</p>
-                          )}
-                        </div>
-                      </div>
-                    </Popup>
-                  </Marker>
+                    {model}
+                  </button>
                 ))}
-              </MapContainer>
-            </>
-          )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
+      {/* =========================================================================
+          SLIDING RIGHT DRAWER: ACTIVE CYCLONES & 24H LANDFALL PROJECTION
+          (Tuck away cleanly so user has 100% full-screen wide map)
+      ========================================================================= */}
+      <div className={`absolute top-0 right-0 h-full w-84 sm:w-96 z-[1050] bg-[#091821]/96 backdrop-blur-2xl border-l border-teal-500/30 shadow-2xl transition-transform duration-300 flex flex-col pointer-events-auto ${
+        isCycloneDrawerOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        {/* Drawer Header */}
+        <div className="p-4 border-b border-teal-500/25 flex items-center justify-between bg-teal-950/50">
+          <div className="flex items-center gap-2">
+            <Activity size={17} className="text-emerald-400 animate-pulse" />
+            <h3 className="font-bold text-white text-sm">Active Cyclones & Track</h3>
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-600 text-white">
+              {totalActiveCount} Active
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCycloneDrawerOpen(false)}
+            className="w-7 h-7 rounded-lg bg-teal-900/40 hover:bg-teal-800 text-teal-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="Close Drawer"
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        {/* 3. Map Information & Meteorological Feeds Sidebar */}
-        <div className="w-full md:w-80 flex flex-col gap-4 h-full overflow-y-auto pr-0.5 custom-scrollbar">
-          {/* Zoom Earth Meteorological Feeds Drawer (Placed cleanly in Sidebar so Map is 100% clear) */}
-          <ZoomEarthLayerMenu 
-            isSidebar={true}
-            activeLayer={activeLayer}
-            setActiveLayer={setActiveLayer}
-            activeBaseMap={activeBaseMap}
-            setActiveBaseMap={setActiveBaseMap}
-            isLiveLoading={isRadarLoading}
-          />
-
+        {/* Drawer Body */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
+          
           {/* Active 24-Hour Landfall Prediction Card */}
           {aiCyclone && aiForecast && aiForecast.length > 0 && (() => {
             const activeWp = aiForecast.find(wp => wp.step === currentStep) || aiForecast[0];
             return (
-              <div className="bg-gradient-to-br from-red-500/10 via-amber-500/5 to-slate-100/50 dark:to-slate-800/40 rounded-xl border-2 border-red-500/40 p-4 shadow-sm space-y-3">
-                {/* Header */}
+              <div className="bg-gradient-to-br from-red-500/15 via-amber-500/10 to-slate-900/80 rounded-xl border border-red-500/40 p-3.5 shadow-sm space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-red-500/20">
                   <div className="flex items-center gap-1.5">
-                    <Navigation size={15} className="text-red-500 animate-spin" style={{ animationDuration: '6s' }} />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400">
+                    <Navigation size={14} className="text-red-400 animate-spin" style={{ animationDuration: '6s' }} />
+                    <h4 className="text-[11px] font-black uppercase tracking-wider text-red-400">
                       Active Landfall Projection
                     </h4>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-600 text-white">
-                      Day {activeWp.step}
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                      +{activeWp.horizon_hours}h
-                    </span>
-                  </div>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-600 text-white">
+                    Day {activeWp.step} (+{activeWp.horizon_hours}h)
+                  </span>
                 </div>
 
-                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Active eye centered at <span className="font-bold text-red-500">{aiCyclone.latitude}°N, {aiCyclone.longitude}°E</span> ({aiCyclone.wind_speed} km/h). Showing projected movement for the active 24-hour cycle.
-                </p>
-
-                {/* Single Active Day Card */}
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border-2 border-red-500/30 shadow-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-red-600 dark:text-red-400 flex items-center gap-1">
-                      <Compass size={12} />
-                      Projected Day {activeWp.step} Position
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-500">
-                      {activeWp.horizon_hours}h Window
-                    </span>
-                  </div>
-
-                  <div className="flex items-baseline justify-between pt-0.5">
-                    <span className="text-base sm:text-lg font-black text-red-600 dark:text-red-400">
+                <div className="p-2.5 rounded-xl bg-slate-900/90 border border-red-500/30 space-y-1.5">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-base font-black text-red-400">
                       {activeWp.latitude}°N, {activeWp.longitude}°E
                     </span>
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                    <span className="text-[11px] font-bold text-slate-300">
                       ±{activeWp.uncertainty_radius_km} km
                     </span>
                   </div>
+                  <p className="text-[11px] text-slate-200 font-semibold">{activeWp.stage}</p>
+                </div>
 
-                  <div className="text-xs text-slate-700 dark:text-slate-300 font-medium pt-1.5 border-t border-slate-100 dark:border-slate-800">
-                    <p className="text-slate-900 dark:text-slate-100 font-semibold">{activeWp.stage}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Expected Window: {new Date(activeWp.arrival_time).toLocaleDateString([], { month: 'short', day: 'numeric' })}{' '}
-                      {new Date(activeWp.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                {/* Day Stepper */}
+                <div className="flex items-center justify-between pt-1 gap-1 border-t border-slate-700/50">
+                  <span className="text-[10px] text-slate-400">Cycle:</span>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setManualDayStep(s === autoActiveStep ? null : s)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                          currentStep === s
+                            ? 'bg-red-600 text-white shadow-xs'
+                            : s === autoActiveStep
+                            ? 'bg-sky-500/20 text-sky-300 border border-sky-400/40'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        D{s}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* 24-Hour Auto-Progression Status Indicator */}
-                <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/60 text-[11px] space-y-1.5">
-                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-600 dark:text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} className="text-sky-500" />
-                      24h Auto-Progression Cycle
-                    </span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-black">
-                      {currentStep === 1 ? 'Day 1 Active' : `Day ${currentStep} Active`}
-                    </span>
-                  </div>
-                  
-                  <p className="text-[10px] text-slate-500 leading-tight">
-                    {currentStep < 5 
-                      ? `Automatically moves to Day ${currentStep + 1} after 24 hours of tracking (in ~${hoursToNextDay.toFixed(1)} hrs).`
-                      : 'Final Day 5 coastal landfall window reached.'}
-                  </p>
-
-                  {/* Day Stepper Selector for quick inspection */}
-                  <div className="flex items-center justify-between pt-1 gap-1 border-t border-slate-200/50 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 font-medium">Cycle:</span>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setManualDayStep(s === autoActiveStep ? null : s)}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
-                            currentStep === s
-                              ? 'bg-red-600 text-white shadow-xs'
-                              : s === autoActiveStep
-                              ? 'bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-400/40'
-                              : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'
-                          }`}
-                          title={s === autoActiveStep ? `Day ${s} (Real-time active based on 24h clock)` : `Preview Day ${s}`}
-                        >
-                          D{s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Link to Dedicated 5-Day Prediction Page */}
                 {setActiveTab && (
                   <button
                     type="button"
                     onClick={() => setActiveTab('prediction')}
-                    className="w-full py-2 px-3 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-sky-600 dark:text-sky-400 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                    className="w-full py-1.5 px-3 rounded-lg bg-teal-900/40 hover:bg-teal-800/60 border border-teal-500/30 text-teal-300 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
                   >
-                    <span>View Full 5-Day Prediction Track</span>
+                    <span>Open 5-Day Trajectory Track</span>
                     <ChevronRight size={14} />
                   </button>
                 )}
@@ -692,129 +1068,112 @@ const MapPage = ({ currentAnalysis, setActiveTab }) => {
             );
           })()}
 
-          {/* Cyclone Monitoring Status */}
-          <div className="bg-white dark:bg-[#1e293b] rounded-xl border border-slate-200/50 dark:border-slate-700/50 p-5 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-4 pb-3 border-b border-slate-200/50 dark:border-slate-700/30 flex items-center gap-2">
-              <Activity size={16} className="text-emerald-400" />
-              Cyclone Monitoring
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <span className="text-xs font-medium text-slate-500 block mb-1">Active Cyclones</span>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <span>{(aiCyclone ? 1 : 0) + cyclones.length}</span>
-                  {aiCyclone && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
-                      1 AI Detected
-                    </span>
-                  )}
+          {/* Active Storms List */}
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-1">
+              Active Storm Events ({totalActiveCount})
+            </span>
+
+            {/* AI Detected Cyclone Card */}
+            {aiCyclone && (
+              <div 
+                className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                  selectedCycloneId === aiCyclone.id || (!selectedCycloneId && primaryCyclone?.id === aiCyclone.id)
+                    ? 'bg-red-500/20 border-red-500 shadow-md'
+                    : 'bg-red-500/10 border-red-500/40 hover:border-red-400'
+                }`}
+                onClick={() => handleSelectCyclone(aiCyclone)}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                    {aiCyclone.name}
+                  </span>
+                  <span className="text-[10px] font-black text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded border border-red-500/30">
+                    LIVE AI EYE
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-300 space-y-0.5">
+                  <p className="flex justify-between">
+                    <span>Coordinates:</span>
+                    <strong className="text-red-400 font-bold">{aiCyclone.latitude}°N, {aiCyclone.longitude}°E</strong>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>Basin:</span>
+                    <span className="font-semibold text-amber-400">{aiCyclone.subbasin}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>Wind Speed:</span>
+                    <span className="font-bold text-white">{aiCyclone.wind_speed} km/h</span>
+                  </p>
                 </div>
               </div>
+            )}
 
-              <div>
-                <span className="text-xs font-medium text-slate-500 block mb-1 flex items-center gap-1.5">
-                  <Clock size={12} /> Last Data Update
-                </span>
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  {aiCyclone ? 'Real-time AI Model & Live Feeds' : (data?.updated_at ? new Date(data.updated_at).toLocaleString() : '-')}
-                </div>
-              </div>
-
-              <div>
-                <span className="text-xs font-medium text-slate-500 block mb-1 flex items-center gap-1.5">
-                  <Database size={12} /> Data Source
-                </span>
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 break-words">
-                  {aiCyclone ? 'CycloSafe AI + RainViewer Radar + Open-Meteo' : (data?.source || '-')}
-                </div>
-              </div>
-
-              <div>
-                <span className="text-xs font-medium text-slate-500 block mb-1">Connection</span>
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${status === 'LIVE / Connected' ? 'bg-emerald-500/100' : 'bg-slate-400'}`} />
-                  {status}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Active Events List */}
-          <div className="bg-slate-100/50 dark:bg-slate-800/30 rounded-xl border border-slate-200/50 dark:border-slate-700/50 p-5 flex-1 overflow-hidden flex flex-col">
-            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 mb-3 uppercase tracking-wider text-slate-500 flex items-center justify-between">
-              <span>Active Events</span>
-              <span className="text-[10px] font-normal text-slate-400">{(aiCyclone ? 1 : 0) + cyclones.length} Monitored</span>
-            </h3>
-
-            <div className="space-y-3 overflow-y-auto flex-1 pr-1 custom-scrollbar">
-              {/* Highlight AI Detected Cyclone */}
-              {aiCyclone && (
-                <div 
-                  className="p-3 rounded-lg bg-red-500/10 border-2 border-red-500/40 shadow-sm cursor-pointer hover:border-red-400 transition-all select-none group"
-                  onClick={() => {
-                    if (mapRef.current) {
-                      mapRef.current.flyTo([aiCyclone.latitude, aiCyclone.longitude], 7);
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                      {aiCyclone.name}
-                    </span>
-                    <span className="text-[10px] font-bold text-red-500 bg-red-500/15 px-1.5 py-0.5 rounded border border-red-500/30">
-                      LIVE EYE
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5">
-                    <p className="flex justify-between">
-                      <span>Coordinates:</span>
-                      <strong className="text-red-500 font-bold">{aiCyclone.latitude}°N, {aiCyclone.longitude}°E</strong>
-                    </p>
-                    <p className="flex justify-between">
-                      <span>Category:</span>
-                      <span className="font-semibold text-amber-500">{aiCyclone.status}</span>
-                    </p>
-                    <p className="flex justify-between">
-                      <span>Wind Speed:</span>
-                      <span className="font-bold text-slate-900 dark:text-slate-100">{aiCyclone.wind_speed} km/h</span>
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* GDACS Cyclones */}
-              {cyclones.map((cyclone) => (
+            {/* GDACS Live Feeds */}
+            {cyclones.map((cyclone) => {
+              const isSelected = selectedCycloneId === cyclone.id || (!selectedCycloneId && !aiCyclone && cyclones[0]?.id === cyclone.id);
+              return (
                 <div 
                   key={cyclone.id}
-                  className="p-3 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 transition-colors cursor-pointer"
-                  onClick={() => {
-                    if (mapRef.current) {
-                      mapRef.current.flyTo([cyclone.latitude, cyclone.longitude], 6);
-                    }
-                  }}
+                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-teal-500/20 border-teal-400 shadow-md'
+                      : 'bg-slate-900/70 border-teal-500/20 hover:border-teal-500/50 hover:bg-slate-900/90'
+                  }`}
+                  onClick={() => handleSelectCyclone(cyclone)}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">{cyclone.name}</span>
-                    <span className="text-[10px] text-slate-400">GDACS</span>
+                    <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${cyclone.alert_level === 'Red' ? 'bg-red-500 animate-pulse' : 'bg-amber-400'}`} />
+                      {cyclone.name}
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                      cyclone.alert_level === 'Red'
+                        ? 'text-red-400 bg-red-500/20 border-red-500/40'
+                        : 'text-amber-400 bg-amber-500/20 border-amber-500/40'
+                    }`}>
+                      {cyclone.alert_level || 'Active'} Alert
+                    </span>
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
-                    <p>Lat: {cyclone.latitude}°, Lon: {cyclone.longitude}°</p>
-                    {cyclone.wind_speed && <p>Wind: {cyclone.wind_speed} km/h</p>}
+                  <div className="text-[11px] text-slate-300 space-y-0.5">
+                    <p className="flex justify-between">
+                      <span>Coordinates:</span>
+                      <strong className="text-teal-300 font-bold">{cyclone.latitude}°N, {cyclone.longitude}°E</strong>
+                    </p>
+                    <p className="flex justify-between">
+                      <span>Basin:</span>
+                      <span className="font-semibold text-slate-300">{cyclone.basin}</span>
+                    </p>
+                    {cyclone.wind_speed != null && (
+                      <p className="flex justify-between">
+                        <span>Wind Speed:</span>
+                        <span className="font-bold text-white">
+                          {cyclone.wind_speed} km/h ({cyclone.wind_kt || Math.round(cyclone.wind_speed / 1.852)} kt)
+                        </span>
+                      </p>
+                    )}
                   </div>
                 </div>
-              ))}
-
-              {!aiCyclone && cyclones.length === 0 && (
-                <div className="text-center py-6 text-slate-400 text-xs">
-                  No active cyclone systems detected in coastal waters.
-                </div>
-              )}
-            </div>
+              );
+            })}
           </div>
+
+          {/* Telemetry info */}
+          <div className="p-3 rounded-xl bg-teal-950/40 border border-teal-500/20 text-[11px] text-slate-300 space-y-1">
+            <p className="flex justify-between">
+              <span className="text-slate-400">Data Source:</span>
+              <span className="font-semibold text-teal-300">GDACS & JTWC Feeds</span>
+            </p>
+            <p className="flex justify-between">
+              <span className="text-slate-400">Last Synoptic:</span>
+              <span className="font-mono text-slate-200">{lastUpdated || 'Live'}</span>
+            </p>
+          </div>
+
         </div>
       </div>
+
     </div>
   );
 };

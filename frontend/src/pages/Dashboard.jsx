@@ -21,7 +21,11 @@ const Dashboard = ({
   setAnalysisStatus,
   currentStage,
   setCurrentStage,
-  adminUser
+  adminUser,
+  activeMapLayer = 'wind',
+  setActiveMapLayer,
+  activeBaseMap = 'satellite_base',
+  setActiveBaseMap
 }) => {
   return (
     <ErrorBoundary fallbackAction={() => setActiveTab('home')}>
@@ -65,6 +69,10 @@ const Dashboard = ({
         <MapPage 
           currentAnalysis={currentAnalysis}
           setActiveTab={setActiveTab}
+          activeLayer={activeMapLayer}
+          setActiveLayer={setActiveMapLayer}
+          activeBaseMap={activeBaseMap}
+          setActiveBaseMap={setActiveBaseMap}
         />
       )}
 

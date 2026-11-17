@@ -26,7 +26,8 @@ export default function ZoomEarthLayerMenu({
   activeBaseMap = 'satellite_base',
   setActiveBaseMap,
   isLiveLoading = false,
-  isSidebar = true
+  isSidebar = false,
+  className = ""
 }) {
   const [isOpen, setIsOpen] = useState(true);
   const [isLiveExpanded, setIsLiveExpanded] = useState(true);
@@ -53,9 +54,9 @@ export default function ZoomEarthLayerMenu({
   ];
 
   return (
-    <div className={isSidebar ? "w-full pointer-events-auto select-none font-sans" : "absolute top-4 right-4 z-[500] pointer-events-auto select-none font-sans"}>
+    <div className={className || (isSidebar ? "w-full pointer-events-auto select-none font-sans" : "absolute top-3 left-3 z-[1000] pointer-events-auto select-none font-sans w-56 sm:w-60")}>
       {/* Glassmorphic Container (Zoom Earth Aesthetic) */}
-      <div className={`w-full bg-gradient-to-b from-[#0f2930]/95 via-[#0c2027]/95 to-[#08151a]/95 backdrop-blur-xl border border-teal-500/30 rounded-2xl shadow-xl text-slate-100 overflow-hidden transition-all duration-300 ${!isSidebar ? 'sm:w-60' : ''}`}>
+      <div className="w-full bg-[#0a1b24]/92 backdrop-blur-xl border border-teal-500/35 rounded-2xl shadow-2xl text-slate-100 overflow-hidden transition-all duration-300">
         
         {/* Header Bar */}
         <div 
