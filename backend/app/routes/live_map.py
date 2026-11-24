@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import HTMLResponse
 from datetime import datetime, timedelta
 import asyncio
 import time
@@ -342,5 +343,77 @@ async def get_spire_future_track(refresh: bool = Query(False, description="Force
             "storms": [],
             "is_stale": True
         }
+
+
+# =========================================================================
+# WINDY ATMOSPHERIC PLAYER EMBED PROXY
+# =========================================================================
+
+@router.get("/windy-embed")
+async def get_windy_embed(request: Request):
+    """
+    Proxies Windy embed2.html to control particle visibility strictly based on overlay layer.
+    When overlay is NOT wind (e.g. humidity, temperature, precipitation, pressure),
+    it disables wind particle drops so the map shows clean meteorological scalar fields.
+    When overlay IS wind, particle drops/streamlines are rendered normally.
+    """
+    query_string = request.url.query
+    url = f"https://embed.windy.com/embed2.html?{query_string}" if query_string else "https://embed.windy.com/embed2.html"
+    
+    headers = {
+        "User-Agent": request.headers.get("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://www.windy.com/"
+    }
+    
+    try:
+        resp = await asyncio.to_thread(requests.get, url, headers=headers, timeout=12.0)
+        resp.raise_for_status()
+        html = resp.text
+    except Exception as e:
+        # Fallback iframe if upstream fetch fails
+        return HTMLResponse(content=f"<html><body><iframe src='{url}' style='width:100%;height:100%;border:none;'></iframe></body></html>")
+
+    # Determine if this request is specifically for the 'wind' overlay
+    overlay_param = request.query_params.get("overlay", "wind").lower()
+    is_wind = overlay_param == "wind"
+
+    if not is_wind:
+        # Turn OFF particle animation in localStorage and hide any canvas particle elements via CSS
+        injection = """
+        <script>
+        try {
+            window.localStorage.setItem("particlesAnim", JSON.stringify("off"));
+        } catch(e) {}
+        </script>
+        <style>
+            .leaflet-canvas, canvas.leaflet-layer {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+        </style>
+        """
+        html = html.replace("</head>", f"{injection}</head>")
+        html = html.replace('<body class="target-embed">', '<body class="target-embed hide-particles no-particles">')
+    else:
+        injection = """
+        <script>
+        try {
+            window.localStorage.setItem("particlesAnim", JSON.stringify("on"));
+        } catch(e) {}
+        </script>
+        """
+        html = html.replace("</head>", f"{injection}</head>")
+
+    # Rewrite any relative asset URLs to absolute Windy CDN URLs
+    html = html.replace('href="v/', 'href="https://embed.windy.com/v/')
+    html = html.replace('src="js/', 'src="https://embed.windy.com/js/')
+    html = html.replace('src="v/', 'src="https://embed.windy.com/v/')
+    html = html.replace('src="/img/', 'src="https://embed.windy.com/img/')
+
+    return HTMLResponse(content=html)
+
 
 
