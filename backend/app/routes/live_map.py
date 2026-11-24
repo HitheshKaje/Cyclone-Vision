@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
 import time
 import requests
@@ -47,6 +47,20 @@ def fetch_gdacs_live_cyclones():
 
         if len(coords) < 2 or props.get("eventtype") != "TC":
             continue
+
+        # Filter out historical or dissipated storms from past months (e.g. Arnab dissipated in October)
+        todate_str = props.get("todate")
+        if todate_str:
+            try:
+                clean_td = str(todate_str).replace("Z", "+00:00")
+                end_dt = datetime.fromisoformat(clean_td)
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=timezone.utc)
+                now_utc = datetime.now(timezone.utc)
+                if end_dt < (now_utc - timedelta(hours=48)):
+                    continue
+            except Exception:
+                pass
 
         lon = float(coords[0])
         lat = float(coords[1])

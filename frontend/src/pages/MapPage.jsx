@@ -32,7 +32,8 @@ import {
   Minimize2,
   X,
   List,
-  Thermometer
+  Thermometer,
+  CheckCircle2
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, LayerGroup, Polyline, CircleMarker, Tooltip, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -1741,6 +1742,22 @@ const MapPage = ({
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-1">
               Active Storm Events ({totalActiveCount})
             </span>
+
+            {/* Empty State: Reassuring status when 0 active cyclones exist in the basin */}
+            {totalActiveCount === 0 && (
+              <div className="p-4 rounded-xl bg-slate-900/60 border border-teal-500/20 text-center space-y-2">
+                <div className="w-8 h-8 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center mx-auto text-teal-400">
+                  <CheckCircle2 size={16} />
+                </div>
+                <h4 className="text-xs font-bold text-white">No Active Storms</h4>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  No tropical cyclones are currently active in the North Indian Ocean basin.
+                </p>
+                <div className="pt-2 text-[10px] text-teal-300/80 border-t border-teal-500/15">
+                  Live real-time monitoring via Spire Weather API
+                </div>
+              </div>
+            )}
 
             {/* AI Detected Cyclone Card */}
             {aiCyclone && (

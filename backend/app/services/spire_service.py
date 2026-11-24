@@ -63,29 +63,30 @@ def _parse_ist_datetime(dt_val) -> dict:
         }
 
 
-def _is_indian_ocean_storm(basin: str, sub_basin: str, lat: Optional[float], lon: Optional[float]) -> bool:
+def _is_indian_ocean_storm(basin: str, sub_basin: str, lat: Optional[float] = None, lon: Optional[float] = None) -> bool:
     """
-    Filters storms belonging to:
-    - NI (North Indian Ocean)
-    - AS (Arabian Sea)
-    - BB (Bay of Bengal)
-    Or coordinates inside the Indian coastal basin (Lat 0-35 N, Lon 45-105 E).
+    Identifies active tropical cyclones belonging to:
+    - NI: North Indian Ocean
+    - AS: Arabian Sea
+    - BB: Bay of Bengal
+    - SI: South Indian Ocean (if required)
+    Uses documented Spire basin and subbasin fields, avoiding confusion with ATCF 'IO'.
     """
     b = str(basin or "").upper().strip()
     sb = str(sub_basin or "").upper().strip()
 
-    # Exact documented Spire basin codes
-    if b in ["NI", "NIO", "IO"] or sb in ["AS", "BB", "BOB", "ARB"]:
+    # Exact documented Spire basin and sub-basin codes
+    if b in ["NI", "AS", "BB", "SI"] or sb in ["AS", "BB", "NI", "SI"]:
         return True
 
-    # Check for text names
+    # Check for text names in Spire fields
     combined = f"{b} {sb}".lower()
-    if any(k in combined for k in ["arabian", "bengal", "north indian"]):
+    if any(k in combined for k in ["north indian", "arabian sea", "bay of bengal", "south indian"]):
         return True
 
-    # Geographic boundary fallback for Indian Ocean waters
+    # Geographic boundary fallback for Indian Ocean waters (Lat -40 to 35 N, Lon 40 to 110 E)
     if lat is not None and lon is not None:
-        if 0.0 <= lat <= 35.0 and 45.0 <= lon <= 105.0:
+        if -40.0 <= lat <= 35.0 and 40.0 <= lon <= 110.0:
             return True
 
     return False
@@ -202,13 +203,18 @@ def fetch_spire_future_tracks_sync(force_refresh: bool = False) -> Dict[str, Any
             if not isinstance(item, dict):
                 continue
 
-            storm_id = str(item.get("id") or item.get("storm_id") or "UNKNOWN")
-            name = str(item.get("name") or "Tropical Cyclone").strip().title()
+            atcf_id = str(item.get("atcf_id") or item.get("id") or item.get("storm_id") or "UNKNOWN")
+            storm_id = atcf_id
+            storm_name = str(item.get("storm_name") or item.get("name") or "Tropical Cyclone").strip().title()
+            name = storm_name
             basin = str(item.get("basin") or "").upper().strip()
-            sub_basin = str(item.get("sub_basin") or item.get("subbasin") or "").upper().strip()
+            sub_basin = str(item.get("subbasin") or item.get("sub_basin") or "").upper().strip()
+            subbasin = sub_basin
+            is_active = bool(item.get("is_active", True))
             agency = str(item.get("agency") or item.get("source") or "JTWC/IMD").upper()
 
-            advisory_raw = item.get("advisory_time") or item.get("time") or item.get("updated_at")
+            advisory_number = item.get("advisory_number") or item.get("adv_num") or "01"
+            advisory_raw = item.get("advisory_issuance_time") or item.get("advisory_time") or item.get("time") or item.get("updated_at")
             advisory_info = _parse_ist_datetime(advisory_raw)
 
             # 1. Process Observed Track
@@ -232,6 +238,7 @@ def fetch_spire_future_tracks_sync(force_refresh: bool = False) -> Dict[str, Any
                     wind_val = pt.get("wind") or pt.get("max_sustained_wind") or pt.get("wind_speed")
                     wind_kt = round(float(wind_val)) if wind_val is not None else None
                     wind_kmh = round(wind_kt * 1.852) if wind_kt is not None else None
+                    cat_code = str(pt.get("category_code") or pt.get("category") or "").upper()
 
                     parsed_obs.append({
                         "lat": f_lat,
@@ -240,9 +247,13 @@ def fetch_spire_future_tracks_sync(force_refresh: bool = False) -> Dict[str, Any
                         "date_display": t_info["date_display"],
                         "time_display": t_info["time_display"],
                         "ist_display": t_info["ist_display"],
+                        "category_code": cat_code,
+                        "stage": _normalize_category_code(cat_code, wind_kt),
+                        "max_sustained_wind": wind_kt,
                         "wind_kt": wind_kt,
                         "wind_kmh": wind_kmh,
-                        "pressure": pt.get("pressure"),
+                        "pressure": pt.get("pressure") or pt.get("min_mslp"),
+                        "min_mslp": pt.get("min_mslp") or pt.get("pressure"),
                         "is_forecast": False
                     })
 
@@ -282,6 +293,9 @@ def fetch_spire_future_tracks_sync(force_refresh: bool = False) -> Dict[str, Any
                     cat_code = str(pt.get("category_code") or pt.get("category") or "").upper()
                     stage_name = _normalize_category_code(cat_code, wind_kt)
 
+                    mov_dir = pt.get("movement_direction") or pt.get("direction")
+                    mov_spd = pt.get("movement_speed") or pt.get("speed")
+
                     parsed_fc.append({
                         "lat": f_lat,
                         "lon": f_lon,
@@ -290,10 +304,13 @@ def fetch_spire_future_tracks_sync(force_refresh: bool = False) -> Dict[str, Any
                         "date_display": t_info["date_display"],
                         "time_display": t_info["time_display"],
                         "ist_display": t_info["ist_display"],
+                        "max_sustained_wind": wind_kt,
                         "max_sustained_wind_kt": wind_kt,
                         "max_sustained_wind_kmh": wind_kmh,
                         "category_code": cat_code,
                         "stage": stage_name,
+                        "movement_direction": mov_dir,
+                        "movement_speed": mov_spd,
                         "is_forecast": True
                     })
 
@@ -335,27 +352,43 @@ def fetch_spire_future_tracks_sync(force_refresh: bool = False) -> Dict[str, Any
                 basin_label = "Bay of Bengal"
             elif basin == "NI":
                 basin_label = "North Indian Ocean"
+            elif basin == "SI":
+                basin_label = "South Indian Ocean"
             else:
                 basin_label = f"{basin} {sub_basin}".strip() or "Indian Coastal Waters"
 
             latest_obs_time = parsed_obs[-1]["ist_display"] if parsed_obs else advisory_info["ist_display"]
 
+            max_dev_cat = item.get("max_development_category") or item.get("max_category") or _normalize_category_code(item.get("category_code"), current_wind_kt)
+            max_sustained_wind = item.get("max_sustained_wind") or item.get("wind") or current_wind_kt
+            min_mslp = item.get("min_mslp") or item.get("pressure") or item.get("mslp")
+
             parsed_storms.append({
-                "id": storm_id,
-                "name": name,
+                "id": atcf_id,
+                "atcf_id": atcf_id,
+                "storm_name": storm_name,
+                "name": storm_name,
                 "basin": basin,
+                "subbasin": subbasin,
                 "sub_basin": sub_basin,
                 "basin_label": basin_label,
+                "is_active": is_active,
                 "is_indian_ocean": is_io,
                 "agency": agency,
+                "advisory_number": advisory_number,
+                "advisory_issuance_time": advisory_info["iso"],
                 "advisory_time": advisory_info["iso"],
                 "advisory_time_ist": advisory_info["ist_display"],
+                "max_development_category": max_dev_cat,
+                "max_sustained_wind": max_sustained_wind,
+                "min_mslp": min_mslp,
                 "latest_observed_time": latest_obs_time,
                 "current_position": {
                     "lat": current_lat,
                     "lon": current_lon,
                     "wind_kt": current_wind_kt,
-                    "wind_kmh": current_wind_kmh
+                    "wind_kmh": current_wind_kmh,
+                    "min_mslp": min_mslp
                 },
                 "observed_track": parsed_obs,
                 "forecast_track": parsed_fc,
