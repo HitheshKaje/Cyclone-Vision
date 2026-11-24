@@ -232,7 +232,7 @@ async def get_cyclone_information(
     port_id: Optional[str] = Query(None),
     lat: Optional[float] = Query(None),
     lng: Optional[float] = Query(None),
-    demo_imd: Optional[bool] = Query(False)
+    demo_imd: bool = False
 ):
     """
     Returns verified cyclone information:

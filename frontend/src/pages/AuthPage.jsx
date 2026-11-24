@@ -76,8 +76,6 @@ const AuthPage = ({
   const [port, setPort] = useState(PORTS[0]);
   const [district, setDistrict] = useState(DISTRICTS[0]);
   const [ward, setWard] = useState('');
-  const [vesselName, setVesselName] = useState('');
-  const [vesselReg, setVesselReg] = useState('');
 
   // UI state
   const [showPassword, setShowPassword] = useState(false);
@@ -166,10 +164,6 @@ const AuthPage = ({
 
         if (password !== confirmPassword) {
           errs.confirmPassword = 'Passwords do not match';
-        }
-
-        if (isFishermanPortal && !vesselName.trim()) {
-          errs.vesselName = 'Vessel or Boat name is required for fishermen';
         }
       }
     }
@@ -264,8 +258,8 @@ const AuthPage = ({
           status: isFishermanPortal ? 'IN_HARBOR' : 'ACTIVE',
           district,
           port: isFishermanPortal ? port : null,
-          vessel_name: isFishermanPortal ? vesselName.trim() : null,
-          vessel_reg: isFishermanPortal ? vesselReg.trim() : null,
+          vessel_name: null,
+          vessel_reg: null,
           ward: isCitizenPortal ? ward.trim() : null
         };
 
@@ -359,7 +353,7 @@ const AuthPage = ({
             {isAdminPortal 
               ? 'Command Center Operational Gateway' 
               : isFishermanPortal
-              ? 'Maritime Weather, Sea Safety & Vessel Operations'
+              ? 'Maritime Weather, Sea Safety & Coastal Alert Gateway'
               : 'Coastal Citizen Safety & Alert Gateway'}
           </p>
         </div>
@@ -725,65 +719,37 @@ const AuthPage = ({
 
               {/* Fisherman Fields ONLY for Fisherman Portal */}
               {isFishermanPortal && (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Base Port / Fishery Harbor
-                      </label>
-                      <select
-                        value={port}
-                        onChange={(e) => setPort(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50 text-slate-900 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-sky-500/20 cursor-pointer"
-                      >
-                        {PORTS.map((p) => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Boat / Vessel Name
-                      </label>
-                      <div className="relative flex items-center">
-                        <span className="absolute left-3.5 text-slate-400 pointer-events-none">
-                          <Ship size={16} />
-                        </span>
-                        <input
-                          type="text"
-                          value={vesselName}
-                          onChange={(e) => {
-                            setVesselName(e.target.value);
-                            if (errors.vesselName) setErrors({ ...errors, vesselName: null });
-                          }}
-                          placeholder="e.g. Sea Falcon"
-                          className={`w-full pl-10 pr-4 py-2 rounded-xl border text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 transition-all ${
-                            errors.vesselName ? 'border-rose-400 bg-rose-50/50' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-500/20'
-                          }`}
-                        />
-                      </div>
-                      {errors.vesselName && (
-                        <p className="text-[11px] font-semibold text-rose-600 mt-0.5 pl-1">
-                          {errors.vesselName}
-                        </p>
-                      )}
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Base Port / Fishery Harbor
+                    </label>
+                    <select
+                      value={port}
+                      onChange={(e) => setPort(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50 text-slate-900 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-sky-500/20 cursor-pointer"
+                    >
+                      {PORTS.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Vessel Registration Number (Optional)
+                      Coastal District
                     </label>
-                    <input
-                      type="text"
-                      value={vesselReg}
-                      onChange={(e) => setVesselReg(e.target.value)}
-                      placeholder="e.g. IND-KA-02-MM-1029"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-sky-500/20"
-                    />
+                    <select
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50 text-slate-900 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-sky-500/20 cursor-pointer"
+                    >
+                      {DISTRICTS.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
                   </div>
-                </>
+                </div>
               )}
 
               {/* Citizen Fields ONLY for Citizen Portal */}

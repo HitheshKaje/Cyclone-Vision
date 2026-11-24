@@ -50,9 +50,6 @@ const UserLoginPage = ({ onLoginSuccess, onNavigate }) => {
   const [port, setPort] = useState(PORTS[0]);
   const [district, setDistrict] = useState(DISTRICTS[0]);
   const [ward, setWard] = useState('');
-  const [vesselName, setVesselName] = useState('');
-  const [vesselReg, setVesselReg] = useState('');
-  const [vesselType, setVesselType] = useState('Deep Sea Trawler');
 
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -109,10 +106,6 @@ const UserLoginPage = ({ onLoginSuccess, onNavigate }) => {
       if (password !== confirmPassword) {
         errs.confirmPassword = 'Passwords do not match';
       }
-
-      if (userType === 'fisherman' && !vesselName.trim()) {
-        errs.vesselName = 'Vessel / Boat name is required for fishermen';
-      }
     }
 
     setErrors(errs);
@@ -165,9 +158,9 @@ const UserLoginPage = ({ onLoginSuccess, onNavigate }) => {
           status: userType === 'fisherman' ? 'IN_HARBOR' : 'ACTIVE',
           district,
           port: userType === 'fisherman' ? port : null,
-          vessel_name: userType === 'fisherman' ? vesselName.trim() : null,
-          vessel_reg: userType === 'fisherman' ? vesselReg.trim() : null,
-          vessel_type: userType === 'fisherman' ? vesselType : null,
+          vessel_name: null,
+          vessel_reg: null,
+          vessel_type: null,
           ward: userType === 'citizen' ? ward.trim() : null
         };
 
@@ -544,42 +537,18 @@ const UserLoginPage = ({ onLoginSuccess, onNavigate }) => {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Vessel / Boat Name
+                        Coastal District
                       </label>
-                      <div className="relative flex items-center">
-                        <span className="absolute left-3.5 text-slate-400 pointer-events-none">
-                          <Ship size={16} />
-                        </span>
-                        <input
-                          type="text"
-                          value={vesselName}
-                          onChange={(e) => {
-                            setVesselName(e.target.value);
-                            if (errors.vesselName) setErrors({ ...errors, vesselName: null });
-                          }}
-                          placeholder="e.g. Sea Falcon"
-                          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-800 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-sky-500/20"
-                        />
-                      </div>
-                      {errors.vesselName && (
-                        <p className="text-[11px] font-semibold text-rose-500 mt-1 pl-1">
-                          {errors.vesselName}
-                        </p>
-                      )}
+                      <select
+                        value={district}
+                        onChange={(e) => setDistrict(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-800 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-sky-500/20 cursor-pointer"
+                      >
+                        {DISTRICTS.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Vessel Reg Number (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={vesselReg}
-                      onChange={(e) => setVesselReg(e.target.value)}
-                      placeholder="e.g. IND-KA-02-MM-1029"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-800 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-sky-500/20"
-                    />
                   </div>
                 </>
               ) : (

@@ -139,22 +139,35 @@ const FishermanHome = ({ onNavigate }) => {
 
   // Check if there is an active cyclone relevant to this port
   const activeCyclone = useMemo(() => {
-    // 1. From cycloneIntel (backend distance calculation)
-    if (cycloneIntel?.cyclone && cycloneIntel.cyclone.is_active) {
-      return cycloneIntel.cyclone;
+    // 1. From official broadcast if active
+    if (officialAdvisories?.active && officialAdvisories.cyclone_name) {
+      return {
+        name: officialAdvisories.cyclone_name,
+        storm_name: officialAdvisories.cyclone_name,
+        category: officialAdvisories.classification || 'Severe Cyclonic Storm',
+        wind_speed_kt: officialAdvisories.wind_speed_kt,
+        wind_speed_kmh: officialAdvisories.wind_speed_kmh,
+        movement_direction: 'Moving towards Coast',
+        distance_km: null,
+        is_active: true
+      };
     }
-    // 2. From live cyclones list
+    // 2. From cycloneIntel (backend distance calculation)
+    if (cycloneIntel?.active_cyclone && cycloneIntel.has_active_system) {
+      return { ...cycloneIntel.active_cyclone, is_active: true };
+    }
+    // 3. From live cyclones list
     if (liveCyclonesList && liveCyclonesList.length > 0) {
-      const activeOne = liveCyclonesList.find(c => c.is_active !== false);
+      const activeOne = liveCyclonesList.find(c => c.is_active === true);
       if (activeOne) return activeOne;
     }
     return null;
-  }, [cycloneIntel, liveCyclonesList]);
+  }, [officialAdvisories, cycloneIntel, liveCyclonesList]);
 
   // Build unified alerts list
   const alertsList = useMemo(() => {
     const list = [];
-    // Official broadcast alerts
+    // Official broadcast alerts: ONLY when officialAdvisories is active
     if (officialAdvisories?.active && officialAdvisories.message) {
       list.push({
         id: 'official-broadcast',
@@ -165,13 +178,13 @@ const FishermanHome = ({ onNavigate }) => {
         title: officialAdvisories.message,
         explanation: officialAdvisories.fishermen_directive || 'All fishing vessels return to harbor immediately!',
         recommended_action: officialAdvisories.fishermen_directive || 'Follow emergency orders.',
-        source: 'State Disaster Management Authority & IMD',
+        source: officialAdvisories.source || 'CycloSafe Early Warning Command Center (Live Admin Broadcast)',
         issued_at: officialAdvisories.issued_at || new Date().toISOString()
       });
     }
 
-    // Cyclone specific alert
-    if (activeCyclone) {
+    // Cyclone specific alert: ONLY when activeCyclone is active
+    if (activeCyclone && (officialAdvisories?.active || activeCyclone.is_active)) {
       list.push({
         id: `cyclone-${activeCyclone.atcf_id || activeCyclone.name || 'active'}`,
         priority: activeCyclone.intensity_category === 'Super Cyclonic Storm' || (activeCyclone.wind_speed_kt && activeCyclone.wind_speed_kt >= 64) ? 'DANGER' : 'CAUTION',
@@ -186,8 +199,8 @@ const FishermanHome = ({ onNavigate }) => {
       });
     }
 
-    // Sea state caution if wave height is high
-    if (seaData?.current?.wave_height != null && Number(seaData.current.wave_height) >= 2.5) {
+    // Sea state caution if wave height is high (>= 2.8m)
+    if (seaData?.current?.wave_height != null && Number(seaData.current.wave_height) >= 2.8) {
       list.push({
         id: 'rough-sea-advisory',
         priority: 'CAUTION',
@@ -216,21 +229,16 @@ const FishermanHome = ({ onNavigate }) => {
 
   // Determine Main Safety Status (GREEN, YELLOW, RED, or UNAVAILABLE)
   const safetyStatus = useMemo(() => {
-    // If offline or data failed to load
-    if (isLoading && !cycloneIntel && !seaData) {
-      return 'UNAVAILABLE';
-    }
-
-    // Priority 1: Official Emergency Broadcast or Siren active
+    // Priority 1: Official Emergency Broadcast or Siren active from Admin
     if (officialAdvisories?.active) {
       const lvl = (officialAdvisories.level || '').toUpperCase();
-      if (lvl === 'RED' || officialAdvisories.siren_active) return 'DANGER';
-      if (lvl === 'ORANGE' || lvl === 'YELLOW') return 'CAUTION';
+      if (lvl === 'RED' || lvl === 'DANGER' || officialAdvisories.siren_active) return 'DANGER';
+      if (lvl === 'ORANGE' || lvl === 'YELLOW' || lvl === 'CAUTION') return 'CAUTION';
       return 'DANGER';
     }
 
-    // Priority 2: Active Cyclone proximity
-    if (activeCyclone) {
+    // Priority 2: Active Cyclone proximity (if admin broadcasted or live cyclone detected)
+    if (activeCyclone && activeCyclone.is_active) {
       const dist = activeCyclone.distance_km;
       const windKt = activeCyclone.wind_speed_kt || 45;
       if (dist != null && dist <= 200) return 'DANGER';
@@ -243,15 +251,16 @@ const FishermanHome = ({ onNavigate }) => {
       const wave = Number(seaData.current.wave_height || 0);
       const windKmh = Number(seaData.current.wind_speed_kmh || weatherData?.current?.wind_speed_10m || 0);
       if (wave >= 3.5 || windKmh >= 60) return 'DANGER';
-      if (wave >= 2.2 || windKmh >= 35) return 'CAUTION';
+      if (wave >= 2.5 || windKmh >= 40) return 'CAUTION';
     }
 
-    // Priority 4: Verified Normal
-    if (cycloneIntel || seaData || weatherData) {
-      return 'SAFE';
+    // If offline or data failed to load
+    if (isLoading && !cycloneIntel && !seaData) {
+      return 'UNAVAILABLE';
     }
 
-    return 'UNAVAILABLE';
+    // Default when no warnings are in effect
+    return 'SAFE';
   }, [isLoading, officialAdvisories, activeCyclone, seaData, weatherData, cycloneIntel]);
 
   // Handle Logout
@@ -291,14 +300,20 @@ const FishermanHome = ({ onNavigate }) => {
                 t('fisherman.unable_verify')
               }
               explanation={
-                officialAdvisories?.message ||
-                (activeCyclone ? `Severe weather threat: ${activeCyclone.storm_name || 'Cyclone'} monitored in regional waters.` : null)
+                safetyStatus === 'DANGER' || safetyStatus === 'CAUTION'
+                  ? (officialAdvisories?.active ? officialAdvisories.message : (activeCyclone ? `Severe weather threat: ${activeCyclone.storm_name || 'Cyclone'} monitored in regional waters.` : t('fisherman.caution_msg')))
+                  : (safetyStatus === 'SAFE' ? t('fisherman.safe_msg') : t('fisherman.unable_verify_msg'))
               }
               recommendedAction={
-                officialAdvisories?.fishermen_directive ||
-                (activeCyclone ? 'Avoid deep offshore venture. Maintain radio contact with port.' : null)
+                safetyStatus === 'DANGER' || safetyStatus === 'CAUTION'
+                  ? (officialAdvisories?.active ? officialAdvisories.fishermen_directive : (activeCyclone ? 'Avoid deep offshore venture. Maintain radio contact with port.' : null))
+                  : null
               }
-              source={officialAdvisories?.source || cycloneIntel?.source || 'IMD Official Marine Advisory'}
+              source={
+                officialAdvisories?.active
+                  ? (officialAdvisories.source || 'CycloSafe Early Warning Command Center (Live Admin Broadcast)')
+                  : 'CycloSafe Coastal Monitoring & IMD'
+              }
               lastUpdated={lastUpdated}
               isStale={isStale}
               onViewAlerts={() => setActiveTab('alerts')}

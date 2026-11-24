@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { User, Ship, MapPin, Phone, LogOut, X, ShieldCheck } from 'lucide-react';
+import { User, Ship, Anchor, MapPin, Phone, Mail, LogOut, X, ShieldCheck } from 'lucide-react';
 import { logoutUser } from '../../../utils/authService';
 
 const FishermanProfileModal = ({ isOpen, onClose, currentUser, currentPort, onLogout }) => {
@@ -32,7 +32,7 @@ const FishermanProfileModal = ({ isOpen, onClose, currentUser, currentPort, onLo
                 {currentUser?.name || 'Fisherman Profile'}
               </h2>
               <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20">
-                Verified Maritime Vessel Owner
+                Verified Coastal Fisherman
               </span>
             </div>
           </div>
@@ -48,18 +48,22 @@ const FishermanProfileModal = ({ isOpen, onClose, currentUser, currentPort, onLo
 
         {/* Content Body */}
         <div className="p-4 sm:p-5 space-y-3.5">
-          {/* Vessel Card */}
+          {/* Account Identity Card */}
           <div className="p-3.5 rounded-2xl bg-sky-500/5 dark:bg-sky-950/30 border border-sky-500/20 flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-              <Ship size={20} />
+              {currentUser?.vessel_name ? <Ship size={20} /> : <Anchor size={20} />}
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Registered Fishing Vessel</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {currentUser?.vessel_name ? 'Registered Fishing Vessel' : 'Fisherman Account'}
+              </span>
               <div className="text-sm font-black text-slate-900 dark:text-white truncate">
-                {currentUser?.vessel_name || 'Sea Falcon'}
+                {currentUser?.vessel_name || currentUser?.name || 'Verified Member'}
               </div>
               <div className="text-xs font-mono text-slate-600 dark:text-slate-300 mt-0.5">
-                Reg: {currentUser?.vessel_reg || 'IND-KA-02-MM-1029'}
+                {currentUser?.vessel_reg 
+                  ? `Reg: ${currentUser.vessel_reg}` 
+                  : (currentUser?.email || '• Active Coastal Safety Subscriber')}
               </div>
             </div>
           </div>
@@ -82,9 +86,21 @@ const FishermanProfileModal = ({ isOpen, onClose, currentUser, currentPort, onLo
                 <span>Mobile Helpline</span>
               </span>
               <span className="font-bold font-mono text-slate-800 dark:text-slate-200">
-                {currentUser?.mobile || '+91 98451 22340'}
+                {currentUser?.mobile || currentUser?.phone || '+91 98451 22330'}
               </span>
             </div>
+
+            {currentUser?.email && (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Mail size={13} className="text-sky-500" />
+                  <span>Email Address</span>
+                </span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">
+                  {currentUser.email}
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
               <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">

@@ -49,9 +49,6 @@ const CitizenAuthModal = ({ isOpen, onClose, onUserAuthenticated }) => {
   const [phone, setPhone] = useState('');
   const [port, setPort] = useState(PORTS[0]);
   const [district, setDistrict] = useState(DISTRICTS[0]);
-  const [vesselName, setVesselName] = useState('');
-  const [vesselReg, setVesselReg] = useState('');
-  const [vesselType, setVesselType] = useState('Deep Sea Trawler');
   const [status, setStatus] = useState('IN_HARBOR');
   const [ward, setWard] = useState('');
   const [alertsEnabled, setAlertsEnabled] = useState(true);
@@ -82,9 +79,9 @@ const CitizenAuthModal = ({ isOpen, onClose, onUserAuthenticated }) => {
       alerts_enabled: alertsEnabled,
       district: district,
       port: userType === 'fisherman' ? port : null,
-      vessel_name: userType === 'fisherman' ? vesselName.trim() : null,
-      vessel_reg: userType === 'fisherman' ? vesselReg.trim() : null,
-      vessel_type: userType === 'fisherman' ? vesselType : null,
+      vessel_name: null,
+      vessel_reg: null,
+      vessel_type: null,
       ward: userType === 'citizen' ? ward.trim() : null
     };
 
@@ -223,38 +220,8 @@ const CitizenAuthModal = ({ isOpen, onClose, onUserAuthenticated }) => {
           {userType === 'fisherman' && (
             <div className="space-y-3 p-3 rounded-xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/40">
               <div className="text-[11px] font-bold text-sky-700 dark:text-sky-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Ship size={14} />
-                <span>{isKn ? 'ದೋಣಿ / ಬೋಟು ವಿವರಗಳು' : 'Vessel & Harbor Information'}</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Vessel Name */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                    {isKn ? 'ದೋಣಿ ಹೆಸರು' : 'Vessel / Boat Name'}
-                  </label>
-                  <input
-                    type="text"
-                    value={vesselName}
-                    onChange={(e) => setVesselName(e.target.value)}
-                    placeholder="e.g. Sea Queen IV"
-                    className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-medium"
-                  />
-                </div>
-
-                {/* Vessel Registration */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                    {isKn ? 'ಬೋಟು ನೋಂದಣಿ ಸಂಖ್ಯೆ' : 'Vessel Reg. No (IND-KA-...)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={vesselReg}
-                    onChange={(e) => setVesselReg(e.target.value)}
-                    placeholder="e.g. IND-KA-02-MM-1049"
-                    className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono font-medium"
-                  />
-                </div>
+                <Anchor size={14} />
+                <span>{isKn ? 'ಕರಾವಳಿ ಬಂದರು ವಿವರಗಳು' : 'Harbor & Port Location'}</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
