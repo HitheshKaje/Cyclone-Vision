@@ -2,6 +2,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import enTranslations from './locales/en.json';
 import knTranslations from './locales/kn.json';
+import hiTranslations from './locales/hi.json';
 
 const savedLanguage = typeof window !== 'undefined' 
   ? localStorage.getItem('cyclosafe_language') || 'en'
@@ -12,7 +13,8 @@ i18n
   .init({
     resources: {
       en: { translation: enTranslations },
-      kn: { translation: knTranslations }
+      kn: { translation: knTranslations },
+      hi: { translation: hiTranslations }
     },
     lng: savedLanguage,
     fallbackLng: 'en',

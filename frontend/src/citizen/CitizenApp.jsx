@@ -34,20 +34,12 @@ const CitizenApp = ({ currentPath, onNavigate }) => {
     );
   }
 
-  // DEDICATED FISHERMAN DASHBOARD
-  // Renders directly WITHOUT CitizenLayout wrapper to ensure:
-  // 1. Strictly the 3 required tabs: 1. Cyclone Info, 2. Sea Info, 3. Weather Info
-  // 2. Zero duplicate headers
-  // 3. Zero extra modules (No Emergency SOS, No Trip Planner, No Fish Breeding Advisory)
+  // DEDICATED MOBILE-FIRST FISHERMAN DASHBOARD
   if (isFishermanRoute) {
     return (
-      <div className="min-h-screen bg-slate-100 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
-        <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 py-4 sm:py-6 flex-1">
-          <Suspense fallback={<PageLoader />}>
-            <FishermanHome onNavigate={onNavigate} />
-          </Suspense>
-        </main>
-      </div>
+      <Suspense fallback={<PageLoader />}>
+        <FishermanHome onNavigate={onNavigate} />
+      </Suspense>
     );
   }
 
