@@ -12,7 +12,6 @@ import {
   BarChart2,
   X
 } from 'lucide-react';
-import { getApiBaseUrl } from '../utils/apiConfig';
 
 /**
  * Full Live Atmospheric Radar & Numerical Dynamics Engine.
@@ -93,16 +92,14 @@ export default function WindyAtmosphericPlayer({
 
   const currentWindyParam = getWindyOverlayParam(overlay);
   const isWind = overlay === 'wind';
-  const apiBase = getApiBaseUrl();
 
   // Detail panel params: only pass detail parameters if explicitly requested
   const detailParam = detailOpen 
     ? `&detailLat=${stormLat}&detailLon=${stormLng}&detail=true` 
     : '';
 
-  // Moving wind particle drops: STRICTLY enabled only for the Wind layer.
-  // For Precipitation, Temperature, Humidity, and Pressure, the proxy turns OFF particle animation.
-  const windyUrl = `${apiBase}/api/live_map/windy-embed?lat=${stormLat}&lon=${stormLng}${detailParam}&width=100%25&height=100%25&zoom=6&level=surface&overlay=${currentWindyParam}&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=${overlay === 'pressure' ? 'true' : 'false'}&type=map&location=coordinates&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1&particlesAnim=${isWind ? 'on' : 'off'}`;
+  // Direct Windy Official CDN Embed: 100% reliable, zero backend proxy dependencies
+  const windyUrl = `https://embed.windy.com/embed2.html?lat=${stormLat}&lon=${stormLng}${detailParam}&width=100%25&height=100%25&zoom=6&level=surface&overlay=${currentWindyParam}&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=${overlay === 'pressure' ? 'true' : 'false'}&type=map&location=coordinates&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1&particlesAnim=${isWind ? 'on' : 'off'}`;
 
   return (
     <div className="relative w-full h-full min-h-[500px] flex flex-col bg-slate-950 overflow-hidden select-none">
