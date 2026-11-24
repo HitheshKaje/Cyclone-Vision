@@ -20,7 +20,10 @@ import {
   Check,
   ChevronDown,
   Layers,
-  Navigation
+  Navigation,
+  Anchor,
+  User,
+  ExternalLink
 } from 'lucide-react';
 
 const navItems = [
@@ -346,6 +349,57 @@ const Sidebar = ({
               </button>
             );
           })}
+        </div>
+
+        {/* Public Coastal Gateways */}
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-2">
+          {(isOpen || isMobile) && (
+            <p className="px-3 pt-1 pb-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Coastal Gateways
+            </p>
+          )}
+
+          {/* Fisherman Gateway */}
+          <a
+            href="/fisherman"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 cursor-pointer ${
+              !isOpen && !isMobile ? 'justify-center px-0' : ''
+            }`}
+            title="Open Fisherman Coastal Gateway"
+          >
+            <Anchor size={18} className="shrink-0 text-sky-500" />
+            {(isOpen || isMobile) && (
+              <span className="truncate text-left flex-1 font-bold">
+                Fisherman Gateway
+              </span>
+            )}
+            {(isOpen || isMobile) && (
+              <ExternalLink size={12} className="opacity-60" />
+            )}
+          </a>
+
+          {/* Citizen Portal */}
+          <a
+            href="/citizen"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer ${
+              !isOpen && !isMobile ? 'justify-center px-0' : ''
+            }`}
+            title="Open Coastal Citizen Portal"
+          >
+            <User size={18} className="shrink-0 text-emerald-500" />
+            {(isOpen || isMobile) && (
+              <span className="truncate text-left flex-1 font-bold">
+                Citizen Portal
+              </span>
+            )}
+            {(isOpen || isMobile) && (
+              <ExternalLink size={12} className="opacity-60" />
+            )}
+          </a>
         </div>
       </nav>
     </aside>

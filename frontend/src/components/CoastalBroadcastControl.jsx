@@ -629,7 +629,7 @@ const CoastalBroadcastControl = ({ currentAnalysis }) => {
           ) : (
             <Send size={18} />
           )}
-          <span>{isLiveActive ? 'Update Coastal Broadcast' : 'Notify Citizens & Coastal App'}</span>
+          <span>{isLiveActive ? 'Update Coastal Broadcast' : 'Notify Citizens & Fisherman Network'}</span>
         </button>
 
         {/* Siren Trigger Button - ALWAYS clickable when siren is blasting so admin can silence it */}

@@ -14,7 +14,9 @@ import {
   AlertTriangle,
   Wind,
   CheckCircle2,
-  Radio
+  Radio,
+  Anchor,
+  ExternalLink
 } from 'lucide-react';
 import cycloneLogo from '../assets/cyclone-logo.png';
 import { fetchOfficialAdvisories, toggleLighthouseSiren } from '../citizen/services/citizenApi';
@@ -285,6 +287,33 @@ const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode, onLogout, adminUser
 
         {/* Right Side: Siren Quick Control + Theme Toggle + Notifications + Admin Profile & Logout */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          
+          {/* Coastal Gateways Quick Launcher for Admins */}
+          <div className="hidden xl:flex items-center gap-2 mr-1">
+            <a
+              href="/fisherman"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Open Fisherman Coastal Safety Gateway"
+            >
+              <Anchor size={13} className="text-sky-500" />
+              <span>Fisherman Gateway</span>
+              <ExternalLink size={10} className="opacity-60" />
+            </a>
+
+            <a
+              href="/citizen"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Open Coastal Citizen Safety Portal"
+            >
+              <User size={13} className="text-emerald-500" />
+              <span>Citizen Portal</span>
+              <ExternalLink size={10} className="opacity-60" />
+            </a>
+          </div>
           
           {/* User Dashboard Siren Action Button */}
           {sirenActive ? (

@@ -379,6 +379,37 @@ const AuthPage = ({
           </div>
         )}
 
+        {/* PUBLIC PORTAL SWITCHER: Citizen Gateway vs Fisherman Gateway */}
+        {!isAdminPortal && (
+          <div className="flex p-1 bg-slate-100 rounded-2xl border border-slate-200 mb-3.5">
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate('/citizen/login')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                isCitizenPortal
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <User size={14} />
+              <span>Citizen Gateway</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate('/fisherman/login')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                isFishermanPortal
+                  ? 'bg-sky-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Anchor size={14} />
+              <span>Fisherman Gateway</span>
+            </button>
+          </div>
+        )}
+
         {/* FOR CITIZEN OR FISHERMAN: Option to Sign In vs Register */}
         {!isAdminPortal && (
           <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200 mb-4">
@@ -902,12 +933,40 @@ const AuthPage = ({
             </button>
           </div>
 
-          {/* Secure Admin Portal Link */}
-          <div className="flex items-center justify-end pt-1 border-t border-slate-50 text-[11px] text-slate-400">
+          {/* Secure Gateways & Portal Navigation */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-50 text-[11px] text-slate-400">
+            {!isAdminPortal ? (
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate(isCitizenPortal ? '/fisherman/login' : '/citizen/login')}
+                className="font-bold text-sky-600 hover:text-sky-800 hover:underline cursor-pointer flex items-center gap-1"
+              >
+                {isCitizenPortal ? '⚓ Fisherman Gateway →' : '👤 Citizen Gateway →'}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate('/citizen/login')}
+                  className="font-semibold text-slate-500 hover:text-slate-800 hover:underline cursor-pointer"
+                >
+                  Citizen Gateway →
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate('/fisherman/login')}
+                  className="font-semibold text-slate-500 hover:text-slate-800 hover:underline cursor-pointer"
+                >
+                  Fisherman Gateway →
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => onNavigate && onNavigate(isAdminPortal ? '/citizen/login' : '/admin/login')}
-              className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer"
+              className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer ml-auto"
             >
               {isAdminPortal ? '← Return to Portal' : 'Admin Gateway →'}
             </button>
