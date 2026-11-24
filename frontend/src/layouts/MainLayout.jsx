@@ -15,7 +15,9 @@ const MainLayout = ({
   activeMapLayer,
   setActiveMapLayer,
   activeBaseMap,
-  setActiveBaseMap
+  setActiveBaseMap,
+  futureTrackActive,
+  setFutureTrackActive
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -71,6 +73,8 @@ const MainLayout = ({
           setActiveMapLayer={setActiveMapLayer}
           activeBaseMap={activeBaseMap}
           setActiveBaseMap={setActiveBaseMap}
+          futureTrackActive={futureTrackActive}
+          setFutureTrackActive={setFutureTrackActive}
         />
         
         {/* Mobile Overlay */}

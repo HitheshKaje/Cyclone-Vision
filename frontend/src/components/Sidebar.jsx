@@ -19,7 +19,8 @@ import {
   Compass,
   Check,
   ChevronDown,
-  Layers
+  Layers,
+  Navigation
 } from 'lucide-react';
 
 const navItems = [
@@ -68,7 +69,9 @@ const Sidebar = ({
   activeMapLayer = 'wind',
   setActiveMapLayer,
   activeBaseMap = 'satellite_base',
-  setActiveBaseMap
+  setActiveBaseMap,
+  futureTrackActive = false,
+  setFutureTrackActive
 }) => {
   const [isMapMenuOpen, setIsMapMenuOpen] = useState(false);
 
@@ -168,6 +171,38 @@ const Sidebar = ({
               {isMapItem && isMapMenuOpen && (isOpen || isMobile) && (
                 <div className="ml-3 pl-2.5 border-l-2 border-sky-500/30 my-2 space-y-2.5 text-xs select-none">
                   
+                  {/* Future Track Submenu Item (Spire Weather API Integration) */}
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (activeTab !== 'map') {
+                          setActiveTab('map');
+                        }
+                        if (setFutureTrackActive) {
+                          setFutureTrackActive(prev => !prev);
+                        }
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        futureTrackActive && activeTab === 'map'
+                          ? 'bg-sky-500 text-white shadow-xs font-bold'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800'
+                      }`}
+                      title="Show official Spire Future Forecast Track on existing map"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Navigation size={14} className={futureTrackActive && activeTab === 'map' ? 'text-white' : 'text-sky-500'} />
+                        <span>Future Track</span>
+                      </span>
+                      {futureTrackActive && activeTab === 'map' ? (
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      ) : (
+                        <span className="text-[10px] uppercase font-bold text-sky-500/80 bg-sky-500/10 px-1 py-0.5 rounded">NEW</span>
+                      )}
+                    </button>
+                  </div>
+
                   {/* Live Maps Group */}
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">

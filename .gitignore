@@ -84,3 +84,20 @@ backend/ml/dataset_split/
 backend/ml/Synthetic_Hard_Negatives*/
 backend/ml/Hard_Negatives_Dataset*/
 backend/ml/intensity/dataset/
+
+# API Endpoints, Keys, Credentials & Sensitive Files
+*.key
+*.token
+*.secret
+*.credentials
+*.api_key
+*spire*key*
+*api*key*
+secrets/
+credentials/
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+*.env.local
+

@@ -99,6 +99,28 @@ const createBagyoCycloneIcon = (alertLevel = 'Red', isSelected = false) => {
   });
 };
 
+// Spire Weather Future Track Prominent Cyclone Marker
+const createSpireCycloneIcon = (isSelected = false) => {
+  const size = isSelected ? 38 : 30;
+  const innerSize = isSelected ? 18 : 14;
+
+  return new L.divIcon({
+    html: `
+      <div style="position: relative; width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <div style="position: absolute; width: ${size}px; height: ${size}px; border-radius: 50%; background: rgba(14, 165, 233, 0.35); border: 2.5px solid #0284c7; animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="width: ${innerSize}px; height: ${innerSize}px; border-radius: 50%; background: #0284c7; border: 2.5px solid #ffffff; box-shadow: 0 0 16px rgba(2, 132, 199, 0.9); display: flex; align-items: center; justify-content: center; z-index: 6;">
+          <div style="background-color: #ffffff; width: 5px; height: 5px; border-radius: 50%;"></div>
+        </div>
+      </div>
+    `,
+    className: 'custom-spire-cyclone-marker',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2]
+  });
+};
+
+
 
 // High-visibility Animated Radar Marker for AI Detected Cyclone
 const aiCycloneIcon = new L.divIcon({
@@ -194,7 +216,9 @@ const MapPage = ({
   activeLayer: propActiveLayer,
   setActiveLayer: propSetActiveLayer,
   activeBaseMap: propActiveBaseMap,
-  setActiveBaseMap: propSetActiveBaseMap
+  setActiveBaseMap: propSetActiveBaseMap,
+  futureTrackActive = false,
+  setFutureTrackActive
 }) => {
   const [internalViewMode, setInternalViewMode] = useState('tactical'); // 'tactical' | 'windy_engine'
   const viewMode = propViewMode !== undefined ? propViewMode : internalViewMode;
@@ -207,6 +231,16 @@ const MapPage = ({
 
   const activeBaseMap = propActiveBaseMap !== undefined ? propActiveBaseMap : internalActiveBaseMap;
   const setActiveBaseMap = propSetActiveBaseMap || setInternalActiveBaseMap;
+
+  // Spire Weather Future Track State
+  const [internalFutureTrackActive, setInternalFutureTrackActive] = useState(false);
+  const isFutureTrack = futureTrackActive !== undefined ? futureTrackActive : internalFutureTrackActive;
+  const toggleFutureTrack = setFutureTrackActive || setInternalFutureTrackActive;
+
+  const [spireData, setSpireData] = useState(null);
+  const [isSpireLoading, setIsSpireLoading] = useState(false);
+  const [lastSpireUpdated, setLastSpireUpdated] = useState(null);
+  const isSpireFetchingRef = useRef(false);
 
   const [rainviewerPath, setRainviewerPath] = useState(null);
   const [isRadarLoading, setIsRadarLoading] = useState(false);
@@ -499,8 +533,57 @@ const MapPage = ({
     return () => clearInterval(interval);
   }, []);
 
+  // Dedicated Spire Weather Future Track 5-minute polling hook with cache awareness
+  const fetchSpireFutureTracks = async (forceRefresh = false) => {
+    if (isSpireFetchingRef.current) return;
+    try {
+      isSpireFetchingRef.current = true;
+      setIsSpireLoading(true);
+      const url = `${API_URL}/api/cyclones/spire-future-track${forceRefresh ? '?refresh=true' : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = await res.json();
+        setSpireData(json);
+        if (json.last_successful_retrieval) {
+          setLastSpireUpdated(json.last_successful_retrieval);
+        } else if (json.status === 'connected') {
+          setLastSpireUpdated(new Date().toLocaleTimeString());
+        }
+      }
+    } catch (err) {
+      console.warn('Spire Future Track API fetch notice:', err);
+    } finally {
+      isSpireFetchingRef.current = false;
+      setIsSpireLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSpireFutureTracks();
+    const interval = setInterval(() => {
+      fetchSpireFutureTracks();
+    }, 300000); // 5 minutes periodic polling
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-center when Future Track mode is toggled on and Spire data is available
+  useEffect(() => {
+    if (isFutureTrack && mapRef.current) {
+      const storms = spireData?.storms || [];
+      const primarySpire = storms.find(s => s.is_indian_ocean) || storms[0];
+      if (primarySpire?.current_position?.lat != null && primarySpire?.current_position?.lon != null) {
+        try {
+          mapRef.current.flyTo([primarySpire.current_position.lat, primarySpire.current_position.lon], 6, { duration: 1.5 });
+        } catch (e) {
+          console.warn('Map flyTo Spire storm notice:', e);
+        }
+      }
+    }
+  }, [isFutureTrack, spireData]);
+
   const cyclones = data?.cyclones || [];
   const bagyoCyclones = bagyoData?.cyclones || [];
+  const spireStorms = spireData?.storms || [];
 
   // Determine currently active storm to center wind vortex and atmospheric layers on
   const primaryCyclone = selectedCycloneId
@@ -562,8 +645,8 @@ const MapPage = ({
     }
   };
 
-  const nioCount = cyclones.filter(c => c.is_nio).length + bagyoCyclones.filter(c => c.is_nio).length;
-  const totalActiveCount = (aiCyclone ? 1 : 0) + cyclones.length + bagyoCyclones.length;
+  const nioCount = cyclones.filter(c => c.is_nio).length + bagyoCyclones.filter(c => c.is_nio).length + (isFutureTrack ? spireStorms.filter(s => s.is_indian_ocean).length : 0);
+  const totalActiveCount = (aiCyclone ? 1 : 0) + cyclones.length + bagyoCyclones.length + (isFutureTrack ? spireStorms.length : 0);
 
   // Formatted synoptic timestamp for the bottom player (e.g. "16 Nov  18:35")
   const currentFormattedTime = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + '  ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -997,6 +1080,195 @@ const MapPage = ({
               </React.Fragment>
             );
           })}
+
+          {/* =========================================================================
+              SPIRE WEATHER FUTURE TRACK: OBSERVED & FORECAST TRAJECTORIES
+          ========================================================================= */}
+          {isFutureTrack && (spireData?.storms || []).map((storm) => {
+            const isSelected = selectedCycloneId === `spire-${storm.id}`;
+            const obsTrack = Array.isArray(storm.observed_track) ? storm.observed_track : [];
+            const fcTrack = Array.isArray(storm.forecast_track) ? storm.forecast_track : [];
+
+            // 1. Observed path line: chronological solid line
+            const obsPoints = obsTrack.map(pt => [pt.lat, pt.lon]);
+            if (storm.current_position?.lat != null && storm.current_position?.lon != null && obsPoints.length > 0) {
+              obsPoints.push([storm.current_position.lat, storm.current_position.lon]);
+            }
+
+            // 2. Future forecast track: dashed line connecting actual coordinates in chronological order
+            const fcPoints = [];
+            if (storm.current_position?.lat != null && storm.current_position?.lon != null) {
+              fcPoints.push([storm.current_position.lat, storm.current_position.lon]);
+            }
+            fcTrack.forEach(pt => {
+              if (pt.lat != null && pt.lon != null) {
+                fcPoints.push([pt.lat, pt.lon]);
+              }
+            });
+
+            const centerLat = storm.current_position?.lat ?? (obsTrack.length > 0 ? obsTrack[obsTrack.length - 1].lat : (fcTrack.length > 0 ? fcTrack[0].lat : null));
+            const centerLon = storm.current_position?.lon ?? (obsTrack.length > 0 ? obsTrack[obsTrack.length - 1].lon : (fcTrack.length > 0 ? fcTrack[0].lon : null));
+
+            return (
+              <React.Fragment key={`spire-group-${storm.id}`}>
+                {/* Observed Historical Path: Solid line (#0284c7 Sky Blue) */}
+                {obsPoints.length > 1 && (
+                  <Polyline
+                    positions={obsPoints}
+                    pathOptions={{
+                      color: '#0284c7',
+                      weight: 3.5,
+                      opacity: 0.9,
+                      lineCap: 'round',
+                      lineJoin: 'round'
+                    }}
+                  />
+                )}
+
+                {/* Observed Waypoint Markers with Date/Time Labels */}
+                {obsTrack.map((pt, idx) => (
+                  <CircleMarker
+                    key={`spire-obs-${storm.id}-${idx}`}
+                    center={[pt.lat, pt.lon]}
+                    radius={5}
+                    pathOptions={{
+                      color: '#ffffff',
+                      fillColor: '#0284c7',
+                      fillOpacity: 0.95,
+                      weight: 1.5
+                    }}
+                  >
+                    <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+                      <div className="text-[11px] font-sans p-1">
+                        <div className="font-bold text-sky-600 flex items-center gap-1">
+                          <span>Observed Fix</span>
+                          <span className="text-[9px] bg-sky-100 text-sky-800 px-1 rounded">{pt.time_display}</span>
+                        </div>
+                        <div className="text-slate-700 mt-0.5 space-y-0.5">
+                          <div><strong>Position:</strong> {pt.lat}°N, {pt.lon}°E</div>
+                          {pt.wind_kmh && <div><strong>Wind:</strong> {pt.wind_kmh} km/h ({pt.wind_kt} kt)</div>}
+                          {pt.pressure && <div><strong>MSLP:</strong> {pt.pressure} hPa</div>}
+                          <div className="text-[9px] text-slate-500">{pt.ist_display}</div>
+                        </div>
+                      </div>
+                    </Tooltip>
+                  </CircleMarker>
+                ))}
+
+                {/* Future Forecast Track: Distinguishable Dashed Line (#f59e0b Amber / Orange) */}
+                {fcPoints.length > 1 && (
+                  <Polyline
+                    positions={fcPoints}
+                    pathOptions={{
+                      color: '#f59e0b',
+                      weight: 3.5,
+                      opacity: 0.95,
+                      dashArray: '8, 8',
+                      lineCap: 'round',
+                      lineJoin: 'round'
+                    }}
+                  />
+                )}
+
+                {/* Forecast Positions: Small Circular Markers with Day/Time, Wind Speed & Category */}
+                {fcTrack.map((pt, idx) => (
+                  <CircleMarker
+                    key={`spire-fc-${storm.id}-${idx}`}
+                    center={[pt.lat, pt.lon]}
+                    radius={6}
+                    pathOptions={{
+                      color: '#ffffff',
+                      fillColor: '#f59e0b',
+                      fillOpacity: 0.95,
+                      weight: 2
+                    }}
+                  >
+                    <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
+                      <div className="text-[11px] font-sans p-1">
+                        <div className="font-bold text-amber-600 flex items-center gap-1">
+                          <span>Spire Forecast +{pt.forecast_hour}h</span>
+                          <span className="text-[9px] bg-amber-100 text-amber-800 px-1 rounded">{pt.date_display} {pt.time_display}</span>
+                        </div>
+                        <div className="text-slate-700 mt-0.5 space-y-0.5">
+                          <div><strong>Position:</strong> {pt.lat}°N, {pt.lon}°E</div>
+                          <div><strong>Wind Speed:</strong> {pt.max_sustained_wind_kmh || '--'} km/h ({pt.max_sustained_wind_kt || '--'} kt)</div>
+                          {pt.category_code && <div><strong>Category:</strong> {pt.stage || pt.category_code}</div>}
+                          <div className="text-[9px] text-slate-500">{pt.ist_display}</div>
+                        </div>
+                      </div>
+                    </Tooltip>
+                  </CircleMarker>
+                ))}
+
+                {/* Current Cyclone Position: Prominent Marker */}
+                {centerLat != null && centerLon != null && (
+                  <Marker
+                    position={[centerLat, centerLon]}
+                    icon={createSpireCycloneIcon(isSelected)}
+                    eventHandlers={{
+                      click: () => {
+                        setSelectedCycloneId(`spire-${storm.id}`);
+                        if (mapRef.current) {
+                          mapRef.current.flyTo([centerLat, centerLon], 7, { duration: 1.2 });
+                        }
+                      }
+                    }}
+                  >
+                    <Popup className="custom-popup" autoPan={true}>
+                      <div className="p-1 min-w-[220px]">
+                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-xs bg-sky-600">
+                            Spire Forecast
+                          </span>
+                          <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
+                            {storm.basin_label || storm.basin}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-1">{storm.name}</h4>
+                        
+                        <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
+                          <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                            <span className="font-semibold text-slate-500">Current Fix:</span>
+                            <span className="font-black text-sky-600">{centerLat}°N, {centerLon}°E</span>
+                          </p>
+                          <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                            <span className="font-semibold text-slate-500">Basin:</span>
+                            <span className="font-bold">{storm.basin_label}</span>
+                          </p>
+                          {storm.current_position?.wind_kmh != null && (
+                            <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                              <span className="font-semibold text-slate-500">Sustained Wind:</span>
+                              <span className="font-bold text-red-600">{storm.current_position.wind_kmh} km/h ({storm.current_position.wind_kt} kt)</span>
+                            </p>
+                          )}
+                          <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-1">
+                            <span className="font-semibold text-slate-500">Forecast Points:</span>
+                            <span className="font-bold text-amber-600">{storm.total_forecast_points} waypoints</span>
+                          </p>
+                          {storm.latest_observed_time && (
+                            <p className="text-[10px] text-slate-400 pt-0.5">
+                              Latest Fix: {storm.latest_observed_time}
+                            </p>
+                          )}
+                          {storm.advisory_time_ist && (
+                            <p className="text-[10px] text-slate-400">
+                              Advisory: {storm.advisory_time_ist}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-2 pt-1.5 border-t border-slate-200 dark:border-slate-700/50">
+                          <p className="text-[9px] text-sky-600 dark:text-sky-400 leading-tight">
+                            ℹ️ Official Spire Weather forecast track. Connected coordinates in chronological sequence.
+                          </p>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
+              </React.Fragment>
+            );
+          })}
         </MapContainer>
 
       )}
@@ -1065,21 +1337,6 @@ const MapPage = ({
               <span className="text-[11px] sm:text-xs">Radar Engine</span>
             </button>
           </div>
-
-          {/* Bagyo Live Track Toggle */}
-          <button
-            type="button"
-            onClick={() => setShowBagyoTrack(!showBagyoTrack)}
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl backdrop-blur-md text-xs font-bold shadow-xl transition-all cursor-pointer ${
-              showBagyoTrack
-                ? 'bg-purple-600/30 text-purple-200 border border-purple-400/50'
-                : 'bg-[#0a1b24]/90 border border-teal-500/35 text-slate-400 hover:text-white'
-            }`}
-            title="Toggle Bagyo Observed & Forecast Tracks"
-          >
-            <Activity size={12} className={showBagyoTrack ? 'text-purple-300' : 'text-slate-400'} />
-            <span className="text-[11px]">Bagyo Track</span>
-          </button>
 
           {/* Active Storms Trigger Pill */}
           <button
@@ -1489,6 +1746,63 @@ const MapPage = ({
                 </div>
               );
             })}
+
+            {/* Spire Weather Future Track Storms */}
+            {isFutureTrack && (spireData?.storms || []).map((storm) => {
+              const isSelected = selectedCycloneId === `spire-${storm.id}`;
+              const centerLat = storm.current_position?.lat;
+              const centerLon = storm.current_position?.lon;
+              return (
+                <div 
+                  key={`spire-card-${storm.id}`}
+                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-amber-500/20 border-amber-400 shadow-md'
+                      : 'bg-slate-900/70 border-amber-500/30 hover:border-amber-400/60 hover:bg-slate-900/90'
+                  }`}
+                  onClick={() => {
+                    setSelectedCycloneId(`spire-${storm.id}`);
+                    if (mapRef.current && centerLat != null && centerLon != null) {
+                      mapRef.current.flyTo([centerLat, centerLon], 7, { duration: 1.2 });
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                      {storm.name}
+                    </span>
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded border text-amber-300 bg-amber-500/20 border-amber-400/40">
+                      SPIRE FORECAST
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-300 space-y-0.5">
+                    {centerLat != null && centerLon != null && (
+                      <p className="flex justify-between">
+                        <span>Current Fix:</span>
+                        <strong className="text-amber-300 font-bold">{centerLat}°N, {centerLon}°E</strong>
+                      </p>
+                    )}
+                    <p className="flex justify-between">
+                      <span>Basin:</span>
+                      <span className="font-semibold text-slate-300">{storm.basin_label}</span>
+                    </p>
+                    {storm.current_position?.wind_kmh != null && (
+                      <p className="flex justify-between">
+                        <span>Sustained Wind:</span>
+                        <span className="font-bold text-white">
+                          {storm.current_position.wind_kmh} km/h ({storm.current_position.wind_kt} kt)
+                        </span>
+                      </p>
+                    )}
+                    <div className="pt-1 flex items-center justify-between text-[10px] text-amber-300/80 border-t border-amber-500/20">
+                      <span>Track Points: {storm.total_observed_points} obs / {storm.total_forecast_points} fc</span>
+                      <span>{storm.latest_observed_time || storm.advisory_time_ist || 'Live'}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Telemetry info */}
@@ -1510,9 +1824,26 @@ const MapPage = ({
               </span>
             </p>
             <p className="flex justify-between">
-              <span className="text-slate-400">Last Synoptic:</span>
-              <span className="font-mono text-slate-200">{lastBagyoUpdated || lastUpdated || 'Live'}</span>
+              <span className="text-slate-400">Spire Future Track:</span>
+              <span className={`font-semibold ${
+                spireData?.status === 'connected' ? 'text-emerald-400' :
+                spireData?.status === 'stale_cached' ? 'text-amber-400' :
+                spireData?.status === 'unconfigured' ? 'text-slate-400' : 'text-amber-300'
+              }`}>
+                {spireData?.status === 'connected' ? 'Live Connected (5m)' :
+                 spireData?.status === 'stale_cached' ? 'Cached / Stale' :
+                 spireData?.status === 'unconfigured' ? 'Key Needed in .env' : (spireData?.status || 'Active')}
+              </span>
             </p>
+            <p className="flex justify-between">
+              <span className="text-slate-400">Last Synoptic:</span>
+              <span className="font-mono text-slate-200">{lastSpireUpdated || lastBagyoUpdated || lastUpdated || 'Live'}</span>
+            </p>
+            {spireData?.message && spireData?.status === 'unconfigured' && (
+              <p className="text-[10px] text-amber-400/90 pt-1 border-t border-amber-500/20">
+                ℹ️ {spireData.message}
+              </p>
+            )}
             {bagyoData?.warning_message && (
               <p className="text-[10px] text-amber-400/90 pt-1 border-t border-amber-500/20">
                 ⚠️ {bagyoData.warning_message}

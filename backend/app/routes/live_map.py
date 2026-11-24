@@ -4,6 +4,7 @@ import asyncio
 import time
 import requests
 from services.bagyo_service import fetch_bagyo_storms_sync
+from services.spire_service import fetch_spire_future_tracks_sync
 
 router = APIRouter()
 
@@ -312,4 +313,34 @@ async def get_bagyo_cyclones(refresh: bool = Query(False, description="Force ref
             "cyclones": [],
             "is_stale": True
         }
+
+
+# =========================================================================
+# SPIRE WEATHER API - TROPICAL CYCLONE FUTURE TRACK
+# =========================================================================
+
+@router.get("/cyclones/spire-future-track")
+async def get_spire_future_track(refresh: bool = Query(False, description="Force refresh bypass cache")):
+    """
+    Fetches official external tropical cyclone future forecast tracks and observed history
+    from Spire Weather API (https://api.wx.spire.com/storm/json?status=active).
+    Filters Indian Ocean basins (NI, AS, BB) and returns chronologically ordered waypoints.
+    """
+    try:
+        data = await asyncio.to_thread(fetch_spire_future_tracks_sync, force_refresh=refresh)
+        return data
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Spire service error: {str(e)}",
+            "source": "Spire Weather Storm Tracking API",
+            "advisory_issuance_time": None,
+            "latest_observed_time": None,
+            "last_successful_retrieval": None,
+            "total_storms": 0,
+            "indian_ocean_storms": 0,
+            "storms": [],
+            "is_stale": True
+        }
+
 

@@ -24,19 +24,21 @@ from typing import Dict, Any, Optional, Tuple
 
 logger = logging.getLogger("uvicorn.error")
 
+ENABLE_LOCAL_TF = os.getenv("ENABLE_LOCAL_TF", "0").lower() in ("1", "true")
 TF_AVAILABLE = False
 tf = None
 keras = None
 
-try:
-    import tensorflow as tf
-    import keras
-    TF_AVAILABLE = True
-except (ImportError, Exception) as tf_import_err:
-    logger.warning(
-        f"TensorFlow / Keras DLL blocked or unavailable ({tf_import_err}). "
-        "Application Control policy active. Running in Cloud Vision API (Google Gemini) & Physics Fallback Mode."
-    )
+if ENABLE_LOCAL_TF:
+    try:
+        import tensorflow as tf
+        import keras
+        TF_AVAILABLE = True
+    except (ImportError, Exception) as tf_import_err:
+        logger.warning(
+            f"TensorFlow / Keras DLL blocked or unavailable ({tf_import_err}). "
+            "Application Control policy active. Running in Cloud Vision API (Google Gemini) & Physics Fallback Mode."
+        )
 
 try:
     from app.services.classifier import get_cyclone_classifier, CycloneClassifier

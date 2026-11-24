@@ -27,7 +27,9 @@ const Dashboard = ({
   activeMapLayer = 'wind',
   setActiveMapLayer,
   activeBaseMap = 'satellite_base',
-  setActiveBaseMap
+  setActiveBaseMap,
+  futureTrackActive,
+  setFutureTrackActive
 }) => {
   return (
     <ErrorBoundary fallbackAction={() => setActiveTab('home')}>
@@ -77,6 +79,8 @@ const Dashboard = ({
           setActiveLayer={setActiveMapLayer}
           activeBaseMap={activeBaseMap}
           setActiveBaseMap={setActiveBaseMap}
+          futureTrackActive={futureTrackActive}
+          setFutureTrackActive={setFutureTrackActive}
         />
       )}
 

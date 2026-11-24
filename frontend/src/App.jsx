@@ -15,6 +15,7 @@ function App() {
   const [mapViewMode, setMapViewMode] = useState('tactical'); // 'tactical' | 'windy_engine'
   const [activeMapLayer, setActiveMapLayer] = useState('wind');
   const [activeBaseMap, setActiveBaseMap] = useState('satellite_base');
+  const [futureTrackActive, setFutureTrackActive] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState(null);
   const [analysisHistory, setAnalysisHistory] = useState([]);
   const [analysisStatus, setAnalysisStatus] = useState('idle');
@@ -216,6 +217,8 @@ function App() {
       setActiveMapLayer={setActiveMapLayer}
       activeBaseMap={activeBaseMap}
       setActiveBaseMap={setActiveBaseMap}
+      futureTrackActive={futureTrackActive}
+      setFutureTrackActive={setFutureTrackActive}
     >
       <Dashboard 
         activeTab={activeTab} 
@@ -235,6 +238,8 @@ function App() {
         setActiveMapLayer={setActiveMapLayer}
         activeBaseMap={activeBaseMap}
         setActiveBaseMap={setActiveBaseMap}
+        futureTrackActive={futureTrackActive}
+        setFutureTrackActive={setFutureTrackActive}
       />
     </MainLayout>
   );
