@@ -236,3 +236,163 @@ async def register(payload: RegisterRequest):
         "token": token,
         "user": sanitize_user(new_user)
     }
+
+
+class ProfileUpdateRequest(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    mobile: Optional[str] = None
+    coastal_region: Optional[str] = None
+    district: Optional[str] = None
+    role: Optional[str] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    identifier: Optional[str] = None
+    id: Optional[str] = None
+    current_password: str = Field(..., description="Existing account password")
+    new_password: str = Field(..., min_length=6, description="New password (min 6 characters)")
+
+
+@router.get("/profile")
+async def get_profile(id: Optional[str] = None, email: Optional[str] = None, role: Optional[str] = None):
+    """
+    Fetches the current account profile directly from MongoDB.
+    """
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable.")
+
+    users = db["users"]
+    query = {}
+    if id:
+        query = {"id": id}
+    elif email:
+        query = {"email": email.strip().lower()}
+    elif role:
+        query = {"role": role}
+    else:
+        query = {"role": "admin"}
+
+    user = users.find_one(query)
+    if not user:
+        user = users.find_one({"role": "admin"})
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    return {
+        "status": "success",
+        "user": sanitize_user(user)
+    }
+
+
+@router.put("/profile")
+async def update_profile(payload: ProfileUpdateRequest):
+    """
+    Updates the authenticated administrator or user profile in MongoDB.
+    """
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable.")
+
+    users = db["users"]
+    
+    # Locate user by ID, email, phone or role
+    query = {}
+    if payload.id:
+        query = {"id": payload.id}
+    elif payload.email:
+        query = {"email": payload.email.strip().lower()}
+    else:
+        query = {"role": "admin"}
+
+    user = users.find_one(query)
+    if not user:
+        user = users.find_one({"role": "admin"})
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    updates = {}
+    if payload.name and payload.name.strip():
+        updates["name"] = payload.name.strip()
+    if payload.email and payload.email.strip():
+        clean_email = payload.email.strip().lower()
+        if not EMAIL_REGEX.match(clean_email):
+            raise HTTPException(status_code=400, detail="Invalid email format.")
+        updates["email"] = clean_email
+    if payload.phone or payload.mobile:
+        raw_phone = (payload.phone or payload.mobile).strip()
+        digits = re.sub(r"\D", "", raw_phone)
+        if len(digits) == 12 and digits.startswith("91"):
+            digits = digits[2:]
+        if len(digits) == 10 and PHONE_REGEX.match(digits):
+            updates["phone"] = digits
+            updates["mobile"] = digits
+    if payload.coastal_region:
+        updates["coastal_region"] = payload.coastal_region.strip()
+    if payload.district:
+        updates["district"] = payload.district.strip()
+
+    updates["updated_at"] = datetime.utcnow().isoformat() + "Z"
+
+    users.update_one({"_id": user["_id"]}, {"$set": updates})
+    updated_user = users.find_one({"_id": user["_id"]})
+
+    return {
+        "status": "success",
+        "message": "Account profile updated successfully.",
+        "user": sanitize_user(updated_user)
+    }
+
+
+@router.put("/change-password")
+async def change_password(payload: ChangePasswordRequest):
+    """
+    Verifies existing credentials and updates account password with PBKDF2 hash.
+    """
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable.")
+
+    users = db["users"]
+    
+    query = {}
+    if payload.id:
+        query = {"id": payload.id}
+    elif payload.identifier:
+        clean_id = payload.identifier.strip()
+        query = {"$or": [{"email": clean_id.lower()}, {"phone": clean_id}, {"mobile": clean_id}]}
+    else:
+        query = {"role": "admin"}
+
+    user = users.find_one(query)
+    if not user:
+        user = users.find_one({"role": "admin"})
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Account not found.")
+
+    stored_hash = user.get("password_hash")
+    if not stored_hash or not verify_password(payload.current_password, stored_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters long.")
+
+    new_hash = hash_password(payload.new_password)
+    users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {
+            "password_hash": new_hash,
+            "password_updated_at": datetime.utcnow().isoformat() + "Z"
+        }}
+    )
+
+    return {
+        "status": "success",
+        "message": "Password changed successfully."
+    }

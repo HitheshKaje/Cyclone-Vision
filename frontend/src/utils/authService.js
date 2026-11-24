@@ -156,8 +156,40 @@ export const getAdminAuth = () => {
     if (userStr && token) {
       return JSON.parse(userStr);
     }
+    if (userStr) {
+      return JSON.parse(userStr);
+    }
   } catch (_) {}
   return null;
+};
+
+/**
+ * Fetch latest Admin or User profile from MongoDB
+ */
+export const fetchUserProfile = async (params = {}) => {
+  const baseUrl = getApiBaseUrl();
+  try {
+    const query = new URLSearchParams(params).toString();
+    const url = `${baseUrl}/api/auth/profile${query ? `?${query}` : ''}`;
+    const response = await fetchWithTimeout(url);
+    const data = await response.json();
+    if (!response.ok) {
+      return { success: false, error: data.detail || 'Failed to fetch profile' };
+    }
+    if (data.user) {
+      if (data.user.role === 'admin') {
+        localStorage.setItem('cyclosafe_admin_user', JSON.stringify(data.user));
+      } else {
+        localStorage.setItem('cyclosafe_current_citizen_user', JSON.stringify(data.user));
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cyclosafe_user_profile_updated', { detail: data.user }));
+      }
+    }
+    return { success: true, user: data.user };
+  } catch (err) {
+    return { success: false, error: err.message || 'Network error' };
+  }
 };
 
 /**
@@ -189,5 +221,86 @@ export const logoutUser = () => {
   localStorage.removeItem('cyclosafe_user_token');
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cyclosafe_user_logged_out'));
+  }
+};
+
+/**
+ * Update User / Admin profile in MongoDB and sync localStorage
+ */
+export const updateUserProfile = async (payload) => {
+  const baseUrl = getApiBaseUrl();
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/auth/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.detail || 'Failed to update profile.'
+      };
+    }
+
+    if (data.user) {
+      if (data.user.role === 'admin') {
+        localStorage.setItem('cyclosafe_admin_user', JSON.stringify(data.user));
+      } else {
+        localStorage.setItem('cyclosafe_current_citizen_user', JSON.stringify(data.user));
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cyclosafe_user_profile_updated', { detail: data.user }));
+      }
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Profile updated successfully.',
+      user: data.user
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.name === 'AbortError' ? 'Connection timed out.' : (err.message || 'Network error.')
+    };
+  }
+};
+
+/**
+ * Change account password in MongoDB
+ */
+export const changeUserPassword = async ({ currentPassword, newPassword, identifier, id }) => {
+  const baseUrl = getApiBaseUrl();
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/auth/change-password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+        identifier: identifier,
+        id: id
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.detail || 'Failed to change password.'
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Password changed successfully.'
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.name === 'AbortError' ? 'Connection timed out.' : (err.message || 'Network error.')
+    };
   }
 };

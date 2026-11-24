@@ -2,8 +2,9 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import AuthPage from './pages/AuthPage';
-import { getAdminAuth, logoutAdmin } from './utils/authService';
+import { getAdminAuth, logoutAdmin, fetchUserProfile } from './utils/authService';
 import { fetchAnalysisHistory } from './utils/analysisApi';
+import { fetchMapSettings } from './utils/aiSettingsApi';
 
 const CitizenApp = lazy(() => import('./citizen/CitizenApp'));
 
@@ -12,10 +13,38 @@ function App() {
     typeof window !== 'undefined' ? window.location.pathname : '/'
   );
   const [activeTab, setActiveTab] = useState('home');
-  const [mapViewMode, setMapViewMode] = useState('tactical'); // 'tactical' | 'windy_engine'
-  const [activeMapLayer, setActiveMapLayer] = useState('wind');
-  const [activeBaseMap, setActiveBaseMap] = useState('satellite_base');
-  const [futureTrackActive, setFutureTrackActive] = useState(false);
+  const [mapViewMode, setMapViewMode] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('cyclosafe_map_settings') || '{}');
+      return saved.default_view_mode || 'tactical';
+    } catch {
+      return 'tactical';
+    }
+  });
+  const [activeMapLayer, setActiveMapLayer] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('cyclosafe_map_settings') || '{}');
+      return saved.default_layer || 'wind';
+    } catch {
+      return 'wind';
+    }
+  });
+  const [activeBaseMap, setActiveBaseMap] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('cyclosafe_map_settings') || '{}');
+      return saved.default_basemap || 'satellite_base';
+    } catch {
+      return 'satellite_base';
+    }
+  });
+  const [futureTrackActive, setFutureTrackActive] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('cyclosafe_map_settings') || '{}');
+      return saved.show_forecast_track !== undefined ? saved.show_forecast_track : true;
+    } catch {
+      return true;
+    }
+  });
   const [currentAnalysis, setCurrentAnalysis] = useState(null);
   const [analysisHistory, setAnalysisHistory] = useState([]);
   const [analysisStatus, setAnalysisStatus] = useState('idle');
@@ -70,6 +99,63 @@ function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Sync admin profile from MongoDB and subscribe to live profile updates
+  useEffect(() => {
+    fetchUserProfile({ role: 'admin' }).then((res) => {
+      if (res.success && res.user) {
+        setAdminUser(res.user);
+      }
+    }).catch(() => {});
+
+    const handleProfileUpdate = (e) => {
+      if (e?.detail) {
+        if (e.detail.role === 'admin' || !e.detail.role) {
+          setAdminUser(e.detail);
+        }
+      } else {
+        setAdminUser(getAdminAuth());
+      }
+    };
+
+    const handleStorageUpdate = (e) => {
+      if (e.key === 'cyclosafe_admin_user') {
+        setAdminUser(getAdminAuth());
+      }
+    };
+
+    window.addEventListener('cyclosafe_user_profile_updated', handleProfileUpdate);
+    window.addEventListener('storage', handleStorageUpdate);
+    return () => {
+      window.removeEventListener('cyclosafe_user_profile_updated', handleProfileUpdate);
+      window.removeEventListener('storage', handleStorageUpdate);
+    };
+  }, []);
+
+  // Fetch and dynamically sync map settings from MongoDB
+  useEffect(() => {
+    fetchMapSettings().then(res => {
+      if (res.success && res.settings) {
+        const s = res.settings;
+        if (s.default_view_mode) setMapViewMode(s.default_view_mode);
+        if (s.default_layer) setActiveMapLayer(s.default_layer);
+        if (s.default_basemap) setActiveBaseMap(s.default_basemap);
+        if (s.show_forecast_track !== undefined) setFutureTrackActive(s.show_forecast_track);
+      }
+    }).catch(() => {});
+
+    const handleMapSettingsUpdate = (e) => {
+      if (e?.detail) {
+        const s = e.detail;
+        if (s.default_view_mode) setMapViewMode(s.default_view_mode);
+        if (s.default_layer) setActiveMapLayer(s.default_layer);
+        if (s.default_basemap) setActiveBaseMap(s.default_basemap);
+        if (s.show_forecast_track !== undefined) setFutureTrackActive(s.show_forecast_track);
+      }
+    };
+    window.addEventListener('cyclosafe_map_settings_updated', handleMapSettingsUpdate);
+    return () => window.removeEventListener('cyclosafe_map_settings_updated', handleMapSettingsUpdate);
   }, []);
 
   // Dynamically load analysis records directly from MongoDB on mount

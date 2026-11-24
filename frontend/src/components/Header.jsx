@@ -19,6 +19,8 @@ import {
 import cycloneLogo from '../assets/cyclone-logo.png';
 import { fetchOfficialAdvisories, toggleLighthouseSiren } from '../citizen/services/citizenApi';
 import { fetchAnalysisHistory } from '../utils/analysisApi';
+import { getAdminAuth } from '../utils/authService';
+import { fetchNotificationSettings } from '../utils/aiSettingsApi';
 
 const CycloSafeLogo = () => (
   <div className="flex items-center justify-center shrink-0">
@@ -31,9 +33,65 @@ const CycloSafeLogo = () => (
 );
 
 const Header = ({ toggleSidebar, isDarkMode, toggleDarkMode, onLogout, adminUser }) => {
-  const adminName = adminUser?.name || 'Command Center Admin';
+  const [currentAdmin, setCurrentAdmin] = useState(() => adminUser || getAdminAuth() || null);
+
+  useEffect(() => {
+    if (adminUser) {
+      setCurrentAdmin(adminUser);
+    }
+  }, [adminUser]);
+
+  useEffect(() => {
+    const handleProfileUpdate = (e) => {
+      if (e?.detail) {
+        if (e.detail.role === 'admin' || !e.detail.role) {
+          setCurrentAdmin(e.detail);
+        }
+      } else {
+        const latest = getAdminAuth();
+        if (latest) setCurrentAdmin(latest);
+      }
+    };
+
+    const handleStorageUpdate = (e) => {
+      if (e.key === 'cyclosafe_admin_user') {
+        const latest = getAdminAuth();
+        if (latest) setCurrentAdmin(latest);
+      }
+    };
+
+    window.addEventListener('cyclosafe_user_profile_updated', handleProfileUpdate);
+    window.addEventListener('storage', handleStorageUpdate);
+    return () => {
+      window.removeEventListener('cyclosafe_user_profile_updated', handleProfileUpdate);
+      window.removeEventListener('storage', handleStorageUpdate);
+    };
+  }, []);
+
+  const adminName = currentAdmin?.name || adminUser?.name || 'Hithesh K';
   const [sirenActive, setSirenActive] = useState(false);
   const [sirenLoading, setSirenLoading] = useState(false);
+
+  // Dynamic Notification Settings from MongoDB
+  const [notifConfig, setNotifConfig] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cyclosafe_notification_settings') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    fetchNotificationSettings().then(res => {
+      if (res.success && res.settings) setNotifConfig(res.settings);
+    }).catch(() => {});
+
+    const handleNotifUpdate = (e) => {
+      if (e?.detail) setNotifConfig(e.detail);
+    };
+    window.addEventListener('cyclosafe_notification_settings_updated', handleNotifUpdate);
+    return () => window.removeEventListener('cyclosafe_notification_settings_updated', handleNotifUpdate);
+  }, []);
 
   // Live Notifications State
   const [notifications, setNotifications] = useState([]);

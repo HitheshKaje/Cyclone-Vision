@@ -277,14 +277,16 @@ const CitizenHome = ({ onNavigate }) => {
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onNavigate('/citizen/login')}
-          className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer self-end sm:self-auto shrink-0"
-        >
-          <LogIn size={13} />
-          <span>{currentUser ? 'Switch User' : 'Sign In / Register'}</span>
-        </button>
+        {!currentUser && (
+          <button
+            type="button"
+            onClick={() => onNavigate('/citizen/login')}
+            className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer self-end sm:self-auto shrink-0"
+          >
+            <LogIn size={13} />
+            <span>{i18n.language === 'kn' ? 'ಸೈನ್ ಇನ್ / ನೋಂದಣಿ' : 'Sign In / Register'}</span>
+          </button>
+        )}
       </div>
 
     </div>

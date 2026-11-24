@@ -973,6 +973,11 @@ class CloudVisionIntensityService:
 
             is_cyclone = bool(parsed.get("is_cyclone", True))
             conf = float(parsed.get("confidence_percent", 92.0))
+
+            # Dynamic confidence threshold enforcement from settings / MongoDB
+            conf_threshold = getattr(self, "detection_confidence_threshold", 50.0)
+            if conf < conf_threshold:
+                is_cyclone = False
             pattern = parsed.get("pattern_detected", "Cyclonic circulation pattern")
             features = parsed.get("features_observed", "Convective rainbands")
             reasoning = parsed.get("reasoning", "Satellite cloud structure evaluated")
