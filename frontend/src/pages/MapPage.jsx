@@ -31,9 +31,10 @@ import {
   Maximize2,
   Minimize2,
   X,
-  List
+  List,
+  Thermometer
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, LayerGroup, Polyline, CircleMarker, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, LayerGroup, Polyline, CircleMarker, Tooltip, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { getApiBaseUrl } from '../utils/apiConfig';
@@ -41,7 +42,7 @@ import WindParticleOverlay from '../components/WindParticleOverlay';
 import ZoomEarthLayerMenu from '../components/ZoomEarthLayerMenu';
 import HumidityMoistureOverlay from '../components/HumidityMoistureOverlay';
 import PressureIsobarOverlay from '../components/PressureIsobarOverlay';
-import TemperatureOverlay from '../components/TemperatureOverlay';
+import TemperatureOverlay, { calculateTemperatureAtLatLng } from '../components/TemperatureOverlay';
 import WindyAtmosphericPlayer from '../components/WindyAtmosphericPlayer';
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -208,6 +209,19 @@ const parseGdacsFeaturesToCyclones = (features) => {
   return list;
 };
 
+// Tracks continuous cursor movements for coordinates and temperature hover
+function MapCursorTracker({ onMouseMove, onMouseLeave }) {
+  useMapEvents({
+    mousemove(e) {
+      if (onMouseMove) onMouseMove(e);
+    },
+    mouseout() {
+      if (onMouseLeave) onMouseLeave();
+    }
+  });
+  return null;
+}
+
 const MapPage = ({ 
   currentAnalysis, 
   setActiveTab,
@@ -266,6 +280,12 @@ const MapPage = ({
   const [lastBagyoUpdated, setLastBagyoUpdated] = useState(null);
   const [showBagyoTrack, setShowBagyoTrack] = useState(true);
   const isBagyoFetchingRef = useRef(false);
+
+  // Cursor coordinate tracking & hover temperature inspection state
+  const [cursorCoords, setCursorCoords] = useState(null);
+  const [cursorPoint, setCursorPoint] = useState(null);
+  const [hoverTemp, setHoverTemp] = useState(null);
+  const [liveThermalData, setLiveThermalData] = useState({ temp: 29.4, feelsLike: 33.5 });
 
 
   const abortControllerRef = useRef(null);
@@ -599,6 +619,49 @@ const MapPage = ({
   const activeWindKmh = primaryCyclone?.wind_speed || 157;
   const activeName = primaryCyclone?.name || 'Live Monitored Cyclone';
 
+  // Dynamic temperature range for continuous scale & legend (updates dynamically with live thermal data)
+  const tempRange = {
+    min: liveThermalData?.temp ? Math.min(20, Math.round(liveThermalData.temp - 9)) : 20,
+    max: liveThermalData?.temp ? Math.max(34, Math.round(liveThermalData.temp + 4)) : 34
+  };
+
+  // Continuous cursor tracker for coordinates and temperature hover
+  const handleMapMouseMove = (e) => {
+    if (!e || !e.latlng) return;
+    const { lat, lng } = e.latlng;
+    const { x, y } = e.containerPoint;
+
+    // Normalize longitude to -180 .. 180 and format directions
+    const normLng = ((lng + 180) % 360 + 360) % 360 - 180;
+    const latDir = lat >= 0 ? 'N' : 'S';
+    const lngDir = normLng >= 0 ? 'E' : 'W';
+
+    setCursorCoords({
+      latStr: `${Math.abs(lat).toFixed(4)}° ${latDir}`,
+      lngStr: `${Math.abs(normLng).toFixed(4)}° ${lngDir}`,
+      lat,
+      lng: normLng
+    });
+
+    setCursorPoint({ x, y });
+
+    if (activeLayer === 'temperature') {
+      const temp = calculateTemperatureAtLatLng(
+        lat, 
+        normLng, 
+        activeLat, 
+        activeLng, 
+        liveThermalData?.temp
+      );
+      setHoverTemp(temp);
+    }
+  };
+
+  const handleMapMouseLeave = () => {
+    setCursorPoint(null);
+    setHoverTemp(null);
+  };
+
   // Smooth auto-centering on the primary active cyclone when page or data loads
   useEffect(() => {
     if (!hasAutoCenteredRef.current && mapRef.current) {
@@ -679,6 +742,12 @@ const MapPage = ({
           className="w-full h-full z-0"
           style={{ width: '100%', height: '100%', background: '#0a1622' }}
         >
+          {/* Continuous Map Cursor Coordinate and Temperature Inspection Tracker */}
+          <MapCursorTracker 
+            onMouseMove={handleMapMouseMove} 
+            onMouseLeave={handleMapMouseLeave} 
+          />
+
           {/* 1. Base Cartography Tiles (Keyed to force clean unmount/remount in Leaflet) */}
           {activeBaseMap === 'street' && (
             <TileLayer
@@ -746,39 +815,48 @@ const MapPage = ({
             />
           )}
 
-          {/* 4. Live Animated Wind Streamlines & Particle Vector Flow */}
-          <WindParticleOverlay
-            stormLat={activeLat}
-            stormLng={activeLng}
-            stormWindKt={activeWindKt}
-            active={activeLayer === 'wind'}
-            showLegend={false}
-          />
+          {/* 4. Live Animated Wind Streamlines & Particle Vector Flow (Strictly isolated to Wind layer) */}
+          {activeLayer === 'wind' && (
+            <WindParticleOverlay
+              stormLat={activeLat}
+              stormLng={activeLng}
+              stormWindKt={activeWindKt}
+              active={true}
+              showLegend={false}
+            />
+          )}
 
           {/* 5. Live Atmospheric Relative Humidity & Moisture Flux */}
-          <HumidityMoistureOverlay
-            stormLat={activeLat}
-            stormLng={activeLng}
-            active={activeLayer === 'humidity'}
-            showLegend={false}
-          />
+          {activeLayer === 'humidity' && (
+            <HumidityMoistureOverlay
+              stormLat={activeLat}
+              stormLng={activeLng}
+              active={true}
+              showLegend={false}
+            />
+          )}
 
           {/* 6. Live Atmospheric Pressure (MSLP) Isobars & Depression Core */}
-          <PressureIsobarOverlay
-            stormLat={activeLat}
-            stormLng={activeLng}
-            stormWindKt={activeWindKt}
-            active={activeLayer === 'pressure'}
-            showLegend={false}
-          />
+          {activeLayer === 'pressure' && (
+            <PressureIsobarOverlay
+              stormLat={activeLat}
+              stormLng={activeLng}
+              stormWindKt={activeWindKt}
+              active={true}
+              showLegend={false}
+            />
+          )}
 
           {/* 7. Live Sea Surface & Air Temperature Warm Pool */}
-          <TemperatureOverlay
-            stormLat={activeLat}
-            stormLng={activeLng}
-            active={activeLayer === 'temperature'}
-            showLegend={false}
-          />
+          {activeLayer === 'temperature' && (
+            <TemperatureOverlay
+              stormLat={activeLat}
+              stormLng={activeLng}
+              active={true}
+              showLegend={false}
+              onThermalData={setLiveThermalData}
+            />
+          )}
 
           {/* AI Detected Cyclone Eyewall Pinpoint */}
           {aiCyclone && (
@@ -1270,7 +1348,21 @@ const MapPage = ({
             );
           })}
         </MapContainer>
+      )}
 
+      {/* Floating Tooltip: Temperature on Mouse Hover (smooth, near cursor) */}
+      {viewMode === 'tactical' && activeLayer === 'temperature' && hoverTemp !== null && cursorPoint && (
+        <div 
+          className="absolute pointer-events-none z-[1000] px-2.5 py-1 rounded-lg bg-[#0a1b24]/95 backdrop-blur-md border border-orange-500/60 shadow-2xl text-xs font-mono font-bold text-white flex items-center gap-1.5 select-none transition-transform duration-75 ease-out"
+          style={{
+            left: `${(cursorPoint.x > (typeof window !== 'undefined' ? window.innerWidth - 200 : 800)) ? cursorPoint.x - 170 : cursorPoint.x + 14}px`,
+            top: `${(cursorPoint.y > (typeof window !== 'undefined' ? window.innerHeight - 120 : 600)) ? cursorPoint.y - 36 : cursorPoint.y + 14}px`
+          }}
+        >
+          <Thermometer size={13} className="text-orange-400 shrink-0 animate-pulse" />
+          <span className="text-slate-200">Temperature:</span>
+          <span className="text-orange-300 font-black">{hoverTemp}°C</span>
+        </div>
       )}
 
       {/* =========================================================================
@@ -1399,65 +1491,106 @@ const MapPage = ({
       ========================================================================= */}
       {viewMode === 'tactical' && (
         <>
-          {/* Floating Option 4: Bottom-Left Scale Bar */}
-          <div className="absolute bottom-4 left-3 z-[950] pointer-events-auto select-none">
-            {activeLayer === 'pressure' && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
-                <span className="font-bold text-teal-300">hPa</span>
-                <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
-                  <span className="px-1.5 py-0.5 bg-[#1d3557] text-white">970</span>
-                  <span className="px-1.5 py-0.5 bg-[#457b9d] text-white">985</span>
-                  <span className="px-1.5 py-0.5 bg-[#a8dadc] text-slate-900 font-bold">1000</span>
-                  <span className="px-1.5 py-0.5 bg-[#f1faee] text-slate-900 font-bold">1015</span>
-                  <span className="px-1.5 py-0.5 bg-[#e63946] text-white">1030</span>
-                  <span className="px-1.5 py-0.5 bg-[#6a040f] text-white">1045</span>
-                </div>
-                <span className="hidden sm:inline text-teal-400 font-bold">MSLP Isobars</span>
-              </div>
-            )}
-
-            {activeLayer === 'wind' && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
-                <span className="font-bold text-teal-300">km/h</span>
-                <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
-                  <span className="px-1.5 py-0.5 bg-[#818cf8] text-white">0</span>
-                  <span className="px-1.5 py-0.5 bg-[#06b6d4] text-white">25</span>
-                  <span className="px-1.5 py-0.5 bg-[#10b981] text-white">50</span>
-                  <span className="px-1.5 py-0.5 bg-[#eab308] text-slate-900 font-bold">75</span>
-                  <span className="px-1.5 py-0.5 bg-[#f97316] text-white">100</span>
-                  <span className="px-1.5 py-0.5 bg-[#ef4444] text-white font-bold">125+</span>
-                </div>
-                <span className="hidden sm:inline text-teal-400 font-bold">Wind Vectors</span>
-              </div>
-            )}
-
+          {/* Floating Option 4: Bottom-Left Scale Bar, Continuous Temperature Legend & Coordinates */}
+          <div className="absolute bottom-4 left-3 z-[950] pointer-events-auto select-none flex flex-col gap-2">
+            {/* 1. Continuous Temperature Legend with °C units (Active strictly on Temperature layer) */}
             {activeLayer === 'temperature' && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
-                <span className="font-bold text-teal-300">°C</span>
-                <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
-                  <span className="px-1.5 py-0.5 bg-[#3b82f6] text-white">20</span>
-                  <span className="px-1.5 py-0.5 bg-[#06b6d4] text-white">24</span>
-                  <span className="px-1.5 py-0.5 bg-[#10b981] text-white">28</span>
-                  <span className="px-1.5 py-0.5 bg-[#f59e0b] text-slate-900 font-bold">30</span>
-                  <span className="px-1.5 py-0.5 bg-[#ef4444] text-white font-bold">34+</span>
+              <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-[#0a1b24]/95 backdrop-blur-md border border-teal-500/40 shadow-2xl text-slate-200 font-mono text-[10px] min-w-[270px] sm:min-w-[310px] animate-fade-in">
+                <div className="flex items-center justify-between pb-1 border-b border-teal-500/20">
+                  <span className="flex items-center gap-1.5 font-bold text-[11px] uppercase tracking-wider text-teal-300">
+                    <Thermometer size={13} className="text-orange-400 animate-pulse" />
+                    Temperature
+                  </span>
+                  <span className="text-[10px] text-teal-400/80">
+                    SST & Air (°C)
+                  </span>
                 </div>
-                <span className="hidden sm:inline text-teal-400 font-bold">SST Thermal</span>
+
+                {/* Continuous colour gradient bar */}
+                <div className="space-y-1">
+                  <div 
+                    className="h-2.5 w-full rounded shadow-inner"
+                    style={{
+                      background: 'linear-gradient(to right, #3b82f6 0%, #06b6d4 20%, #10b981 40%, #eab308 60%, #f97316 80%, #ef4444 100%)'
+                    }}
+                  />
+                  {/* Dynamic continuous labels with °C units */}
+                  <div className="flex justify-between text-[9px] text-slate-300 px-0.5">
+                    <span>{tempRange.min}°C</span>
+                    <span>{Math.round(tempRange.min + (tempRange.max - tempRange.min) * 0.2)}°C</span>
+                    <span>{Math.round(tempRange.min + (tempRange.max - tempRange.min) * 0.4)}°C</span>
+                    <span>{Math.round(tempRange.min + (tempRange.max - tempRange.min) * 0.6)}°C</span>
+                    <span>{Math.round(tempRange.min + (tempRange.max - tempRange.min) * 0.8)}°C</span>
+                    <span>{tempRange.max}°C+</span>
+                  </div>
+                </div>
+
+                {/* Live warm pool status & dynamic range */}
+                <div className="pt-1 border-t border-teal-500/15 flex items-center justify-between text-[9px] text-slate-400">
+                  <span className="text-orange-300 font-semibold">Warm Core: {liveThermalData?.temp ? `${liveThermalData.temp}°C` : '29.5°C'}</span>
+                  <span>Scale: {tempRange.min}°C – {tempRange.max}°C</span>
+                </div>
               </div>
             )}
 
-            {activeLayer === 'humidity' && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
-                <span className="font-bold text-teal-300">%</span>
-                <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
-                  <span className="px-1.5 py-0.5 bg-[#e0f2fe] text-slate-900 font-bold">40%</span>
-                  <span className="px-1.5 py-0.5 bg-[#38bdf8] text-slate-900 font-bold">60%</span>
-                  <span className="px-1.5 py-0.5 bg-[#0284c7] text-white">75%</span>
-                  <span className="px-1.5 py-0.5 bg-[#0369a1] text-white">90%</span>
-                  <span className="px-1.5 py-0.5 bg-[#0c4a6e] text-white font-bold">100%</span>
+            {/* 2. Coordinates Display and other Layer Scales */}
+            <div className="flex items-center gap-2">
+              {/* Latitude and Longitude Display (Continuously updated on mouse move) */}
+              <div className="flex flex-col justify-center px-2.5 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] font-mono text-slate-300 leading-snug">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 font-semibold">Latitude:</span>{' '}
+                  <span className="text-teal-300 font-bold">{cursorCoords ? cursorCoords.latStr : `${activeLat.toFixed(4)}° N`}</span>
                 </div>
-                <span className="hidden sm:inline text-teal-400 font-bold">RH Moisture</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 font-semibold">Longitude:</span>{' '}
+                  <span className="text-teal-300 font-bold">{cursorCoords ? cursorCoords.lngStr : `${activeLng.toFixed(4)}° E`}</span>
+                </div>
               </div>
-            )}
+
+              {activeLayer === 'pressure' && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
+                  <span className="font-bold text-teal-300">hPa</span>
+                  <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
+                    <span className="px-1.5 py-0.5 bg-[#1d3557] text-white">970</span>
+                    <span className="px-1.5 py-0.5 bg-[#457b9d] text-white">985</span>
+                    <span className="px-1.5 py-0.5 bg-[#a8dadc] text-slate-900 font-bold">1000</span>
+                    <span className="px-1.5 py-0.5 bg-[#f1faee] text-slate-900 font-bold">1015</span>
+                    <span className="px-1.5 py-0.5 bg-[#e63946] text-white">1030</span>
+                    <span className="px-1.5 py-0.5 bg-[#6a040f] text-white">1045</span>
+                  </div>
+                  <span className="hidden sm:inline text-teal-400 font-bold">MSLP Isobars</span>
+                </div>
+              )}
+
+              {activeLayer === 'wind' && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
+                  <span className="font-bold text-teal-300">km/h</span>
+                  <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
+                    <span className="px-1.5 py-0.5 bg-[#818cf8] text-white">0</span>
+                    <span className="px-1.5 py-0.5 bg-[#06b6d4] text-white">25</span>
+                    <span className="px-1.5 py-0.5 bg-[#10b981] text-white">50</span>
+                    <span className="px-1.5 py-0.5 bg-[#eab308] text-slate-900 font-bold">75</span>
+                    <span className="px-1.5 py-0.5 bg-[#f97316] text-white">100</span>
+                    <span className="px-1.5 py-0.5 bg-[#ef4444] text-white font-bold">125+</span>
+                  </div>
+                  <span className="hidden sm:inline text-teal-400 font-bold">Wind Vectors</span>
+                </div>
+              )}
+
+              {activeLayer === 'humidity' && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-[10px] text-slate-200 font-mono">
+                  <span className="font-bold text-teal-300">%</span>
+                  <div className="flex items-center rounded overflow-hidden shadow-xs border border-teal-500/20">
+                    <span className="px-1.5 py-0.5 bg-[#e0f2fe] text-slate-900 font-bold">40%</span>
+                    <span className="px-1.5 py-0.5 bg-[#38bdf8] text-slate-900 font-bold">60%</span>
+                    <span className="px-1.5 py-0.5 bg-[#0284c7] text-white">75%</span>
+                    <span className="px-1.5 py-0.5 bg-[#0369a1] text-white">90%</span>
+                    <span className="px-1.5 py-0.5 bg-[#0c4a6e] text-white font-bold">100%</span>
+                  </div>
+                  <span className="hidden sm:inline text-teal-400 font-bold">RH Moisture</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Floating Option 5: Bottom-Center Synoptic Player */}

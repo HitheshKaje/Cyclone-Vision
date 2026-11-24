@@ -223,6 +223,9 @@ export default function WindParticleOverlay({
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       map.off('move', handleMapMove);
       map.off('resize', handleMapMove);
+      if (canvas && ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
     };
   }, [active, map, getWindVector]);
 
