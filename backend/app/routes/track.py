@@ -49,20 +49,24 @@ def get_track_model():
             _track_model = keras.models.load_model(MODEL_PATH)
             logger.info("-> Track prediction model loaded successfully!")
         except Exception as e:
-            logger.warning(f"keras.models.load_model direct deserialize notice: {e}. Building graph and loading weights...")
-            import tensorflow as tf
-            from tensorflow.keras import layers, models
-            inputs = layers.Input(shape=(8, 7), name="track_history_input")
-            x = layers.Bidirectional(layers.LSTM(128, return_sequences=True), name="bi_lstm_1")(inputs)
-            x = layers.Dropout(0.2, name="dropout_1")(x)
-            x = layers.Bidirectional(layers.LSTM(64, return_sequences=False), name="bi_lstm_2")(x)
-            x = layers.Dropout(0.2, name="dropout_2")(x)
-            x = layers.Dense(64, activation="relu", name="dense_proj")(x)
-            outputs = layers.Dense(10, activation="linear", name="displacement_output")(x)
-            model = models.Model(inputs=inputs, outputs=outputs, name="CycloSafe_Track_BiLSTM")
-            model.load_weights(MODEL_PATH)
-            _track_model = model
-            logger.info("-> Track prediction model graph built and weights loaded successfully!")
+            logger.warning(f"keras.models.load_model direct deserialize notice: {e}. Attempting fallback build...")
+            try:
+                import tensorflow as tf
+                from tensorflow.keras import layers, models
+                inputs = layers.Input(shape=(8, 7), name="track_history_input")
+                x = layers.Bidirectional(layers.LSTM(128, return_sequences=True), name="bi_lstm_1")(inputs)
+                x = layers.Dropout(0.2, name="dropout_1")(x)
+                x = layers.Bidirectional(layers.LSTM(64, return_sequences=False), name="bi_lstm_2")(x)
+                x = layers.Dropout(0.2, name="dropout_2")(x)
+                x = layers.Dense(64, activation="relu", name="dense_proj")(x)
+                outputs = layers.Dense(10, activation="linear", name="displacement_output")(x)
+                model = models.Model(inputs=inputs, outputs=outputs, name="CycloSafe_Track_BiLSTM")
+                model.load_weights(MODEL_PATH)
+                _track_model = model
+                logger.info("-> Track prediction model graph built and weights loaded successfully!")
+            except Exception as tf_err:
+                logger.warning(f"TensorFlow track model load skipped ({tf_err}). Using physics & API track prediction.")
+                _track_model = None
     return _track_model
 
 def get_track_scaler():

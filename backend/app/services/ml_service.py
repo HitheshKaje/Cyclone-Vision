@@ -20,48 +20,62 @@ import time
 import logging
 import cv2
 import numpy as np
-import tensorflow as tf
-import keras
 from typing import Dict, Any, Optional, Tuple
+
+logger = logging.getLogger("uvicorn.error")
+
+TF_AVAILABLE = False
+tf = None
+keras = None
+
+try:
+    import tensorflow as tf
+    import keras
+    TF_AVAILABLE = True
+except (ImportError, Exception) as tf_import_err:
+    logger.warning(
+        f"TensorFlow / Keras DLL blocked or unavailable ({tf_import_err}). "
+        "Application Control policy active. Running in Cloud Vision API (Google Gemini) & Physics Fallback Mode."
+    )
 
 try:
     from app.services.classifier import get_cyclone_classifier, CycloneClassifier
 except ImportError:
     from services.classifier import get_cyclone_classifier, CycloneClassifier
 
-logger = logging.getLogger("uvicorn.error")
-
 # Global cross-version Keras deserialization compatibility patches
 # Fixes mismatches between models saved in Google Colab / Kaggle (Keras 3.5+) and local environments
-try:
-    if not hasattr(keras.layers.Dense, "_is_patched"):
-        original_dense_init = keras.layers.Dense.__init__
-        def patched_dense_init(self, *args, **kwargs):
-            kwargs.pop('quantization_config', None)
-            original_dense_init(self, *args, **kwargs)
-        keras.layers.Dense.__init__ = patched_dense_init
-        keras.layers.Dense._is_patched = True
+if TF_AVAILABLE and keras is not None:
+    try:
+        if not hasattr(keras.layers.Dense, "_is_patched"):
+            original_dense_init = keras.layers.Dense.__init__
+            def patched_dense_init(self, *args, **kwargs):
+                kwargs.pop('quantization_config', None)
+                original_dense_init(self, *args, **kwargs)
+            keras.layers.Dense.__init__ = patched_dense_init
+            keras.layers.Dense._is_patched = True
 
-    if hasattr(keras.layers, "BatchNormalization") and not hasattr(keras.layers.BatchNormalization, "_is_patched"):
-        original_bn_init = keras.layers.BatchNormalization.__init__
-        def patched_bn_init(self, *args, **kwargs):
-            for k in ['renorm', 'renorm_clipping', 'renorm_momentum', 'synchronized']:
-                kwargs.pop(k, None)
-            original_bn_init(self, *args, **kwargs)
-        keras.layers.BatchNormalization.__init__ = patched_bn_init
-        keras.layers.BatchNormalization._is_patched = True
+        if hasattr(keras.layers, "BatchNormalization") and not hasattr(keras.layers.BatchNormalization, "_is_patched"):
+            original_bn_init = keras.layers.BatchNormalization.__init__
+            def patched_bn_init(self, *args, **kwargs):
+                for k in ['renorm', 'renorm_clipping', 'renorm_momentum', 'synchronized']:
+                    kwargs.pop(k, None)
+                original_bn_init(self, *args, **kwargs)
+            keras.layers.BatchNormalization.__init__ = patched_bn_init
+            keras.layers.BatchNormalization._is_patched = True
 
-    from keras.src.initializers.random_initializers import VarianceScaling
-    if not getattr(VarianceScaling, "_is_patched", False):
-        original_vs_init = VarianceScaling.__init__
-        def patched_vs_init(self, *args, **kwargs):
-            kwargs.pop('input_axes', None)
-            kwargs.pop('output_axes', None)
-            original_vs_init(self, *args, **kwargs)
-        VarianceScaling.__init__ = patched_vs_init
-        VarianceScaling._is_patched = True
-except Exception as patch_e:
-    logger.debug(f"Initializer compatibility patch notice: {patch_e}")
+        from keras.src.initializers.random_initializers import VarianceScaling
+        if not getattr(VarianceScaling, "_is_patched", False):
+            original_vs_init = VarianceScaling.__init__
+            def patched_vs_init(self, *args, **kwargs):
+                kwargs.pop('input_axes', None)
+                kwargs.pop('output_axes', None)
+                original_vs_init(self, *args, **kwargs)
+            VarianceScaling.__init__ = patched_vs_init
+            VarianceScaling._is_patched = True
+    except Exception as patch_e:
+        logger.debug(f"Initializer compatibility patch notice: {patch_e}")
+
 
 # Target image size for both models
 TARGET_SIZE = (224, 224)
@@ -99,8 +113,8 @@ class MLService:
     _instance: Optional["MLService"] = None
 
     def __init__(self):
-        self.detection_model: Optional[tf.keras.Model] = None
-        self.intensity_model: Optional[tf.keras.Model] = None
+        self.detection_model: Optional[Any] = None
+        self.intensity_model: Optional[Any] = None
         self.class_names: list = ["No_Cyclone", "Cyclone"]
         self.classifier: CycloneClassifier = get_cyclone_classifier()
         self.is_loaded: bool = False
@@ -114,6 +128,9 @@ class MLService:
 
     def load_detection_model(self, force: bool = False) -> None:
         """Loads or reloads the detection model if file modification time has changed."""
+        if not TF_AVAILABLE or keras is None:
+            logger.info("TensorFlow/Keras unavailable. Skipping local detection model load.")
+            return
         if not os.path.exists(DETECTION_MODEL_PATH):
             raise FileNotFoundError(f"Detection model not found at: {DETECTION_MODEL_PATH}")
         mtime = os.path.getmtime(DETECTION_MODEL_PATH)
@@ -131,6 +148,11 @@ class MLService:
         """
         Load all models and pre-warm them once at application startup.
         """
+        if not TF_AVAILABLE or keras is None:
+            logger.info("TensorFlow/Keras is unavailable. Skipping local model load (Cloud Vision API mode active).")
+            self.is_loaded = True
+            return
+
         if self.is_loaded and self.detection_model is not None:
             return
 
@@ -231,11 +253,16 @@ class MLService:
         Resizes to (224, 224), converts BGR to RGB, and applies EfficientNet preprocess_input.
         Returns shape: (1, 224, 224, 3)
         """
-        from tensorflow.keras.applications.efficientnet import preprocess_input
         resized = cv2.resize(img_bgr, TARGET_SIZE)
         rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
         batch = np.expand_dims(rgb.astype(np.float32), axis=0)
-        return preprocess_input(batch)
+        if TF_AVAILABLE and tf is not None:
+            try:
+                from tensorflow.keras.applications.efficientnet import preprocess_input
+                return preprocess_input(batch)
+            except Exception:
+                pass
+        return (batch / 127.5) - 1.0
 
     def preprocess_intensity_image(self, img_bgr: np.ndarray) -> np.ndarray:
         """

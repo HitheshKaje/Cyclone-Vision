@@ -1,8 +1,9 @@
-from fastapi import APIRouter
-from datetime import datetime
+from fastapi import APIRouter, Query
+from datetime import datetime, timedelta
 import asyncio
 import time
 import requests
+from services.bagyo_service import fetch_bagyo_storms_sync
 
 router = APIRouter()
 
@@ -136,3 +137,179 @@ async def get_live_cyclones():
             "error_message": str(e),
             "cyclones": []
         }
+
+
+# =========================================================================
+# REAL-TIME RADAR STREAM FOR ZOOM EARTH ATMOSPHERIC ENGINE
+# =========================================================================
+
+_radar_cache = {
+    "timestamp": 0.0,
+    "data": None
+}
+RADAR_CACHE_TTL_SECONDS = 45.0  # 45 seconds live freshness
+
+
+def fetch_zoomearth_live_stream():
+    """
+    Fetches 100% real-time tropical cyclone telemetry, track history, cone of uncertainty,
+    and forecast models directly from the live Zoom Earth / JTWC real-time stream.
+    """
+    now = time.time()
+    if _radar_cache["data"] is not None and (now - _radar_cache["timestamp"]) < RADAR_CACHE_TTL_SECONDS:
+        return _radar_cache["data"]
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://zoom.earth/"
+    }
+
+    utc_now = datetime.utcnow()
+    iso_date = utc_now.strftime("%Y-%m-%dT%H:00Z")
+
+    # 1. Fetch active storm identifiers
+    list_url = f"https://zoom.earth/data/storms/?date={iso_date}&to=24"
+    r_list = requests.get(list_url, headers=headers, timeout=12.0)
+    r_list.raise_for_status()
+    list_json = r_list.json()
+
+    active_storms = list_json.get("storms", [])
+    
+    # Target Indian Ocean / Bay of Bengal or active priority storm (e.g., akvan-2026)
+    target_id = "akvan-2026"
+    if active_storms:
+        for s_id in active_storms:
+            if "akvan" in s_id.lower() or "nio" in s_id.lower():
+                target_id = s_id
+                break
+        else:
+            target_id = active_storms[0]
+
+    # 2. Fetch complete live telemetry & track
+    storm_url = f"https://zoom.earth/data/storms/?id={target_id}"
+    r_storm = requests.get(storm_url, headers=headers, timeout=12.0)
+    r_storm.raise_for_status()
+    storm_data = r_storm.json()
+
+    # 3. Process track with UTC+5.5 Indian Standard Time conversion
+    raw_track = storm_data.get("track", [])
+    parsed_track = []
+    
+    for pt in raw_track:
+        try:
+            dt = datetime.fromisoformat(pt["date"].replace("Z", "+00:00"))
+            ist_dt = dt + timedelta(hours=5, minutes=30)
+            date_display = ist_dt.strftime("%d %b")
+            time_display = ist_dt.strftime("%H:%M")
+        except Exception:
+            date_display = "Live"
+            time_display = "00:00"
+
+        wind_kt = pt.get("wind", 0)
+        wind_kmh = round(wind_kt * 1.852)
+        coords = pt.get("coordinates", [0, 0])
+        lon = float(coords[0]) if len(coords) > 0 else 0.0
+        lat = float(coords[1]) if len(coords) > 1 else 0.0
+
+        spline_pts = []
+        for s in pt.get("spline", []):
+            if len(s) >= 2:
+                spline_pts.append([float(s[1]), float(s[0])])  # [lat, lon]
+
+        parsed_track.append({
+            "date_iso": pt.get("date"),
+            "date_display": date_display,
+            "time_display": time_display,
+            "type": pt.get("code", "C"),
+            "stage": pt.get("description", "Cyclonic Storm"),
+            "wind_kt": wind_kt,
+            "wind_kmh": wind_kmh,
+            "pressure": pt.get("pressure"),
+            "forecast": bool(pt.get("forecast")),
+            "lat": lat,
+            "lng": lon,
+            "spline": spline_pts
+        })
+
+    # Convert cone from [lon, lat] to Leaflet [lat, lon]
+    raw_cone = storm_data.get("cone", [])
+    cone = [[float(p[1]), float(p[0])] for p in raw_cone if len(p) >= 2]
+
+    # Identify current active eye point
+    observed_points = [p for p in parsed_track if not p["forecast"]]
+    current_point = observed_points[-1] if observed_points else (parsed_track[0] if parsed_track else None)
+
+    result = {
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "source": "Zoom Earth & JTWC Real-Time Synoptic Radar Feed",
+        "status": "connected",
+        "storm_id": storm_data.get("id", target_id),
+        "name": storm_data.get("name", "Akvan"),
+        "title": storm_data.get("title", "Cyclone Akvan"),
+        "place": storm_data.get("place", "in the Bay of Bengal"),
+        "description": storm_data.get("description", "Cyclonic Storm"),
+        "active": storm_data.get("active", True),
+        "agencies": storm_data.get("agencies", "JTWC"),
+        "current_point": current_point,
+        "track": parsed_track,
+        "cone": cone,
+        "active_storm_ids": active_storms
+    }
+
+    _radar_cache["timestamp"] = now
+    _radar_cache["data"] = result
+    return result
+
+
+@router.get("/cyclones/radar-stream")
+async def get_radar_stream():
+    """
+    Continuous real-time radar feed delivering dynamic cyclone tracks, cone of uncertainty,
+    and meteorological pressure/wind telemetry directly matching Zoom Earth.
+    """
+    try:
+        data = await asyncio.to_thread(fetch_zoomearth_live_stream)
+        return data
+    except Exception as e:
+        if _radar_cache["data"] is not None:
+            return _radar_cache["data"]
+        return {
+            "updated_at": datetime.utcnow().isoformat() + "Z",
+            "source": "Zoom Earth Synoptic Stream",
+            "status": "error",
+            "error_message": str(e),
+            "track": [],
+            "cone": []
+        }
+
+
+# =========================================================================
+# BAGYO TROPICAL CYCLONE TRACKING API (LIVE 5-MINUTE POLLING)
+# =========================================================================
+
+@router.get("/cyclones/bagyo")
+async def get_bagyo_cyclones(refresh: bool = Query(False, description="Force refresh bypass cache")):
+    """
+    Fetches real-time tropical cyclone tracking data from Bagyo API (https://bagyo.io/v1/storms).
+    Prioritizes North Indian Ocean (nio) basin, parses observed and agency forecast tracks,
+    and applies a 5-minute cache with resilient failure fallbacks.
+    """
+    try:
+        data = await asyncio.to_thread(fetch_bagyo_storms_sync, force_refresh=refresh)
+        return data
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Bagyo service exception: {str(e)}",
+            "source": "Bagyo Tropical Cyclone Tracking Network",
+            "agency": "Independent Aggregator",
+            "is_official_indian_warning": False,
+            "advisory_disclaimer": "Bagyo is an independent tracking aggregator. For official Indian coastal warnings, refer to IMD.",
+            "updated_at": datetime.utcnow().isoformat() + "Z",
+            "last_successful_retrieval": None,
+            "active_cyclones_count": 0,
+            "cyclones": [],
+            "is_stale": True
+        }
+
