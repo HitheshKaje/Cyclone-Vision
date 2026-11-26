@@ -289,13 +289,27 @@ class MLService:
             img_3ch = np.stack([norm_inverted, norm_inverted, norm_inverted], axis=-1).astype(np.float32)
             return np.expand_dims(img_3ch, axis=0)
 
+    @staticmethod
+    def compute_ir_band_fractions(
+        h_chan: np.ndarray, s_chan: np.ndarray, v_chan: np.ndarray
+    ) -> Tuple[float, float, float, float, int]:
+        """Compute coverage fractions for meteorological thermal/IR hue bands."""
+        red_mag = float(np.mean(((h_chan <= 10) | (h_chan >= 145)) & (s_chan >= 80) & (v_chan >= 50)))
+        org_yel = float(np.mean((h_chan > 10) & (h_chan <= 36) & (s_chan >= 80) & (v_chan >= 70)))
+        grn_cyn = float(np.mean((h_chan > 36) & (h_chan <= 95) & (s_chan >= 70) & (v_chan >= 45)))
+        blu_pur = float(np.mean((h_chan > 95) & (h_chan < 145) & (s_chan >= 60) & (v_chan >= 35)))
+        band_count = sum(1 for frac in (red_mag, org_yel, grn_cyn, blu_pur) if frac >= 0.015)
+        return red_mag, org_yel, grn_cyn, blu_pur, band_count
+
     def validate_satellite_domain(self, img_bgr: np.ndarray) -> Tuple[bool, str]:
         """
         Validates whether an input image conforms to Earth meteorological satellite or weather map domains.
-        Accredits:
-          - Earth weather satellite observations (Visible, IR, Water Vapor, RGB composites).
-          - Meteorological satellite maps with geographical coordinate grids (lat/lon lines, degrees, coastlines).
-          - Oceanic and atmospheric cloud formations, tropical cyclones, and storm systems.
+        Accepts ANY meteorological satellite modality:
+          - True-Color / Visible RGB Earth weather satellite observations (including dark oceans, brown/green landmasses, coastlines, black margins).
+          - Grayscale Infrared (IR), Inverted IR, and Water Vapor (WV) channels.
+          - Color-Enhanced / False-Color / Rainbow / Dvorak BD-curve Infrared imagery.
+          - Meteorological satellite maps with geographical coordinate grids (lat/lon lines, borders, coastlines).
+          - Full-disk and regional oceanic/atmospheric cloud formations and tropical cyclones.
         Strictly rejects non-meteorological inputs:
           - Charts, plots, graphs, diagrams, bar charts, tables, white documents.
           - Ground-level landscape photos (lakes, ponds, foliage, grass, parks).
@@ -310,7 +324,6 @@ class MLService:
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
         hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
         h, w = gray.shape
-        total_pixels = float(h * w)
 
         b_chan = img_bgr[:, :, 0].astype(np.float32)
         g_chan = img_bgr[:, :, 1].astype(np.float32)
@@ -321,30 +334,77 @@ class MLService:
         pure_white_mask = (gray > 235) & (s_chan < 30)
         pure_white_frac = float(np.mean(pure_white_mask))
 
-        # 2. Real atmospheric cloud formations: desaturated bright pixels, but NOT clipped flat paper
-        cloud_mask = (gray > 145) & (gray <= 245) & (s_chan < 75)
+        # 2. Real atmospheric cloud formations: desaturated bright pixels with convective texture
+        cloud_mask = (gray > 140) & (gray <= 248) & (s_chan < 80)
         cloud_frac = float(np.mean(cloud_mask))
+        cloud_std = float(np.std(gray[cloud_mask])) if cloud_frac > 0.02 else 0.0
 
-        # 3. Real Earth Oceans: blue dominant spaceborne water
-        ocean_mask = (b_chan > r_chan + 12) & (b_chan >= g_chan - 20) & (v_chan > 15) & (v_chan < 210)
-        ocean_frac = float(np.mean(ocean_mask))
+        # 3. Real Earth Oceans: bright blue ocean AND dark navy/charcoal marine waters in true-color satellite captures
+        blue_ocean_mask = (b_chan > r_chan + 12) & (b_chan >= g_chan - 20) & (v_chan > 15) & (v_chan < 210)
+        blue_ocean_frac = float(np.mean(blue_ocean_mask))
+        dark_marine_mask = (b_chan >= r_chan - 3) & (b_chan >= g_chan - 10) & (v_chan > 8) & (v_chan <= 95) & (s_chan >= 10) & (s_chan <= 95)
+        dark_marine_frac = float(np.mean(dark_marine_mask))
+        ocean_frac = max(blue_ocean_frac, dark_marine_frac)
 
         # 4. Terrestrial green vegetation (trees, grass, foliage in ground photos of lakes/ponds)
         green_mask = (g_chan > r_chan + 12) & (g_chan > b_chan + 10) & (v_chan > 25)
         green_frac = float(np.mean(green_mask))
 
-        # 5. Human skin detection (YCrCb + HSV hue/saturation)
+        # 5. Human skin detection (YCrCb + HSV hue/saturation, plus strict skin tone check)
         ycbcr = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)
         cr = ycbcr[:, :, 1]
         cb = ycbcr[:, :, 2]
         skin_mask = (cb >= 77) & (cb <= 127) & (cr >= 133) & (cr <= 173) & (h_chan <= 22) & (s_chan >= 35) & (s_chan <= 180) & (v_chan >= 45)
         skin_frac = float(np.mean(skin_mask))
+        strict_skin_mask = (cb >= 85) & (cb <= 125) & (cr >= 136) & (cr <= 168) & (r_chan > g_chan) & (g_chan > b_chan) & ((r_chan - b_chan) > 25) & (v_chan > 75)
+        strict_skin_frac = float(np.mean(strict_skin_mask))
 
         # 6. Brown liquid / coffee / tableware
         brown_mask = (h_chan >= 6) & (h_chan <= 32) & (s_chan > 45) & (v_chan > 25) & (v_chan < 210)
         brown_frac = float(np.mean(brown_mask))
 
-        # 7. Edge & line analysis
+        # 7. Monochrome / Grayscale IR / Water Vapor & Color-Enhanced False-Color IR detection
+        gray_std = float(np.std(gray))
+        gray_sat_frac = float(np.mean(s_chan < 28))
+        midtone_frac = float(np.mean((gray >= 45) & (gray <= 215)))
+        dark_bg_frac = float(np.mean(gray < 30))
+        bright_or_mid_frac = float(np.mean(gray > 95))
+
+        red_mag_frac, org_yel_frac, grn_cyn_frac, blu_pur_frac, ir_hue_bands = self.compute_ir_band_fractions(
+            h_chan, s_chan, v_chan
+        )
+
+        gx = np.abs(np.diff(gray.astype(np.int16), axis=1))
+        gy = np.abs(np.diff(gray.astype(np.int16), axis=0))
+        grad_richness = 0.5 * (float(np.mean((gx >= 1) & (gx <= 35))) + float(np.mean((gy >= 1) & (gy <= 35))))
+
+        is_grayscale_sat = (
+            gray_sat_frac > 0.65
+            and gray_std > 16.0
+            and midtone_frac > 0.22
+            and (cloud_frac >= 0.04 or bright_or_mid_frac >= 0.30)
+            and pure_white_frac < 0.55
+        )
+        is_false_color_ir = (
+            (ir_hue_bands >= 3 and pure_white_frac < 0.35 and grad_richness > 0.12)
+            or (
+                gray_sat_frac > 0.42
+                and gray_std > 22.0
+                and midtone_frac > 0.22
+                and (red_mag_frac + org_yel_frac + blu_pur_frac) >= 0.03
+                and (cloud_frac >= 0.04 or bright_or_mid_frac >= 0.30)
+                and pure_white_frac < 0.45
+            )
+            or (
+                blu_pur_frac >= 0.20
+                and grn_cyn_frac >= 0.15
+                and grad_richness > 0.25
+                and (cloud_frac >= 0.03 or org_yel_frac >= 0.02 or red_mag_frac >= 0.02)
+                and pure_white_frac < 0.35
+            )
+        )
+
+        # 8. Edge & line analysis
         edges = cv2.Canny(gray, 40, 120)
         min_len = int(min(h, w) * 0.12)
         lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=45, minLineLength=min_len, maxLineGap=20)
@@ -353,23 +413,22 @@ class MLService:
         # =========================================================================
         # FILTER 1: Charts, Plots, Graphs, Diagrams, Tables, White Canvas Documents
         # =========================================================================
-        if pure_white_frac > 0.35 and cloud_std < 10.0 and ocean_frac < 0.05:
+        if pure_white_frac > 0.38 and cloud_std < 12.0 and ocean_frac < 0.05 and not is_grayscale_sat and not is_false_color_ir:
             return False, "Chart, plot, or document detected (white canvas/background). CycloneVision only analyzes Earth meteorological satellite imagery."
 
-        dark_bg_frac = float(np.mean(gray < 30))
-        if dark_bg_frac > 0.50 and cloud_frac < 0.05 and ocean_frac < 0.04 and line_count > 6:
+        if dark_bg_frac > 0.50 and cloud_frac < 0.05 and ocean_frac < 0.04 and line_count > 6 and not is_false_color_ir and not is_grayscale_sat:
             return False, "Chart, plot, or schematic detected (dark canvas with vector lines). CycloneVision only analyzes Earth meteorological satellite imagery."
 
         # =========================================================================
         # FILTER 2: Ground-Level Landscape Photography (Lakes, Ponds, Parks, Foliage)
         # =========================================================================
-        if green_frac > 0.16 and cloud_frac < 0.08:
+        if green_frac > 0.18 and cloud_frac < 0.08 and not is_false_color_ir:
             return False, "Ground-level landscape photo detected (lake, pond, or park foliage). CycloneVision only analyzes Earth meteorological satellite imagery."
 
         # =========================================================================
         # FILTER 3: Human Portrait / Face / Selfie
         # =========================================================================
-        if skin_frac > 0.15 and cloud_frac < 0.12:
+        if ((skin_frac > 0.15 and cloud_frac < 0.12) or strict_skin_frac > 0.32 or (strict_skin_frac > 0.14 and cloud_frac < 0.08)) and ocean_frac < 0.06 and not is_false_color_ir:
             return False, "Human portrait / photo detected (human skin identified). CycloneVision only analyzes Earth meteorological satellite imagery."
 
         if hasattr(cv2, 'CascadeClassifier'):
@@ -390,57 +449,54 @@ class MLService:
         # =========================================================================
         # FILTER 4: Coffee Cup / Mug / Tableware / Food
         # =========================================================================
-        if brown_frac > 0.07 and ocean_frac < 0.05:
+        if brown_frac > 0.09 and ocean_frac < 0.06 and not is_false_color_ir and not is_grayscale_sat:
             return False, "Household tableware / coffee or food detected. CycloneVision only analyzes Earth meteorological satellite imagery."
 
         # =========================================================================
         # FILTER 5: Deep Outer Space / Astronomical Scene
         # =========================================================================
-        if dark_bg_frac > 0.60 and cloud_frac < 0.04 and ocean_frac < 0.04:
+        if (dark_bg_frac > 0.60 or bright_or_mid_frac < 0.18) and cloud_frac < 0.04 and ocean_frac < 0.04 and not is_false_color_ir and not is_grayscale_sat:
             return False, "Outer space / astronomical scene detected (deep space void). Please upload Earth meteorological satellite imagery."
 
         # =========================================================================
         # FILTER 6: High-Saturation Non-Meteorological Graphics
         # =========================================================================
         mean_sat = float(np.mean(s_chan))
-        if mean_sat > 165.0 and ocean_frac < 0.05 and cloud_frac < 0.05:
+        if mean_sat > 165.0 and ocean_frac < 0.05 and cloud_frac < 0.05 and not is_false_color_ir:
             return False, f"High-saturation graphic or illustration detected (color saturation {mean_sat:.1f}%). Please upload weather satellite imagery."
 
         # Natural atmospheric cloud texture check (real convective clouds have high local standard deviation)
-        cloud_std = float(np.std(gray[cloud_mask])) if cloud_frac > 0.03 else 0.0
-        if cloud_frac > 0.10 and cloud_std < 12.0 and ocean_frac < 0.05:
+        if cloud_frac > 0.10 and cloud_std < 12.0 and ocean_frac < 0.05 and not is_grayscale_sat and not is_false_color_ir:
             return False, "Flat uniform artificial surface detected (not meteorological clouds). CycloneVision only analyzes Earth meteorological satellite imagery."
 
         # =========================================================================
-        # POSITIVE WHITELIST: Genuine Meteorological Satellite Imagery
+        # POSITIVE WHITELIST: Genuine Meteorological Satellite Imagery (All Modalities)
         # =========================================================================
-        # A. Visible/RGB Satellite Image over Ocean & Cloud systems
+        # A. Visible/RGB Satellite Image over Ocean & Cloud systems (supports dark marine waters & landmasses)
         if ocean_frac > 0.05 and cloud_frac > 0.05 and cloud_std > 12.0:
             return True, "Valid Earth satellite domain (Oceanic-atmospheric weather observation)."
 
         # B. Atmospheric Cloud Formation / Cyclone Spiral System
-        if cloud_frac > 0.14 and cloud_std > 12.0 and (ocean_frac > 0.01 or float(np.std(gray)) > 26.0) and green_frac < 0.22:
+        if cloud_frac > 0.14 and cloud_std > 12.0 and (ocean_frac > 0.01 or gray_std > 26.0) and (green_frac < 0.22 or ocean_frac > 0.05):
             return True, "Valid Earth satellite domain (Atmospheric cloud formation over Earth/ocean)."
 
-        # C. Meteorological Satellite Map with Lat/Lon Grid lines over clouds/ocean
-        if line_count >= 4 and (cloud_frac > 0.03 or ocean_frac > 0.03 or cloud_std > 10.0):
-            return True, "Valid Earth satellite domain (Meteorological map with coordinate grid)."
+        # C. Color-Enhanced / False-Color / Dvorak BD / Rainbow IR or Water Vapor Satellite Imagery
+        if is_false_color_ir:
+            return True, "Valid Earth satellite domain (Color-enhanced / radiometric weather satellite imagery)."
 
-        # D. Infrared (IR) or Radiometric Satellite Channel
-        if float(np.std(gray)) > 30.0 and cloud_frac > 0.08 and green_frac < 0.10:
-            return True, "Valid Earth satellite domain (Infrared/radiometric weather satellite imagery)."
+        # D. Grayscale Infrared (IR), Inverted IR, or Monochrome Water Vapor Satellite Channel
+        if is_grayscale_sat:
+            return True, "Valid Earth satellite domain (Infrared / radiometric weather satellite imagery)."
+
+        # E. Meteorological Satellite Map with Lat/Lon Grid lines or Coastlines over clouds
+        if line_count >= 4 and (cloud_frac > 0.04 or is_false_color_ir or is_grayscale_sat):
+            return True, "Valid Earth satellite domain (Meteorological map with coordinate grid)."
 
         # =========================================================================
         # GENERAL REJECTION: Any other random everyday image
         # (pets, cars, indoor furniture, rooms, appliances, street photos)
         # =========================================================================
-        if line_count >= 4 and (cloud_frac > 0.03 or ocean_frac > 0.03 or cloud_std > 10.0):
-            return True, "Valid Earth satellite domain (Meteorological map with coordinate grid)."
-
-        if cloud_frac < 0.08 and ocean_frac < 0.05:
-            return False, "Non-satellite image detected. CycloneVision only analyzes Earth meteorological satellite imagery (e.g. INSAT-3D, NOAA, GOES)."
-
-        return True, "Valid Earth satellite domain."
+        return False, "Non-satellite image detected. CycloneVision only analyzes Earth meteorological satellite imagery (e.g. INSAT-3D, NOAA, GOES)."
 
     def run_detection(self, img_bgr: np.ndarray) -> Tuple[Dict[str, Any], float, float]:
         """

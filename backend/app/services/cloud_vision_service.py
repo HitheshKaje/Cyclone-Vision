@@ -803,8 +803,8 @@ class CloudVisionIntensityService:
             "You are an expert meteorological vision system specializing in tropical cyclone detection, "
             "georeferencing, and intensity estimation from authentic Earth satellite imagery.\n\n"
             "CRITICAL DOMAIN CHECK (RULE 1):\n"
-            "First, inspect whether this image is a genuine Earth meteorological weather satellite capture (e.g. INSAT-3D, GOES, NOAA, Himawari, Meteosat, synoptic weather satellite maps, or satellite captures with coordinate grid lines / map projections).\n"
-            "- CRITICAL RULE FOR SATELLITE MAPS: Earth meteorological satellite observations frequently display latitude/longitude coordinate grid lines (e.g. 80°E, 82°E, 20°N, 18°N), coastal boundaries, or synoptic map overlays. These ARE 100% VALID Earth meteorological satellite observations! You MUST set is_valid_satellite = true.\n"
+            "First, inspect whether this image is a genuine Earth meteorological weather satellite capture of ANY satellite modality or visualization type (e.g. INSAT-3D, INSAT-3DR, GOES, NOAA, Himawari, Meteosat, MODIS, VIIRS, Suomi NPP, Doppler/Radar-Satellite composites, synoptic weather satellite maps, or satellite captures with coordinate grid lines / map projections).\n"
+            "- CRITICAL RULE FOR ALL SATELLITE IMAGE TYPES: Accept ANY authentic meteorological satellite observation style — including True-Color / Visible RGB (even with brown/tan/green landmasses, dark navy/black oceans, white/yellow coastline or country border outlines, or black margins/padding), Grayscale Infrared (IR) and inverted IR, Color-Enhanced / False-Color / Rainbow / Dvorak BD-curve Infrared (with red/orange/yellow/green/cyan/purple temperature palettes or colorbar legends), Water Vapor (WV) imagery, Full-Disk Earth captures, and satellite maps with latitude/longitude coordinate grid lines (e.g. 80°E, 82°E, 20°N, 18°N), coastal boundaries, or synoptic track overlays. ALL of these are 100% VALID Earth meteorological satellite observations — you MUST set is_valid_satellite = true.\n"
             "- If the image is a non-meteorological business chart, financial bar/line graph, spreadsheet, table, document, or presentation slide:\n"
             "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Non-meteorological chart or document detected.'\n"
             "- If the image is a lake, pond, river, park, foliage, trees, or ground-level landscape photo:\n"
@@ -813,11 +813,11 @@ class CloudVisionIntensityService:
             "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Household object, coffee cup, or tableware detected.'\n"
             "- If the image is a person, human face, selfie, portrait, body, or photo of people:\n"
             "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Human portrait or non-satellite photo detected.'\n"
-            "- If the image is a drawing, digital artwork, CGI graphic, illustration, cartoon, whirlpool graphic, or meme:\n"
+            "- If the image is a drawing, digital artwork, CGI graphic, illustration, cartoon, whirlpool graphic, ocean sinkhole photo, deep space black hole / galaxy, or meme:\n"
             "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Non-meteorological illustration or graphic detected.'\n"
             "- If the image is an animal, pet, vehicle, car, room interior, or regular non-orbital everyday photo:\n"
             "  -> You MUST set is_valid_satellite = false, is_cyclone = false, and validation_message = 'Non-satellite everyday photo detected.'\n"
-            "ONLY set is_valid_satellite = true if the image is an authentic spaceborne Earth meteorological satellite observation or meteorological weather map.\n\n"
+            "ONLY set is_valid_satellite = true if the image is an authentic Earth meteorological satellite observation (of any satellite sensor/color mode) or meteorological weather satellite map.\n\n"
             "CRITICAL BASIN VALIDATION (RULE 2 - INDIAN COASTAL BASINS ONLY):\n"
             "CycloneVision is strictly configured for Indian coastal maritime domains (North Indian Ocean). It ONLY processes cyclones and satellite weather observations located in either the Bay of Bengal or the Arabian Sea.\n"
             "- If the satellite image depicts a tropical cyclone, hurricane, or typhoon from any other ocean basin outside the Bay of Bengal or Arabian Sea (e.g. Atlantic Ocean hurricanes like Katrina, Ian, Sandy, Irma, Milton; Eastern or Western Pacific typhoons like Haiyan, Yagi, Tip; Gulf of Mexico; Caribbean Sea; South Indian Ocean; or Australian waters):\n"
@@ -902,39 +902,35 @@ class CloudVisionIntensityService:
 
             # Scan Gemini text fields for non-satellite keywords
             combined_text = f"{parsed.get('reasoning', '')} {parsed.get('validation_message', '')} {parsed.get('features_observed', '')} {parsed.get('pattern_detected', '')} {parsed.get('cyclone_name', '')} {parsed.get('subbasin', '')} {filename or ''}".lower()
-
-            # Check for authentic cyclone / meteorological system evidence (including coordinate grids)
-            has_cyclone_evidence = bool(
-                parsed.get("is_cyclone") or
-                any(k in combined_text for k in [
-                    "cyclone", "cyclonic", "vortex", "eye wall", "eye of the storm", "curved band",
-                    "tropical storm", "tropical depression", "convective bands", "spiral bands",
-                    "dvorak", "meteorological satellite", "satellite observation", "satellite imagery",
-                    "satellite view", "coordinate grid", "lat/lon", "synoptic map", "weather satellite"
-                ])
-            )
+            model_text = f"{parsed.get('reasoning', '')} {parsed.get('validation_message', '')} {parsed.get('features_observed', '')} {parsed.get('pattern_detected', '')} {parsed.get('cyclone_name', '')}".lower()
 
             strict_non_sat_indicators = [
-                "not a meteorological", "not a satellite", "not satellite", "portrait", "person", "selfie", "human",
-                "facial", "coffee cup", "tea cup", "cup rim", "cup handle", "tableware", "creative manipulation",
-                "non-meteorological everyday", "household object", "illustration", "whirlpool graphic",
-                "drawing of a whirlpool", "cartoon", "meme", "not real-world meteorological",
-                "does not contain real-world meteorological", "spreadsheet", "business presentation",
-                "financial chart", "bar chart", "line graph", "lake photo", "pond foliage", "park foliage",
-                "ground-level photo", "animal", "pet", "dog", "cat", "vehicle", "car photo", "room interior"
+                "not a meteorological", "not a satellite", "not satellite", "non-satellite", "non-meteorological",
+                "portrait", "person", "selfie", "human", "people", "facial",
+                "coffee cup", "tea cup", "cup rim", "cup handle", "tableware", "food",
+                "creative manipulation", "non-meteorological everyday", "household object", "illustration",
+                "whirlpool graphic", "ocean sinkhole", "drawing of a whirlpool", "cartoon", "meme",
+                "not real-world meteorological", "does not contain real-world meteorological", "spreadsheet",
+                "business presentation", "financial chart", "bar chart", "line graph", "lake photo",
+                "pond foliage", "park foliage", "ground-level", "animal", "pet", "dog", "cat",
+                "vehicle", "car photo", "room interior", "black hole", "galaxy", "outer space", "deep space"
             ]
 
-            is_everyday_non_sat = any(ind in combined_text for ind in strict_non_sat_indicators)
+            is_everyday_non_sat = any(ind in model_text for ind in strict_non_sat_indicators)
 
-            if has_cyclone_evidence:
-                # Authentic cyclone / satellite map observation - always valid
-                is_valid_sat = True
-                val_msg = parsed.get("validation_message") or "Valid Earth meteorological satellite observation."
-            elif is_everyday_non_sat or parsed.get("is_valid_satellite") is False:
+            if is_everyday_non_sat and not parsed.get("is_cyclone"):
                 is_valid_sat = False
-                val_msg = parsed.get("reasoning") or parsed.get("validation_message") or "Non-satellite image detected. CycloneVision only analyzes Earth meteorological satellite imagery."
+                val_msg = parsed.get("validation_message") or parsed.get("reasoning") or "Non-satellite image detected. CycloneVision only analyzes Earth meteorological satellite imagery."
+            elif parsed.get("is_valid_satellite") is False:
+                if parsed.get("is_cyclone") and not is_everyday_non_sat and parsed.get("is_indian_coastal") is not False:
+                    is_valid_sat = True
+                    val_msg = parsed.get("validation_message") or "Valid Earth meteorological satellite observation."
+                else:
+                    is_valid_sat = False
+                    val_msg = parsed.get("validation_message") or parsed.get("reasoning") or "Non-satellite image detected. CycloneVision only analyzes Earth meteorological satellite imagery."
             else:
                 is_valid_sat = True
+                val_msg = parsed.get("validation_message") or "Valid Earth meteorological satellite observation."
 
             # =========================================================================
             # RULE 2: INDIAN COASTAL REGION RESTRICTION (Bay of Bengal / Arabian Sea ONLY)
@@ -1395,9 +1391,29 @@ class CloudVisionIntensityService:
         elif explicit_storm:
             is_cyclone = True
         else:
+            hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+            h_c, s_c, v_c = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+            red_mag, org_yel, grn_cyn, blu_pur, ir_bands = ml_service.compute_ir_band_fractions(h_c, s_c, v_c)
+            is_false_color_cyclone = (
+                std_val >= 28.0
+                and (
+                    ir_bands >= 3
+                    or (float(np.mean(s_c < 28)) > 0.42 and (red_mag + org_yel + blu_pur) >= 0.03)
+                    or (blu_pur >= 0.20 and grn_cyn >= 0.15 and (org_yel >= 0.02 or red_mag >= 0.02))
+                )
+            )
+            is_inverted_ir_cyclone = (
+                float(np.mean(s_c < 28)) > 0.65
+                and float(np.mean(gray < 95)) >= 0.05
+                and float(np.mean((gray >= 95) & (gray <= 215))) >= 0.30
+                and std_val >= 22.0
+                and edge_density >= 0.02
+            )
             is_cyclone = bool(
                 (high_core_frac >= 0.04 and bright_cloud_frac >= 0.14 and std_val >= 32.0)
                 or (bright_cloud_frac >= 0.22 and edge_density >= 0.04)
+                or is_false_color_cyclone
+                or is_inverted_ir_cyclone
             )
 
         conf = min(96.5, max(78.0, 76.0 + high_core_frac * 45.0 + std_val * 0.22)) if is_cyclone else min(94.0, max(75.0, 88.0 - high_core_frac * 50.0))
