@@ -47,7 +47,7 @@ const CitizenLayout = ({ children, currentPath = '/citizen', onNavigate }) => {
     };
   }, []);
 
-  const isFishermanMode = currentPath.startsWith('/fisherman') || currentUser?.user_type === 'fisherman';
+  const isFishermanMode = currentPath.startsWith('/fisherman');
   const homePath = isFishermanMode ? '/fisherman' : '/citizen';
   const loginPath = isFishermanMode ? '/fisherman/login' : '/citizen/login';
 

@@ -23,17 +23,36 @@ import FishermanBottomNav from '../components/fisherman/FishermanBottomNav';
 import LocationModal, { COASTAL_PORTS } from '../components/fisherman/LocationModal';
 import FishermanProfileModal from '../components/fisherman/FishermanProfileModal';
 
-const FishermanHome = ({ onNavigate }) => {
+const getTabFromPath = (path) => {
+  if (!path) return 'home';
+  if (path.startsWith('/fisherman/map')) return 'map';
+  if (path.startsWith('/fisherman/alerts')) return 'alerts';
+  if (path.startsWith('/fisherman/safety')) return 'safety';
+  return 'home';
+};
+
+const FishermanHome = ({ currentPath = '/fisherman', onNavigate }) => {
   const { t, i18n } = useTranslation();
   const { isOnline, isBackendReachable } = useNetworkStatus();
 
   // Navigation tab: 'home' | 'map' | 'alerts' | 'safety'
-  const [activeTab, setActiveTab] = useState('home');
+  const [prevPath, setPrevPath] = useState(currentPath);
+  const [activeTab, setActiveTab] = useState(() => getTabFromPath(currentPath));
 
   // Modals
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(
+    () => typeof currentPath === 'string' && currentPath.startsWith('/fisherman/emergency')
+  );
+
+  if (currentPath !== prevPath) {
+    setPrevPath(currentPath);
+    setActiveTab(getTabFromPath(currentPath));
+    if (typeof currentPath === 'string' && currentPath.startsWith('/fisherman/emergency')) {
+      setIsEmergencyModalOpen(true);
+    }
+  }
 
   // Current logged in user
   const [currentUser, setCurrentUser] = useState(() => {

@@ -38,7 +38,7 @@ const CitizenApp = ({ currentPath, onNavigate }) => {
   if (isFishermanRoute) {
     return (
       <Suspense fallback={<PageLoader />}>
-        <FishermanHome onNavigate={onNavigate} />
+        <FishermanHome currentPath={currentPath} onNavigate={onNavigate} />
       </Suspense>
     );
   }
