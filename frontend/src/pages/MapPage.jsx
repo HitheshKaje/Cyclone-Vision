@@ -142,6 +142,45 @@ const aiCycloneIcon = new L.divIcon({
   popupAnchor: [0, -24]
 });
 
+// Helper: Color-code track segments by meteorological intensity (knots)
+function getTrackSegmentColor(windKt = 0, isLandfall = false, stage = '') {
+  if (isLandfall || String(stage).toLowerCase().includes('landfall')) return '#dc2626';
+  if (String(stage).toLowerCase().includes('dissipat')) return '#64748b';
+  if (windKt >= 64) return '#ef4444'; // Severe / Hurricane strength
+  if (windKt >= 34) return '#f59e0b'; // Tropical / Cyclonic Storm
+  return '#10b981'; // Depression
+}
+
+const createLandfallBadgeIcon = () => new L.divIcon({
+  html: `
+    <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+      <div style="background: #dc2626; color: #ffffff; font-weight: 900; font-size: 9.5px; padding: 2px 7px; border-radius: 9999px; border: 2px solid #ffffff; box-shadow: 0 3px 10px rgba(220,38,38,0.65); white-space: nowrap; letter-spacing: 0.04em;">
+        LANDFALL
+      </div>
+      <div style="width: 10px; height: 10px; border-radius: 50%; background: #dc2626; border: 2.5px solid #ffffff; margin-top: 2px; box-shadow: 0 0 8px #dc2626;"></div>
+    </div>
+  `,
+  className: 'custom-landfall-marker',
+  iconSize: [74, 30],
+  iconAnchor: [37, 26],
+  popupAnchor: [0, -24]
+});
+
+const createGenesisBadgeIcon = () => new L.divIcon({
+  html: `
+    <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+      <div style="background: #10b981; color: #ffffff; font-weight: 900; font-size: 9px; padding: 2px 6px; border-radius: 9999px; border: 2px solid #ffffff; box-shadow: 0 2px 8px rgba(16,185,129,0.55); white-space: nowrap;">
+        FORMATION
+      </div>
+      <div style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; border: 2px solid #ffffff; margin-top: 2px;"></div>
+    </div>
+  `,
+  className: 'custom-genesis-marker',
+  iconSize: [74, 28],
+  iconAnchor: [37, 24],
+  popupAnchor: [0, -22]
+});
+
 // Color-coded Day Waypoint Badge for AI Trajectory Forecast
 const createDayMarkerIcon = (dayNumber, windKt, isCurrentStep = false) => {
   let bg = '#10b981'; // Green (Tropical Storm)
@@ -384,6 +423,16 @@ const MapPage = ({
   const mapRef = useRef(null);
   const hasAutoCenteredRef = useRef(false);
 
+  // Live Mode vs Demo Mode Complete Track Resolution
+  const isLiveMode = (currentAnalysis?.operationalMode || currentAnalysis?.detection?.operational_mode) === 'live';
+  const resolvedTemporalStatus = currentAnalysis?.temporalStatus || currentAnalysis?.detection?.temporal_status;
+  const isCompletedHistorical = Boolean(isLiveMode && resolvedTemporalStatus === 'HISTORICAL');
+  const completeTrack = Array.isArray(currentAnalysis?.completeTrack) && currentAnalysis.completeTrack.length > 0
+    ? currentAnalysis.completeTrack
+    : (Array.isArray(currentAnalysis?.detection?.complete_track) ? currentAnalysis.detection.complete_track : []);
+  const historicalInfo = currentAnalysis?.historicalInfo || currentAnalysis?.detection?.historical_info || null;
+  const lifecycleDates = currentAnalysis?.lifecycleDates || currentAnalysis?.detection?.lifecycle_dates || null;
+
   // Compute AI Detected Cyclone strictly from inputted image analysis (currentAnalysis)
   const isAiCyclone = Boolean(
     currentAnalysis && 
@@ -407,17 +456,22 @@ const MapPage = ({
     longitude: aiLng,
     wind_speed: currentAnalysis.intensity?.wind_speed_kmh != null 
       ? currentAnalysis.intensity.wind_speed_kmh 
-      : (currentAnalysis.intensity?.wind_speed_kt ? Math.round(currentAnalysis.intensity.wind_speed_kt * 1.852) : 120),
-    wind_kt: currentAnalysis.intensity?.wind_speed_kt || (currentAnalysis.intensity?.wind_speed_kmh ? Math.round(currentAnalysis.intensity.wind_speed_kmh / 1.852) : 65),
-    status: currentAnalysis.classification?.classification || currentAnalysis.intensity?.classification || 'Severe Cyclonic Storm (SCS)',
-    category_desc: currentAnalysis.classification?.description || 'Detected via Satellite AI Analysis',
+      : (historicalInfo?.peak_intensity_kmh || (currentAnalysis.intensity?.wind_speed_kt ? Math.round(currentAnalysis.intensity.wind_speed_kt * 1.852) : 120)),
+    wind_kt: currentAnalysis.intensity?.wind_speed_kt || historicalInfo?.peak_intensity_kt || (currentAnalysis.intensity?.wind_speed_kmh ? Math.round(currentAnalysis.intensity.wind_speed_kmh / 1.852) : 65),
+    status: isCompletedHistorical
+      ? (historicalInfo?.category || currentAnalysis.intensity?.category || 'Completed Cyclone')
+      : (currentAnalysis.classification?.classification || currentAnalysis.intensity?.classification || 'Severe Cyclonic Storm (SCS)'),
+    category_desc: isCompletedHistorical
+      ? 'Verified Completed Historical Cyclone Track'
+      : (currentAnalysis.classification?.description || 'Detected via Satellite AI Analysis'),
     subbasin: currentAnalysis.subbasin || (aiLng >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea'),
     basin: currentAnalysis.subbasin || (aiLng >= 78.0 ? 'Bay of Bengal' : 'Arabian Sea'),
-    alert_level: 'Red',
+    alert_level: isCompletedHistorical ? 'Orange' : 'Red',
     isAiDetected: true,
+    isCompletedHistorical,
     imagePreview: currentAnalysis.imagePreview,
     coordMethod: currentAnalysis.coordMethod || 'Auto-Extracted from Image',
-    last_updated: 'Current AI Analysis'
+    last_updated: isCompletedHistorical ? (historicalInfo?.season || 'Historical Archive') : 'Current AI Analysis'
   } : null;
 
   // Real-time live Doppler radar frame path from RainViewer (free public open weather API)
@@ -475,10 +529,26 @@ const MapPage = ({
   const currentStep = manualDayStep || autoActiveStep;
   const hoursToNextDay = Math.max(0, 24 - (elapsedHours % 24));
 
-  // Fetch Trajectory waypoints using Bi-LSTM model based on detected point & intensity
+  // Fetch Trajectory waypoints ONLY for Demo Mode or Currently Active Live Storms (NEVER for Already Completed Historical Storms)
   useEffect(() => {
-    if (!aiCyclone) {
+    if (!aiCyclone || (isCompletedHistorical && completeTrack.length > 0)) {
       setAiForecast(null);
+      return;
+    }
+
+    // If live active storm returned real forecast waypoints from live internet feed, use them
+    const liveWaypoints = currentAnalysis?.activeTrajectory?.probable_future_waypoints;
+    if (isLiveMode && Array.isArray(liveWaypoints) && liveWaypoints.length > 0) {
+      const normalized = liveWaypoints.map((w, idx) => ({
+        step: idx + 1,
+        horizon_hours: w.horizon_hours || (idx + 1) * 24,
+        latitude: w.latitude,
+        longitude: w.longitude,
+        wind_speed_kt: w.wind_speed_kt || aiCyclone.wind_kt,
+        uncertainty_radius_km: 120 + idx * 75,
+        stage: w.stage || 'Live Projected Position'
+      }));
+      setAiForecast(normalized);
       return;
     }
 
@@ -755,16 +825,26 @@ const MapPage = ({
     setHoverTemp(null);
   };
 
-  // Smooth auto-centering on the analyzed cyclone when page or analysis loads
+  // Smooth auto-centering on the analyzed cyclone (or full historical track bounds) when page or analysis loads
   useEffect(() => {
-    if (mapRef.current && aiCyclone?.latitude != null && aiCyclone?.longitude != null) {
+    if (!mapRef.current) return;
+    if (isCompletedHistorical && completeTrack.length > 1) {
+      try {
+        const bounds = L.latLngBounds(completeTrack.map(pt => [pt.lat, pt.lng]));
+        mapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 7, animate: true });
+        return;
+      } catch (e) {
+        console.warn('Map fitBounds notice:', e);
+      }
+    }
+    if (aiCyclone?.latitude != null && aiCyclone?.longitude != null) {
       try {
         mapRef.current.flyTo([aiCyclone.latitude, aiCyclone.longitude], 6, { duration: 1.5 });
       } catch (e) {
         console.warn('Map flyTo notice:', e);
       }
     }
-  }, [aiCyclone?.latitude, aiCyclone?.longitude]);
+  }, [aiCyclone?.latitude, aiCyclone?.longitude, isCompletedHistorical, completeTrack.length]);
 
   // Whenever user clicks any of the 4 Base Maps (Street, Satellite, Ocean, Terrain), switch to Tactical Map mode
   useEffect(() => {
@@ -950,12 +1030,123 @@ const MapPage = ({
           )}
 
           {/* =========================================================================
-              AI DETECTED CYCLONE (FROM INPUTTED IMAGE): EYEWALL PINPOINT & 5-DAY NEXT UPDATE TRACK
+              AI DETECTED / LIVE VERIFIED CYCLONE: COMPLETE TRACK + FORECAST
           ========================================================================= */}
           {aiCyclone && (
             <React.Fragment key={`ai-group-${aiCyclone.id}`}>
-              {/* 1. Uncertainty Cone Envelope Polygon */}
-              {aiForecast && aiForecast.length > 0 && (
+              {/* 0. COMPLETE HISTORICAL / OBSERVED TRACK (Shown in Live Mode when available) */}
+              {completeTrack.length > 1 && (
+                <>
+                  {/* Subtle dark backdrop polyline for crisp contrast on satellite tiles */}
+                  <Polyline
+                    positions={completeTrack.map(pt => [pt.lat, pt.lng])}
+                    pathOptions={{
+                      color: '#0f172a',
+                      weight: 6.5,
+                      opacity: 0.55,
+                      lineCap: 'round',
+                      lineJoin: 'round'
+                    }}
+                  />
+                  {/* Intensity color-coded chronological track segments */}
+                  {completeTrack.slice(0, -1).map((pt, idx) => {
+                    const nextPt = completeTrack[idx + 1];
+                    const segColor = getTrackSegmentColor(
+                      Math.max(pt.wind_kt || 0, nextPt.wind_kt || 0),
+                      nextPt.is_landfall,
+                      nextPt.stage
+                    );
+                    return (
+                      <Polyline
+                        key={`hist-seg-${idx}`}
+                        positions={[[pt.lat, pt.lng], [nextPt.lat, nextPt.lng]]}
+                        pathOptions={{
+                          color: segColor,
+                          weight: 4,
+                          opacity: 0.95,
+                          lineCap: 'round',
+                          lineJoin: 'round'
+                        }}
+                      />
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Complete Track Waypoint Markers */}
+              {completeTrack.map((pt, idx) => {
+                const ptColor = getTrackSegmentColor(pt.wind_kt || 0, pt.is_landfall, pt.stage);
+                const isFirst = idx === 0;
+                const isLandfall = Boolean(pt.is_landfall);
+                return (
+                  <React.Fragment key={`hist-wp-${idx}`}>
+                    <CircleMarker
+                      center={[pt.lat, pt.lng]}
+                      radius={isLandfall ? 8 : (isFirst ? 7 : 5.5)}
+                      pathOptions={{
+                        color: '#ffffff',
+                        fillColor: ptColor,
+                        fillOpacity: 1,
+                        weight: 2
+                      }}
+                      eventHandlers={{
+                        click: () => {
+                          if (mapRef.current) {
+                            mapRef.current.flyTo([pt.lat, pt.lng], 7, { duration: 1.0 });
+                          }
+                        }
+                      }}
+                    >
+                      <Popup className="custom-popup" autoPan={true}>
+                        <div className="p-1 min-w-[215px] space-y-1.5 font-sans">
+                          <div className="flex items-center justify-between pb-1 border-b border-slate-200 dark:border-slate-700/50">
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-xs"
+                              style={{ backgroundColor: ptColor }}
+                            >
+                              {isFirst ? 'Formation' : isLandfall ? 'Landfall' : `Point #${pt.step || idx + 1}`}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400">
+                              {pt.date_display} {pt.time_display}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                            {pt.stage}
+                          </h4>
+                          <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
+                            <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-0.5">
+                              <span className="font-semibold text-slate-500">Coordinates:</span>
+                              <span className="font-black text-sky-600">{pt.lat}°N, {pt.lng}°E</span>
+                            </p>
+                            <p className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-0.5">
+                              <span className="font-semibold text-slate-500">Original Wind:</span>
+                              <span className="font-bold text-amber-600">
+                                {pt.wind_kmh} km/h ({pt.wind_kt} kt)
+                              </span>
+                            </p>
+                            {pt.pressure_mb && (
+                              <p className="flex justify-between">
+                                <span className="font-semibold text-slate-500">Central Pressure:</span>
+                                <span className="font-bold text-slate-600 dark:text-slate-300">{pt.pressure_mb} hPa</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+
+                    {isFirst && (
+                      <Marker position={[pt.lat, pt.lng]} icon={createGenesisBadgeIcon()} interactive={false} />
+                    )}
+                    {isLandfall && (
+                      <Marker position={[pt.lat, pt.lng]} icon={createLandfallBadgeIcon()} interactive={false} />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+
+              {/* 1. Uncertainty Cone Envelope Polygon (Demo / Active Live Storms Only) */}
+              {!isCompletedHistorical && aiForecast && aiForecast.length > 0 && (
                 <Polygon
                   positions={generateUncertaintyCone([aiCyclone.latitude, aiCyclone.longitude], aiForecast)}
                   pathOptions={{
@@ -969,7 +1160,7 @@ const MapPage = ({
               )}
 
               {/* 2. Trajectory Track Polyline connecting Eyewall to each Next Update */}
-              {aiForecast && aiForecast.length > 0 && (
+              {!isCompletedHistorical && aiForecast && aiForecast.length > 0 && (
                 <Polyline
                   positions={[[aiCyclone.latitude, aiCyclone.longitude], ...aiForecast.map(w => [w.latitude, w.longitude])]}
                   pathOptions={{
@@ -984,7 +1175,7 @@ const MapPage = ({
               )}
 
               {/* 3. Next Update Waypoint Markers (Day 1..5 / +24h..+120h) */}
-              {aiForecast && aiForecast.map((wp) => {
+              {!isCompletedHistorical && aiForecast && aiForecast.map((wp) => {
                 const isSelectedStep = currentStep === wp.step;
                 return (
                   <Marker
@@ -1033,7 +1224,8 @@ const MapPage = ({
                 );
               })}
 
-              {/* 4. Current AI Detected Cyclone Eyewall Pinpoint Marker */}
+              {/* 4. Active / Eyewall Marker (Skip pulsing live marker if already showing Complete Historical Track) */}
+              {(!isCompletedHistorical || completeTrack.length === 0) && (
               <Marker 
                 position={[aiCyclone.latitude, aiCyclone.longitude]}
                 icon={aiCycloneIcon}
@@ -1045,7 +1237,7 @@ const MapPage = ({
                   <div className="p-1 min-w-[220px]">
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white animate-pulse shadow-xs">
-                        AI DETECTED EYEWALL
+                        {isLiveMode ? 'LIVE CYCLONE EYEWALL' : 'AI DETECTED EYEWALL'}
                       </span>
                     </div>
                     <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-2">{aiCyclone.name}</h4>
@@ -1073,6 +1265,7 @@ const MapPage = ({
                   </div>
                 </Popup>
               </Marker>
+              )}
             </React.Fragment>
           )}
 
@@ -1537,6 +1730,40 @@ const MapPage = ({
             </div>
           </div>
 
+          {/* Floating Historical Complete Track Summary Banner (When viewing a Completed Storm in Live Mode) */}
+          {viewMode === 'tactical' && isCompletedHistorical && completeTrack.length > 0 && aiCyclone && (
+            <div className="absolute top-14 left-3 z-[940] pointer-events-auto max-w-md bg-[#0a1b24]/92 backdrop-blur-md border border-emerald-500/40 rounded-xl px-3.5 py-2.5 shadow-2xl text-white space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
+                  <span className="text-xs font-black truncate">{aiCyclone.name}</span>
+                  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                    Complete Track ({completeTrack.length} pts)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCycloneDrawerOpen(true)}
+                  className="text-[10px] font-bold text-sky-300 hover:text-sky-200 underline shrink-0 cursor-pointer"
+                >
+                  Timeline
+                </button>
+              </div>
+              <div className="text-[10px] text-slate-300 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                <span><strong>Original Peak:</strong> {aiCyclone.wind_speed} km/h ({aiCyclone.wind_kt} kt)</span>
+                {lifecycleDates?.formed && (
+                  <span><strong>Dates:</strong> {lifecycleDates.formed} – {lifecycleDates.dissipated || 'Done'}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5 text-[9px] text-slate-300 pt-0.5 border-t border-slate-700/50">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10b981]" /> Formation</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#f59e0b]" /> Storm</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#ef4444]" /> Severe / Landfall</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#64748b]" /> Dissipated</span>
+              </div>
+            </div>
+          )}
+
           {/* Floating Option 5: Bottom-Center Synoptic Player */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[950] pointer-events-auto flex items-center gap-2">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-[#0a1b24]/92 backdrop-blur-md border border-teal-500/35 shadow-2xl text-xs text-white">
@@ -1614,8 +1841,55 @@ const MapPage = ({
         {/* Drawer Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
           
+          {/* Complete Historical Track Timeline Card (When Completed Cyclone in Live Mode) */}
+          {aiCyclone && isCompletedHistorical && completeTrack.length > 0 && (
+            <div className="bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-slate-900/80 rounded-xl border border-emerald-500/40 p-3.5 shadow-sm space-y-2.5">
+              <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                  <h4 className="text-[11px] font-black uppercase tracking-wider text-emerald-300">
+                    Complete Cyclone Track
+                  </h4>
+                </div>
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                  {completeTrack.length} Waypoints
+                </span>
+              </div>
+              {historicalInfo?.actual_landfall && (
+                <p className="text-[11px] text-slate-200 font-semibold leading-snug">
+                  <strong className="text-emerald-400">Landfall:</strong> {historicalInfo.actual_landfall}
+                </p>
+              )}
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                {completeTrack.map((pt, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      if (mapRef.current) {
+                        mapRef.current.flyTo([pt.lat, pt.lng], 7, { duration: 1.0 });
+                      }
+                    }}
+                    className="w-full text-left p-2 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-700/70 transition-colors cursor-pointer space-y-0.5"
+                  >
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-bold text-white truncate max-w-[175px]">
+                        #{pt.step || idx + 1} {pt.stage}
+                      </span>
+                      <span className="text-slate-400 shrink-0">{pt.date_display}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-300">
+                      <span className="font-mono text-sky-400">{pt.lat}°N, {pt.lng}°E</span>
+                      <span className="font-bold text-amber-400">{pt.wind_kmh} km/h ({pt.wind_kt} kt)</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Active 24-Hour Landfall Prediction Card */}
-          {aiCyclone && aiForecast && aiForecast.length > 0 && (() => {
+          {aiCyclone && !isCompletedHistorical && aiForecast && aiForecast.length > 0 && (() => {
             const activeWp = aiForecast.find(wp => wp.step === currentStep) || aiForecast[0];
             return (
               <div className="bg-gradient-to-br from-red-500/15 via-amber-500/10 to-slate-900/80 rounded-xl border border-red-500/40 p-3.5 shadow-sm space-y-3">

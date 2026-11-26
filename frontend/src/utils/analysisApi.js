@@ -65,7 +65,16 @@ export const saveAnalysisRecord = async (record) => {
       hasRadiusLines: Boolean(record.hasRadiusLines),
       coordMethod: record.coordMethod || null,
       coordConfidence: record.coordConfidence != null ? parseFloat(record.coordConfidence) : null,
-      timestamp: record.timestamp || new Date().toLocaleString()
+      timestamp: record.timestamp || new Date().toLocaleString(),
+      operationalMode: record.operationalMode || 'demo',
+      cycloneName: record.cycloneName || null,
+      temporalStatus: record.temporalStatus || null,
+      historicalInfo: record.historicalInfo || null,
+      activeTrajectory: record.activeTrajectory || null,
+      completeTrack: Array.isArray(record.completeTrack) ? record.completeTrack : [],
+      internetSources: Array.isArray(record.internetSources) ? record.internetSources : [],
+      internetVerified: Boolean(record.internetVerified),
+      lifecycleDates: record.lifecycleDates || null
     };
 
     const res = await fetch(`${apiBase}/api/analysis`, {

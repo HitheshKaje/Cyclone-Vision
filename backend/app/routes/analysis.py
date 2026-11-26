@@ -41,6 +41,10 @@ class AnalysisRecordPayload(BaseModel):
     temporalStatus: Optional[str] = None
     historicalInfo: Optional[Dict[str, Any]] = None
     activeTrajectory: Optional[Dict[str, Any]] = None
+    completeTrack: Optional[List[Dict[str, Any]]] = None
+    internetSources: Optional[List[Dict[str, Any]]] = None
+    internetVerified: Optional[bool] = False
+    lifecycleDates: Optional[Dict[str, Any]] = None
 
     class Config:
         extra = "allow"

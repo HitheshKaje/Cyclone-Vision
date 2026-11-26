@@ -52,7 +52,7 @@ async def detect_cyclone(
                 "inference_time_ms": round(t_total * 1000, 1)
             }
 
-        # 1. Engine: High-Accuracy Google Gemini Vision AI API (Exclusively)
+        # 1. Engine: Google Gemini Vision AI API with automatic Local CV Offline Fallback
         try:
             result = cloud_vision_service.detect_with_gemini(
                 image_bytes, 
@@ -63,11 +63,20 @@ async def detect_cyclone(
             if result.get("is_valid_satellite") is False:
                 return result
         except Exception as g_err:
-            logger.error(f"[Detect API] Gemini engine error: {g_err}")
-            raise HTTPException(
-                status_code=502,
-                detail=f"Google Gemini Vision API detection error: {str(g_err)}. Please add fresh API keys."
-            )
+            logger.warning(f"[Detect API] Cloud Gemini unreachable ({g_err}). Engaging Local Computer Vision Fallback...")
+            try:
+                result = cloud_vision_service.detect_with_cv_fallback(
+                    image_bytes,
+                    mode=mode or "demo",
+                    filename=image.filename,
+                    note=str(g_err),
+                )
+            except Exception as cv_err:
+                logger.error(f"[Detect API] Both Cloud & Local CV detection failed: {cv_err}")
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Detection error: Cloud API unavailable ({str(g_err)}) and CV fallback failed ({str(cv_err)})."
+                )
 
         # 3. Ensure coordinates are attached if cyclone is detected
         if result.get("is_cyclone") and (result.get("latitude") is None or result.get("longitude") is None):

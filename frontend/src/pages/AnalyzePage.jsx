@@ -468,6 +468,10 @@ const AnalyzePage = ({
       const temporalStatus = detectData.temporal_status || (operationalMode === 'live' ? 'ACTIVE_PRESENT' : null);
       const historicalInfo = detectData.historical_info || null;
       const activeTrajectory = detectData.active_trajectory || null;
+      const completeTrack = Array.isArray(detectData.complete_track) ? detectData.complete_track : [];
+      const internetSources = Array.isArray(detectData.internet_sources) ? detectData.internet_sources : [];
+      const internetVerified = Boolean(detectData.internet_verified);
+      const lifecycleDates = detectData.lifecycle_dates || null;
 
       const analysisRecord = {
         id: Date.now().toString(),
@@ -479,6 +483,10 @@ const AnalyzePage = ({
         temporalStatus: temporalStatus,
         historicalInfo: historicalInfo,
         activeTrajectory: activeTrajectory,
+        completeTrack: completeTrack,
+        internetSources: internetSources,
+        internetVerified: internetVerified,
+        lifecycleDates: lifecycleDates,
         detection: detectData,
         intensity: intensityData,
         classification: classificationData,
@@ -706,9 +714,9 @@ const AnalyzePage = ({
                       }`}
                     >
                       {isAnalyzing ? (
-                        <><Loader2 size={18} className="animate-spin" /> {operationalMode === 'live' ? 'Ingesting Live Satellite Telemetry...' : 'Running AI Analysis...'}</>
+                        <><Loader2 size={18} className="animate-spin" /> {operationalMode === 'live' ? 'Searching Internet & Live Cyclone Feeds...' : 'Running AI Analysis...'}</>
                       ) : (
-                        <><Play size={16} className="fill-current" /> {operationalMode === 'live' ? '🔴 Analyze Live Cyclone & Predict Future Track' : 'Analyze Image'}</>
+                        <><Play size={16} className="fill-current" /> {operationalMode === 'live' ? '🔴 Search Internet & Analyze Live Cyclone' : 'Analyze Image'}</>
                       )}
                     </button>
                   </div>
@@ -927,32 +935,40 @@ const AnalyzePage = ({
                       {/* Header */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
                         <div className="flex items-center gap-3">
-                          <div className="p-2.5 rounded-xl bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/30">
-                            <Compass size={24} className="animate-pulse" />
+                          <div className={`p-2.5 rounded-xl border ${
+                            operationalMode === 'live' && currentAnalysis.temporalStatus === 'HISTORICAL'
+                              ? 'bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border-emerald-500/30'
+                              : 'bg-red-500/20 text-red-500 dark:text-red-400 border-red-500/30'
+                          }`}>
+                            {operationalMode === 'live' && currentAnalysis.temporalStatus === 'HISTORICAL'
+                              ? <CheckCircle2 size={24} />
+                              : <Compass size={24} className="animate-pulse" />}
                           </div>
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                                {operationalMode === 'live' && (currentAnalysis.cycloneName || currentAnalysis.historicalInfo?.name)
-                                  ? (currentAnalysis.cycloneName || currentAnalysis.historicalInfo?.name)
+                                {operationalMode === 'live' && (currentAnalysis.cycloneName || currentAnalysis.historicalInfo?.cyclone_name || currentAnalysis.historicalInfo?.name)
+                                  ? (currentAnalysis.cycloneName || currentAnalysis.historicalInfo?.cyclone_name || currentAnalysis.historicalInfo?.name)
                                   : 'Cyclone Detected — Coordinates & Location'}
                               </h3>
-                              {operationalMode === 'live' && currentAnalysis.temporalStatus === 'ACTIVE_PRESENT' ? (
-                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shadow-xs">
-                                  <Sparkles size={11} /> Live Satellite & Internet Intelligence
+                              {operationalMode === 'live' && currentAnalysis.temporalStatus === 'HISTORICAL' ? (
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-xs">
+                                  <CheckCircle2 size={11} /> Completed Cyclone (Verified Original Record)
                                 </span>
-                              ) : operationalMode === 'live' && currentAnalysis.historicalInfo ? (
-                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40 flex items-center gap-1 shadow-xs">
-                                  <History size={11} /> Historical Landmark Archive
+                              ) : operationalMode === 'live' && currentAnalysis.temporalStatus === 'ACTIVE_PRESENT' ? (
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1 shadow-xs">
+                                  <Radio size={11} className="animate-pulse" /> {currentAnalysis.internetVerified ? 'Currently Running (Live Internet Feed)' : 'Live Satellite & Internet Telemetry'}
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shadow-xs">
-                                  <Sparkles size={11} /> AI Georeferenced Coordinates
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center gap-1 shadow-xs">
+                                  <Sparkles size={11} /> Demo Mode: AI Georeferenced & Predicted
                                 </span>
                               )}
-                              {operationalMode === 'live' && currentAnalysis.historicalInfo?.season && (
+                              {operationalMode === 'live' && (currentAnalysis.historicalInfo?.season || currentAnalysis.lifecycleDates?.formed) && (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                                  {currentAnalysis.historicalInfo.season}
+                                  {currentAnalysis.lifecycleDates?.formed && currentAnalysis.lifecycleDates?.dissipated
+                                    ? `${currentAnalysis.lifecycleDates.formed} – ${currentAnalysis.lifecycleDates.dissipated}`
+                                    : currentAnalysis.historicalInfo?.season}
                                 </span>
                               )}
                             </div>
@@ -967,17 +983,47 @@ const AnalyzePage = ({
                         </div>
                       </div>
 
+                      {/* Original Intensity / Historical Summary & Track Indicator in Live Mode */}
+                      {operationalMode === 'live' && currentAnalysis.historicalInfo?.summary && (
+                        <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 text-xs text-slate-700 dark:text-slate-200 space-y-1.5">
+                          <p className="leading-relaxed font-medium">{currentAnalysis.historicalInfo.summary}</p>
+                          {Array.isArray(currentAnalysis.internetSources) && currentAnalysis.internetSources.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-emerald-200/60 dark:border-emerald-800/30 text-[11px]">
+                              <span className="font-bold text-emerald-700 dark:text-emerald-400">Internet Sources:</span>
+                              {currentAnalysis.internetSources.slice(0, 3).map((src, i) => (
+                                <a
+                                  key={i}
+                                  href={src.url || '#'}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 border border-emerald-300/60 dark:border-emerald-700/60 text-sky-600 dark:text-sky-400 hover:underline font-semibold truncate max-w-[220px]"
+                                >
+                                  {src.name}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Intensity & Landfall Details */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         {/* Peak Sustained Wind (Intensity) */}
                         <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
-                          <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400">
-                            <Wind size={15} /> Peak Sustained Wind
+                          <div className="flex items-center justify-between gap-2 text-xs font-bold text-amber-600 dark:text-amber-400">
+                            <span className="flex items-center gap-1.5">
+                              <Wind size={15} /> {operationalMode === 'live' && (currentAnalysis.intensity?.is_original_verified || currentAnalysis.historicalInfo) ? 'Original Verified Peak Wind' : 'Peak Sustained Wind'}
+                            </span>
+                            {operationalMode === 'live' && currentAnalysis.intensity?.estimated_pressure_mb && (
+                              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                {currentAnalysis.intensity.estimated_pressure_mb} hPa
+                              </span>
+                            )}
                           </div>
                           <p className="text-lg font-black text-slate-900 dark:text-white">
                             {currentAnalysis.intensity?.wind_speed_kt || currentAnalysis.detection?.wind_speed_kt || (operationalMode === 'live' && currentAnalysis.historicalInfo?.peak_intensity_kt) || 65} kt
                             <span className="text-xs font-normal text-slate-500 ml-1.5">
-                              (~{currentAnalysis.intensity?.wind_speed_kmh || Math.round((currentAnalysis.intensity?.wind_speed_kt || 65) * 1.852)} km/h)
+                              (~{currentAnalysis.intensity?.wind_speed_kmh || (operationalMode === 'live' && currentAnalysis.historicalInfo?.peak_intensity_kmh) || Math.round((currentAnalysis.intensity?.wind_speed_kt || 65) * 1.852)} km/h)
                             </span>
                           </p>
                           <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
@@ -985,8 +1031,22 @@ const AnalyzePage = ({
                           </p>
                         </div>
 
-                        {/* Card 2: Only show Landfall / Track in Live Mode. In Demo Mode, show Central Pressure / Threat Level */}
-                        {operationalMode === 'live' && currentAnalysis.activeTrajectory?.projected_landfall ? (
+                        {/* Card 2: Show Completed Landfall / Live Projected Landfall in Live Mode, Central Pressure in Demo Mode */}
+                        {operationalMode === 'live' && currentAnalysis.historicalInfo?.actual_landfall ? (
+                          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
+                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                              <Anchor size={15} /> Actual Landfall & Complete Track
+                            </div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">
+                              {currentAnalysis.historicalInfo.actual_landfall}
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {Array.isArray(currentAnalysis.completeTrack) && currentAnalysis.completeTrack.length > 0
+                                ? `Complete Track Verified (${currentAnalysis.completeTrack.length} Lifecycle Waypoints)`
+                                : 'IMD Official Meteorological Archive'}
+                            </p>
+                          </div>
+                        ) : operationalMode === 'live' && currentAnalysis.activeTrajectory?.projected_landfall ? (
                           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
                             <div className="flex items-center gap-2 text-xs font-bold text-rose-600 dark:text-rose-400">
                               <Compass size={15} /> Projected Landfall & Track
@@ -996,18 +1056,6 @@ const AnalyzePage = ({
                             </p>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400">
                               Live Satellite Tracking ({currentAnalysis.activeTrajectory.movement_direction || 'WNW Direction'})
-                            </p>
-                          </div>
-                        ) : operationalMode === 'live' && currentAnalysis.historicalInfo?.actual_landfall ? (
-                          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
-                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                              <Anchor size={15} /> Actual Landfall Recorded
-                            </div>
-                            <p className="text-sm font-black text-slate-900 dark:text-white">
-                              {currentAnalysis.historicalInfo.actual_landfall}
-                            </p>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                              IMD Official Archive
                             </p>
                           </div>
                         ) : operationalMode === 'live' && currentAnalysis.activeTrajectory?.closest_port ? (
@@ -1028,7 +1076,7 @@ const AnalyzePage = ({
                               <Activity size={15} /> Estimated Central Pressure
                             </div>
                             <p className="text-lg font-black text-slate-900 dark:text-white">
-                              {currentAnalysis.intensity?.pressure_mb || 968} hPa
+                              {currentAnalysis.intensity?.pressure_mb || currentAnalysis.intensity?.estimated_pressure_mb || 968} hPa
                               <span className="text-xs font-normal text-slate-500 ml-1.5">
                                 (Barometric Core)
                               </span>
@@ -1096,10 +1144,18 @@ const AnalyzePage = ({
                         <button
                           type="button"
                           onClick={() => handleNavigateWithSync('map')}
-                          className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-600/30 transition-all cursor-pointer active:scale-95"
+                          className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer active:scale-95 text-white ${
+                            operationalMode === 'live' && currentAnalysis.temporalStatus === 'HISTORICAL' && Array.isArray(currentAnalysis.completeTrack) && currentAnalysis.completeTrack.length > 0
+                              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/30'
+                              : 'bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 shadow-sky-600/30'
+                          }`}
                         >
                           <Map size={17} />
-                          <span>View on Live Cyclone Map ({latitude}°N, {longitude}°E)</span>
+                          <span>
+                            {operationalMode === 'live' && currentAnalysis.temporalStatus === 'HISTORICAL' && Array.isArray(currentAnalysis.completeTrack) && currentAnalysis.completeTrack.length > 0
+                              ? `View Complete Cyclone Track on Map (${currentAnalysis.completeTrack.length} Points)`
+                              : `View on Live Cyclone Map (${latitude}°N, ${longitude}°E)`}
+                          </span>
                         </button>
 
                         <button
@@ -1108,7 +1164,11 @@ const AnalyzePage = ({
                           className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer active:scale-95"
                         >
                           <Navigation size={17} />
-                          <span>5-Day Track Prediction</span>
+                          <span>
+                            {operationalMode === 'live' && currentAnalysis.temporalStatus === 'HISTORICAL'
+                              ? 'Complete Track & Lifecycle View'
+                              : '5-Day Track Prediction'}
+                          </span>
                         </button>
 
                         <button

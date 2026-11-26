@@ -5,7 +5,7 @@ import {
   Calendar, Layers, MapPin, BarChart3, Map, Eye, Waves,
   UploadCloud, ImageIcon, Sparkles
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, Polygon, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Circle, Polygon, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { getApiBaseUrl } from '../utils/apiConfig';
@@ -60,15 +60,25 @@ const createDayMarkerIcon = (dayNumber, windKt) => {
   });
 };
 
-// Auto-center map helper
-function ChangeView({ center, zoom }) {
+// Auto-center map helper (supports either single center or full track bounding box)
+function ChangeView({ center, zoom, bounds }) {
   const map = useMap();
   useEffect(() => {
-    if (center && center[0] && center[1]) {
+    if (bounds && bounds.length > 1) {
+      map.fitBounds(bounds, { padding: [55, 55], maxZoom: 7, animate: true });
+    } else if (center && center[0] && center[1]) {
       map.setView(center, zoom, { animate: true });
     }
-  }, [center, zoom, map]);
+  }, [center, zoom, bounds, map]);
   return null;
+}
+
+function getHistTrackColor(windKt = 0, isLandfall = false, stage = '') {
+  if (isLandfall || String(stage).toLowerCase().includes('landfall')) return '#dc2626';
+  if (String(stage).toLowerCase().includes('dissipat')) return '#64748b';
+  if (windKt >= 64) return '#ef4444';
+  if (windKt >= 34) return '#f59e0b';
+  return '#10b981';
 }
 
 // Helper: Generate Continuous Uncertainty Cone Polygon (Envelope)
@@ -172,6 +182,16 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeMapLayer, setActiveMapLayer] = useState('satellite'); // Default to satellite view
+  const [showSimulatedDemo, setShowSimulatedDemo] = useState(false);
+
+  const isLiveMode = (currentAnalysis?.operationalMode || currentAnalysis?.detection?.operational_mode) === 'live';
+  const completeTrack = Array.isArray(currentAnalysis?.completeTrack) && currentAnalysis.completeTrack.length > 0
+    ? currentAnalysis.completeTrack
+    : (Array.isArray(currentAnalysis?.detection?.complete_track) ? currentAnalysis.detection.complete_track : []);
+  const isCompletedHistorical = Boolean(
+    isLiveMode && (currentAnalysis?.temporalStatus || currentAnalysis?.detection?.temporal_status) === 'HISTORICAL' && completeTrack.length > 0
+  );
+  const showingCompleteTrack = isCompletedHistorical && !showSimulatedDemo;
 
   // Core trajectory forecast calculation starting from (lat, lon) in the ocean
   const calculateTrackFromOcean = async (lat, lon, customStormName = null) => {
@@ -272,6 +292,7 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
       return;
     }
 
+    setShowSimulatedDemo(true);
     setIsExtracting(true);
     setExtractError(null);
 
@@ -338,17 +359,20 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
     calculateTrackFromOcean(inputLat, inputLon);
   }, []);
 
-  // Auto-synchronize when AI detected cyclone coordinates are extracted from uploaded image
+  // Auto-synchronize when AI detected cyclone coordinates or completed historical track changes
   useEffect(() => {
+    setShowSimulatedDemo(false);
     if (detectedLat !== null && detectedLon !== null && !isNaN(detectedLat) && !isNaN(detectedLon)) {
       setInputLat(detectedLat);
       setInputLon(detectedLon);
       if (currentAnalysis?.imagePreview || currentAnalysis?.preview) {
         setImagePreview(currentAnalysis.imagePreview || currentAnalysis.preview);
       }
-      calculateTrackFromOcean(detectedLat, detectedLon);
+      if (!(isLiveMode && currentAnalysis?.temporalStatus === 'HISTORICAL' && completeTrack.length > 0)) {
+        calculateTrackFromOcean(detectedLat, detectedLon);
+      }
     }
-  }, [detectedLat, detectedLon]);
+  }, [detectedLat, detectedLon, currentAnalysis?.id]);
 
   // Coordinates data for map
   const originPos = [Number(inputLat), Number(inputLon)];
@@ -358,6 +382,9 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
     : [];
 
   const conePolygonCoords = generateUncertaintyCone(originPos, forecastWaypoints);
+  const completeTrackBounds = showingCompleteTrack && completeTrack.length > 1
+    ? completeTrack.map(pt => [pt.lat, pt.lng])
+    : null;
 
   return (
     <div className="space-y-4 pb-12 animate-in fade-in duration-300">
@@ -387,9 +414,13 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
               </div>
               <div>
                 <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight flex flex-wrap items-center gap-2">
-                  <span>Tropical Cyclone Track Prediction</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-400 font-bold border border-sky-500/30">
-                    Ocean → Landfall
+                  <span>{showingCompleteTrack ? 'Complete Historical Cyclone Track' : 'Tropical Cyclone Track Prediction'}</span>
+                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                    showingCompleteTrack
+                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                      : 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30'
+                  }`}>
+                    {showingCompleteTrack ? `✅ Completed Track (${completeTrack.length} Waypoints)` : 'Ocean → Landfall'}
                   </span>
                 </h1>
                 
@@ -485,20 +516,56 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-2.5 px-1">
           
           {/* Simple Clean Legend */}
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-bold text-slate-700 dark:text-slate-300">
-            <div className="flex items-center gap-1.5 text-rose-500">
-              <span className="w-3 h-3 rounded-full bg-red-500 animate-ping inline-block"></span>
-              <span>🌀 Cyclone Origin ({Number(inputLat).toFixed(2)}°N, {Number(inputLon).toFixed(2)}°E)</span>
+          {showingCompleteTrack ? (
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-bold text-slate-700 dark:text-slate-300">
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] inline-block" /> Formation
+              </span>
+              <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] inline-block" /> Cyclonic Storm
+              </span>
+              <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] inline-block" /> Peak / Landfall
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-500">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#64748b] inline-block" /> Dissipated
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSimulatedDemo(true);
+                  calculateTrackFromOcean(inputLat, inputLon);
+                }}
+                className="text-[11px] font-bold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+              >
+                Preview 5-Day Projection
+              </button>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-              <span className="w-4 h-1 border-t-2 border-dashed border-white inline-block"></span>
-              <span>--- Predicted Track to Land</span>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-bold text-slate-700 dark:text-slate-300">
+              <div className="flex items-center gap-1.5 text-rose-500">
+                <span className="w-3 h-3 rounded-full bg-red-500 animate-ping inline-block"></span>
+                <span>🌀 Cyclone Origin ({Number(inputLat).toFixed(2)}°N, {Number(inputLon).toFixed(2)}°E)</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                <span className="w-4 h-1 border-t-2 border-dashed border-white inline-block"></span>
+                <span>--- Predicted Track to Land</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sky-600 dark:text-sky-400">
+                <span className="w-3 h-3 rounded-sm bg-sky-500/30 border border-sky-400 inline-block"></span>
+                <span>Uncertainty Cone</span>
+              </div>
+              {isCompletedHistorical && (
+                <button
+                  type="button"
+                  onClick={() => setShowSimulatedDemo(false)}
+                  className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                >
+                  Back to Complete Track
+                </button>
+              )}
             </div>
-            <div className="flex items-center gap-1.5 text-sky-600 dark:text-sky-400">
-              <span className="w-3 h-3 rounded-sm bg-sky-500/30 border border-sky-400 inline-block"></span>
-              <span>Uncertainty Cone</span>
-            </div>
-          </div>
+          )}
 
           {/* Layer Switcher: Street / Satellite / Ocean */}
           <div className="flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs">
@@ -551,7 +618,7 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
             style={{ height: '100%', width: '100%' }}
             scrollWheelZoom={true}
           >
-            <ChangeView center={originPos} zoom={5} />
+            <ChangeView center={originPos} zoom={5} bounds={completeTrackBounds} />
 
             {/* Base Tile Layer */}
             {activeMapLayer === 'standard' && (
@@ -581,77 +648,129 @@ const SevenDaysPrediction = ({ currentAnalysis }) => {
               />
             )}
 
-            {/* A. Continuous Shaded Cone of Uncertainty (Ocean to Landfall Envelope) */}
-            {conePolygonCoords.length > 2 && (
-              <Polygon
-                positions={conePolygonCoords}
-                pathOptions={{
-                  color: '#38bdf8',
-                  weight: 1.5,
-                  dashArray: '5, 5',
-                  fillColor: '#38bdf8',
-                  fillOpacity: 0.22
-                }}
-              />
-            )}
-
-            {/* B. Predicted Track Line from Ocean to Land (White Dashed Polyline) */}
-            {forecastCoords.length > 1 && (
-              <Polyline
-                positions={forecastCoords}
-                pathOptions={{
-                  color: '#ffffff',
-                  weight: 4,
-                  dashArray: '8, 8',
-                  opacity: 0.95
-                }}
-              />
-            )}
-
-            {/* C. Cyclone Eye Swirl Marker at Starting Ocean Coordinate */}
-            <Marker position={originPos} icon={cycloneSwirlIcon}>
-              <Popup>
-                <div className="p-1.5 text-xs">
-                  <div className="font-extrabold text-red-600 text-sm flex items-center gap-1.5">
-                    <span>🌀 {stormName}</span>
-                  </div>
-                  <div className="text-slate-600 dark:text-slate-300 mt-1">
-                    <strong>Starting Coordinates:</strong> {Number(inputLat).toFixed(2)}°N, {Number(inputLon).toFixed(2)}°E
-                  </div>
-                  <div className="text-slate-500 text-[11px] mt-0.5">
-                    Subbasin: {extractedInfo?.subbasin || 'Bay of Bengal'} ({extractedInfo?.confidence || 95}% Confidence)
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-
-            {/* D. Day 1 to Day 5 Waypoint Markers Moving Towards Land */}
-            {forecastWaypoints.map((wp) => {
-              const wind = wp.wind_speed_kt || Math.max(35, 90 - wp.step * 10);
-              return (
-                <Marker
-                  key={`day-wp-${wp.step}`}
-                  position={[wp.latitude, wp.longitude]}
-                  icon={createDayMarkerIcon(wp.step, wind)}
-                >
-                  <Popup>
-                    <div className="p-2 text-xs min-w-[190px]">
-                      <div className="font-extrabold text-slate-900 border-b pb-1 mb-1">
-                        Day {wp.step} (+{wp.horizon_hours} Hours)
-                      </div>
-                      <div className="space-y-0.5 text-slate-600">
-                        <div><strong>Target Lat/Lon:</strong> {wp.latitude}°N, {wp.longitude}°E</div>
-                        <div><strong>Wind Speed:</strong> ~{wind} knots</div>
-                        <div><strong>Expected Arrival:</strong> {new Date(wp.arrival_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit' })}</div>
-                        <div className="text-[11px] font-bold text-amber-600 pt-1">
-                          {wp.stage || (wp.step >= 4 ? "Landfall / Coastal Region" : "Inland Movement")}
+            {showingCompleteTrack ? (
+              <>
+                {/* COMPLETE VERIFIED HISTORICAL CYCLONE TRACK */}
+                <Polyline
+                  positions={completeTrack.map(pt => [pt.lat, pt.lng])}
+                  pathOptions={{ color: '#0f172a', weight: 6.5, opacity: 0.55, lineCap: 'round', lineJoin: 'round' }}
+                />
+                {completeTrack.slice(0, -1).map((pt, idx) => {
+                  const nextPt = completeTrack[idx + 1];
+                  const segColor = getHistTrackColor(
+                    Math.max(pt.wind_kt || 0, nextPt.wind_kt || 0),
+                    nextPt.is_landfall,
+                    nextPt.stage
+                  );
+                  return (
+                    <Polyline
+                      key={`sd-hist-seg-${idx}`}
+                      positions={[[pt.lat, pt.lng], [nextPt.lat, nextPt.lng]]}
+                      pathOptions={{ color: segColor, weight: 4, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }}
+                    />
+                  );
+                })}
+                {completeTrack.map((pt, idx) => {
+                  const ptColor = getHistTrackColor(pt.wind_kt || 0, pt.is_landfall, pt.stage);
+                  return (
+                    <CircleMarker
+                      key={`sd-hist-wp-${idx}`}
+                      center={[pt.lat, pt.lng]}
+                      radius={pt.is_landfall ? 8.5 : (idx === 0 ? 7.5 : 6)}
+                      pathOptions={{ color: '#ffffff', fillColor: ptColor, fillOpacity: 1, weight: 2 }}
+                    >
+                      <Popup>
+                        <div className="p-1.5 text-xs min-w-[200px]">
+                          <div className="font-extrabold border-b pb-1 mb-1" style={{ color: ptColor }}>
+                            #{pt.step || idx + 1} • {pt.stage}
+                          </div>
+                          <div className="space-y-0.5 text-slate-700">
+                            <div><strong>Date:</strong> {pt.date_display} {pt.time_display}</div>
+                            <div><strong>Position:</strong> {pt.lat}°N, {pt.lng}°E</div>
+                            <div><strong>Original Wind:</strong> {pt.wind_kmh} km/h ({pt.wind_kt} kt)</div>
+                            {pt.pressure_mb && <div><strong>Pressure:</strong> {pt.pressure_mb} hPa</div>}
+                          </div>
                         </div>
+                      </Popup>
+                    </CircleMarker>
+                  );
+                })}
+              </>
+            ) : (
+              <>
+                {/* A. Continuous Shaded Cone of Uncertainty (Ocean to Landfall Envelope) */}
+                {conePolygonCoords.length > 2 && (
+                  <Polygon
+                    positions={conePolygonCoords}
+                    pathOptions={{
+                      color: '#38bdf8',
+                      weight: 1.5,
+                      dashArray: '5, 5',
+                      fillColor: '#38bdf8',
+                      fillOpacity: 0.22
+                    }}
+                  />
+                )}
+
+                {/* B. Predicted Track Line from Ocean to Land (White Dashed Polyline) */}
+                {forecastCoords.length > 1 && (
+                  <Polyline
+                    positions={forecastCoords}
+                    pathOptions={{
+                      color: '#ffffff',
+                      weight: 4,
+                      dashArray: '8, 8',
+                      opacity: 0.95
+                    }}
+                  />
+                )}
+
+                {/* C. Cyclone Eye Swirl Marker at Starting Ocean Coordinate */}
+                <Marker position={originPos} icon={cycloneSwirlIcon}>
+                  <Popup>
+                    <div className="p-1.5 text-xs">
+                      <div className="font-extrabold text-red-600 text-sm flex items-center gap-1.5">
+                        <span>🌀 {stormName}</span>
+                      </div>
+                      <div className="text-slate-600 dark:text-slate-300 mt-1">
+                        <strong>Starting Coordinates:</strong> {Number(inputLat).toFixed(2)}°N, {Number(inputLon).toFixed(2)}°E
+                      </div>
+                      <div className="text-slate-500 text-[11px] mt-0.5">
+                        Subbasin: {extractedInfo?.subbasin || 'Bay of Bengal'} ({extractedInfo?.confidence || 95}% Confidence)
                       </div>
                     </div>
                   </Popup>
                 </Marker>
-              );
-            })}
+
+                {/* D. Day 1 to Day 5 Waypoint Markers Moving Towards Land */}
+                {forecastWaypoints.map((wp) => {
+                  const wind = wp.wind_speed_kt || Math.max(35, 90 - wp.step * 10);
+                  return (
+                    <Marker
+                      key={`day-wp-${wp.step}`}
+                      position={[wp.latitude, wp.longitude]}
+                      icon={createDayMarkerIcon(wp.step, wind)}
+                    >
+                      <Popup>
+                        <div className="p-2 text-xs min-w-[190px]">
+                          <div className="font-extrabold text-slate-900 border-b pb-1 mb-1">
+                            Day {wp.step} (+{wp.horizon_hours} Hours)
+                          </div>
+                          <div className="space-y-0.5 text-slate-600">
+                            <div><strong>Target Lat/Lon:</strong> {wp.latitude}°N, {wp.longitude}°E</div>
+                            <div><strong>Wind Speed:</strong> ~{wind} knots</div>
+                            <div><strong>Expected Arrival:</strong> {new Date(wp.arrival_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit' })}</div>
+                            <div className="text-[11px] font-bold text-amber-600 pt-1">
+                              {wp.stage || (wp.step >= 4 ? "Landfall / Coastal Region" : "Inland Movement")}
+                            </div>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+              </>
+            )}
 
           </MapContainer>
         </div>

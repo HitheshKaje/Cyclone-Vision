@@ -21,7 +21,8 @@ import {
   Loader2,
   CheckCircle2,
   MapPin,
-  Waves
+  Waves,
+  ExternalLink
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -93,6 +94,12 @@ const ResultsPage = ({
   const { detection, intensity, classification, fileName, imagePreview, timestamp } = currentAnalysis;
   const isValidSatellite = detection?.is_valid_satellite !== false;
   const isCyclone = detection?.is_cyclone === true;
+  const isLiveMode = currentAnalysis?.operationalMode === 'live';
+  const isCompletedCyclone = isLiveMode && currentAnalysis?.temporalStatus === 'HISTORICAL';
+  const completeTrack = Array.isArray(currentAnalysis?.completeTrack) ? currentAnalysis.completeTrack : [];
+  const historicalInfo = currentAnalysis?.historicalInfo || null;
+  const internetSources = Array.isArray(currentAnalysis?.internetSources) ? currentAnalysis.internetSources : [];
+  const lifecycleDates = currentAnalysis?.lifecycleDates || null;
   const validationMessage = detection?.validation_message;
   const confidencePercent = detection?.confidence_percent != null 
     ? detection.confidence_percent 
@@ -342,10 +349,18 @@ const ResultsPage = ({
             <>
               <button
                 onClick={() => setActiveTab('map')}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/20 active:scale-95"
+                className={`px-3.5 py-2 rounded-xl text-white font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 ${
+                  isCompletedCyclone && completeTrack.length > 0
+                    ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'
+                    : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20'
+                }`}
               >
                 <Map size={14} />
-                <span>View on Live Map ({displayLat}°N, {displayLon}°E)</span>
+                <span>
+                  {isCompletedCyclone && completeTrack.length > 0
+                    ? `View Complete Track (${completeTrack.length} Points)`
+                    : `View on Live Map (${displayLat}°N, ${displayLon}°E)`}
+                </span>
               </button>
 
               <button
@@ -353,7 +368,7 @@ const ResultsPage = ({
                 className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-purple-500/20 active:scale-95"
               >
                 <Navigation size={14} />
-                <span>5-Day Track</span>
+                <span>{isCompletedCyclone ? 'Complete Track Map' : '5-Day Track'}</span>
               </button>
             </>
           )}
@@ -391,6 +406,80 @@ const ResultsPage = ({
             <RotateCcw size={15} />
             <span>Upload Satellite Image</span>
           </button>
+        </div>
+      )}
+
+      {/* Live Mode Internet Verification & Lifecycle Card */}
+      {isLiveMode && isValidSatellite && isCyclone && (
+        <div className={`p-5 rounded-2xl border-2 shadow-sm space-y-3 ${
+          isCompletedCyclone
+            ? 'border-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/20'
+            : 'border-rose-500/40 bg-rose-50/60 dark:bg-rose-950/20'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl border ${
+                isCompletedCyclone
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                  : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+              }`}>
+                {isCompletedCyclone ? <CheckCircle2 size={22} /> : <Radio size={22} className="animate-pulse" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                    {currentAnalysis?.cycloneName || historicalInfo?.cyclone_name || 'Live Identified Cyclone'}
+                  </h2>
+                  <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${
+                    isCompletedCyclone
+                      ? 'bg-emerald-600 text-white border-emerald-500'
+                      : 'bg-rose-600 text-white border-rose-500'
+                  }`}>
+                    {isCompletedCyclone ? 'Completed Historical Storm • Verified' : (currentAnalysis?.internetVerified ? 'Currently Running Live' : 'Real-Time Observation')}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                  {isCompletedCyclone && historicalInfo
+                    ? `${historicalInfo.formed || lifecycleDates?.formed || ''} ${historicalInfo.dissipated ? `→ ${historicalInfo.dissipated}` : ''} • Landfall: ${historicalInfo.actual_landfall}`
+                    : (currentAnalysis?.activeTrajectory?.current_place || 'Live Internet Meteorological Verification Active')}
+                </p>
+              </div>
+            </div>
+
+            {completeTrack.length > 0 && (
+              <button
+                onClick={() => setActiveTab('map')}
+                className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs flex items-center gap-1.5 hover:opacity-90 transition-all cursor-pointer shrink-0 shadow-md"
+              >
+                <Map size={14} />
+                <span>Open Complete Track on Map ({completeTrack.length} Waypoints)</span>
+              </button>
+            )}
+          </div>
+
+          {historicalInfo?.summary && (
+            <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed bg-white/70 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200/70 dark:border-slate-800">
+              {historicalInfo.summary}
+            </p>
+          )}
+
+          {internetSources.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="font-bold text-slate-600 dark:text-slate-400">Verified Internet Records:</span>
+              {internetSources.map((src, idx) => (
+                <a
+                  key={idx}
+                  href={src.url || '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sky-600 dark:text-sky-400 hover:underline font-semibold"
+                >
+                  <span>{src.name}</span>
+                  <ExternalLink size={11} />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -640,7 +729,11 @@ const ResultsPage = ({
                 <div className="space-y-3">
                   <div className="flex items-baseline justify-between">
                     <div>
-                      <p className="text-xs text-slate-500 font-medium">Estimated Maximum Sustained Wind Speed</p>
+                      <p className="text-xs text-slate-500 font-medium">
+                        {intensity?.is_original_verified || isCompletedCyclone
+                          ? 'Official Original Maximum Sustained Wind Speed (Verified)'
+                          : 'Estimated Maximum Sustained Wind Speed'}
+                      </p>
                       <div className="flex items-baseline gap-2 mt-0.5">
                         <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100">
                           {windKt != null ? windKt : '—'}
